@@ -1,6 +1,23 @@
 #!/bin/bash
 # Quick production health checks after start/update.
 
+# Wait until backend responds (lifespan may still be running Alembic/bcrypt).
+wait_for_backend_health() {
+    local backend_port="${1:-8888}"
+    local max_attempts="${2:-30}"
+    local sleep_sec="${3:-2}"
+    local attempt=1
+
+    while [ "$attempt" -le "$max_attempts" ]; do
+        if curl -sf "http://127.0.0.1:${backend_port}/api/v1/system/health" > /dev/null 2>&1; then
+            return 0
+        fi
+        sleep "$sleep_sec"
+        attempt=$((attempt + 1))
+    done
+    return 1
+}
+
 check_service_health() {
     local backend_port="${1:-8888}"
     local frontend_port="${2:-4173}"

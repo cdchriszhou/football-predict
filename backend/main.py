@@ -2,11 +2,64 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from contextlib import asynccontextmanager
+import asyncio
 import os
 from config import CORS_ORIGINS, CORS_ALLOW_ORIGIN_REGEX, HOST, PORT, ADMIN_USERNAME, ADMIN_PASSWORD
 from db import init_db, close_db
 from db.redis_client import init_redis, close_redis
 from utils.logger import logger
+
+
+async def _background_startup():
+    """League seed, WC sync, empty-DB crawl — run after HTTP is up (may take minutes)."""
+    from db import async_session
+    from db.sqlite_write import commit_session, write_lock
+
+    from data.competitions import COMPETITIONS
+    from data.league_seed import ensure_league_data
+    async with write_lock:
+        async with async_session() as session:
+            for slug, comp in COMPETITIONS.items():
+                if comp.get("type") != "club":
+                    continue
+                try:
+                    result = await ensure_league_data(session, slug)
+                    if result.get("teams") or result.get("fixtures"):
+                        logger.info(f"League seed [{slug}]: {result}")
+                except Exception as e:
+                    logger.warning(f"League seed [{slug}] failed: {e}")
+            await commit_session(session)
+
+    from data.match_status import maintain_competition_matches
+    from crawler.worldcup_score_sync import refresh_fd_cache
+    async with write_lock:
+        async with async_session() as session:
+            try:
+                await refresh_fd_cache()
+                wc = await maintain_competition_matches(session, "worldcup-2026")
+                if any(wc.values()):
+                    logger.info(f"World Cup match maintenance on startup: {wc}")
+                await commit_session(session)
+            except Exception as e:
+                logger.warning(f"World Cup match maintenance on startup failed: {e}")
+
+    try:
+        from sqlalchemy import func, select
+        from db.models import Match
+        async with async_session() as session:
+            n = (await session.execute(select(func.count(Match.id)))).scalar() or 0
+        if n == 0:
+            logger.warning("Database has no matches — running initial schedule crawl")
+            async with write_lock:
+                async with async_session() as session:
+                    from crawler.schedule_crawler import run_schedule_crawler
+                    result = await run_schedule_crawler(session)
+                    await commit_session(session)
+                    logger.info(f"Initial schedule crawl: {result}")
+    except Exception as e:
+        logger.warning(f"Initial schedule crawl skipped: {e}")
+
+    logger.info("Background startup complete")
 
 
 @asynccontextmanager
@@ -17,8 +70,10 @@ async def lifespan(app: FastAPI):
     set_auth_credentials(ADMIN_USERNAME, ADMIN_PASSWORD)
     logger.info("Admin account: %s (password from ADMIN_PASSWORD env)", ADMIN_USERNAME)
 
+    bg_task = None
     try:
         await init_db()
+        logger.info("Database initialized")
         from db.models import User
         from db import async_session
         from db.sqlite_write import commit_session, write_lock
@@ -51,55 +106,11 @@ async def lifespan(app: FastAPI):
                         ADMIN_USERNAME,
                         admin_user.is_admin,
                     )
-        # 五大联赛：启动时仅做轻量种子（不阻塞 football-data 全量同步）
-        from data.competitions import COMPETITIONS
-        from data.league_seed import ensure_league_data
-        async with write_lock:
-            async with async_session() as session:
-                for slug, comp in COMPETITIONS.items():
-                    if comp.get("type") != "club":
-                        continue
-                    try:
-                        result = await ensure_league_data(session, slug)
-                        if result.get("teams") or result.get("fixtures"):
-                            logger.info(f"League seed [{slug}]: {result}")
-                    except Exception as e:
-                        logger.warning(f"League seed [{slug}] failed: {e}")
-                await commit_session(session)
-        # 世界杯：启动时同步已确认赛果，避免已结束比赛缺比分
-        from data.match_status import maintain_competition_matches
-        from crawler.worldcup_score_sync import refresh_fd_cache
-        async with write_lock:
-            async with async_session() as session:
-                try:
-                    await refresh_fd_cache()
-                    wc = await maintain_competition_matches(session, "worldcup-2026")
-                    if any(wc.values()):
-                        logger.info(f"World Cup match maintenance on startup: {wc}")
-                    await commit_session(session)
-                except Exception as e:
-                    logger.warning(f"World Cup match maintenance on startup failed: {e}")
     except Exception as e:
         logger.error(f"Database init failed: {e}")
     else:
-        # Fresh deploy: empty DB → seed schedule so dashboard is not blank
-        try:
-            from sqlalchemy import func, select
-            from db.models import Match
-            from db import async_session
-            from db.sqlite_write import commit_session, write_lock
-            async with async_session() as session:
-                n = (await session.execute(select(func.count(Match.id)))).scalar() or 0
-            if n == 0:
-                logger.warning("Database has no matches — running initial schedule crawl")
-                async with write_lock:
-                    async with async_session() as session:
-                        from crawler.schedule_crawler import run_schedule_crawler
-                        result = await run_schedule_crawler(session)
-                        await commit_session(session)
-                        logger.info(f"Initial schedule crawl: {result}")
-        except Exception as e:
-            logger.warning(f"Initial schedule crawl skipped: {e}")
+        bg_task = asyncio.create_task(_background_startup())
+
     try:
         await init_redis()
     except Exception as e:
@@ -111,6 +122,12 @@ async def lifespan(app: FastAPI):
         logger.error(f"Scheduler start failed: {e}")
     logger.info("System ready (some services may be degraded)")
     yield
+    if bg_task is not None and not bg_task.done():
+        bg_task.cancel()
+        try:
+            await bg_task
+        except asyncio.CancelledError:
+            pass
     try:
         from scheduler.jobs import stop_scheduler
         stop_scheduler()

@@ -142,11 +142,12 @@ BACKEND_PID=$!
 echo "$BACKEND_PID" > "$DIR/.backend.pid"
 log "Backend started (PID $BACKEND_PID)"
 
-sleep 3
-if ! curl -sf "http://127.0.0.1:${BACKEND_PORT}/api/v1/system/health" > /dev/null 2>&1; then
-    err "Backend failed health check — last 20 lines of backend.log:"
-    tail -n 20 "$DIR/backend.log" 2>/dev/null || true
-    err "Fix .env (ADMIN_PASSWORD, JWT_SECRET) or see backend.log"
+# shellcheck source=lib/health-check.sh
+source "$DIR/lib/health-check.sh"
+if ! wait_for_backend_health "$BACKEND_PORT" 45 2; then
+    err "Backend failed health check after ~90s — last 30 lines of backend.log:"
+    tail -n 30 "$DIR/backend.log" 2>/dev/null || true
+    err "Check .env (ADMIN_PASSWORD, JWT_SECRET), Alembic/DB lock, or see backend.log"
     exit 1
 fi
 log "Backend health OK"

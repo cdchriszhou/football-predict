@@ -288,12 +288,11 @@ else
 fi
 
 # Health check (frontend proxies /api -> backend; 401 on competitions without token is OK)
-sleep 3
 if [ -f "$DEPLOY_DIR/lib/health-check.sh" ]; then
     sed -i 's/\r$//' "$DEPLOY_DIR/lib/health-check.sh" 2>/dev/null || true
     # shellcheck source=lib/health-check.sh
     source "$DEPLOY_DIR/lib/health-check.sh"
-    if check_service_health 8888 4173; then
+    if wait_for_backend_health 8888 45 2 && check_service_health 8888 4173; then
         log "Service health checks passed"
     else
         warn "Some health checks failed — see backend.log / frontend.log"
