@@ -1,0 +1,32 @@
+﻿.\venv\Scripts\python.exe : D:\Works\CursorSpace\worldcup-2026-predict\backend\config.py:33: UserWarning: ADMIN_PASSWOR
+D not set — using dev default 'changeme-dev'
+所在位置 C:\Users\zhouyl01\AppData\Local\Temp\ps-script-cf2a9d5e-9e48-459b-a734-d380b97cc96d.ps1:87 字符: 79
++ ... ONPATH="."; .\venv\Scripts\python.exe scripts\diagnose_june21.py 2>&1 ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (D:\Works\Cursor... 'changeme-dev':String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+  warnings.warn("ADMIN_PASSWORD not set — using dev default 'changeme-dev'", stacklevel=1)
+============================================================
+日本 vs 突尼斯  实际 4:0 (主胜)
+  W/D/L pred 63/22/15% -> 主胜  ok=True
+  比分推荐 ['2:0', '2:1', '1:1']  三选命中=False
+  CRS keys=31  SPF=[1.36, 4.05, 6.8]
+  CRS top6: [('2:0', 4.95), ('2:1', 5.5), ('1:0', 6.4), ('1:1', 8.0), ('3:1', 9.25), ('3:0', 9.5)]
+  pipeline replay: ['4:1', '2:1', '1:1'] upset=1:1
+  replay primary=False triple=False
+============================================================
+德国 vs 科特迪瓦  实际 2:1 (主胜)
+  W/D/L pred 67/19/15% -> 主胜  ok=True
+  比分推荐 ['1:0', '1:1', '0:1']  三选命中=False
+  CRS keys=0  SPF=None
+============================================================
+库拉索 vs 厄瓜多尔  实际 0:0 (平)
+  W/D/L pred 15/12/73% -> 客胜  ok=False
+  比分推荐 ['0:3', '0:2', '1:0']  三选命中=False
+  CRS keys=0  SPF=None
+============================================================
+荷兰 vs 瑞典  实际 5:1 (主胜)
+  W/D/L pred 61/21/17% -> 主胜  ok=True
+  比分推荐 ['2:0', '1:0', '0:1']  三选命中=False
+  CRS keys=0  SPF=None

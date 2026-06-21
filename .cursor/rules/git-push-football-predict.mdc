@@ -1,0 +1,21 @@
+---
+description: 每次代码修改完成后提交并推送到 GitHub football-predict 仓库
+alwaysApply: true
+---
+
+# Git 提交与推送
+
+完成代码修改后，除非用户明确说「不要提交」，否则必须：
+
+1. 在 `d:\Works\CursorSpace\worldcup-2026-predict` 执行 git 工作流
+2. 提交到远程：`https://github.com/cdchriszhou/football-predict.git`（分支 `main`）
+3. 不要提交 `.env`、密钥、`venv/`、`node_modules/`、`*.db`、`*.zip`
+
+## 流程
+
+- `git status` / `git diff` 确认变更
+- `git add` 相关文件（勿含敏感文件）
+- 写简洁 commit message（说明 why）
+- `git push origin main`
+
+若 push 被拒，先 `git pull --rebase origin main` 再 push；不要 force push 除非用户明确要求。

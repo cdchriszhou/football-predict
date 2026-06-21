@@ -1,0 +1,61 @@
+[
+  {
+    "match": "美国 vs 澳大利亚",
+    "actual": "2-0 (主胜)",
+    "db_result": null,
+    "wdl": null,
+    "scores": null,
+    "upset": null,
+    "confidence": null,
+    "rank": null,
+    "reason_snip": null,
+    "error": "DB 未找到该对阵"
+  },
+  {
+    "match": "苏格兰 vs 摩洛哥",
+    "actual": "0-1 (客胜)",
+    "db_result": null,
+    "wdl": null,
+    "scores": null,
+    "upset": null,
+    "confidence": null,
+    "rank": null,
+    "reason_snip": null,
+    "error": "DB 未找到该对阵"
+  },
+  {
+    "match": "巴西 vs 海地",
+    "actual": "3-0 (主胜)",
+    "db_result": null,
+    "wdl": {
+      "win": 86.9,
+      "draw": 4.6,
+      "lose": 8.5,
+      "check": "命中"
+    },
+    "scores": [
+      "2:0",
+      "3:0"
+    ],
+    "upset": "1:1",
+    "confidence": 0.9,
+    "rank": {
+      "巴西": 6,
+      "海地": 72
+    },
+    "reason_snip": "[deepseek] 【排名/实力】巴西FIFA第6，海地第72，实力差距悬殊。巴西进攻88、防守85，海地进攻60、防守57，攻防全面碾压。【战术克制】巴西攻势足球对阵海地快速反击，但海地身体对抗59，难以抵挡巴西速度89与身体87的冲击。【核心球员】维尼修斯、内马尔等能力90+，海地最高能力仅69，个人能力决定比赛。【盘口信号】虽无盘口，但基于实力差，预期巴西净胜4球以上，首选比分4-0、5-",
+    "score_hit": true
+  },
+  {
+    "match": "土耳其 vs 巴拉圭",
+    "actual": "0-1 (客胜)",
+    "db_result": null,
+    "wdl": null,
+    "scores": null,
+    "upset": null,
+    "confidence": null,
+    "rank": null,
+    "reason_snip": null,
+    "error": "DB 未找到该对阵"
+  }
+]

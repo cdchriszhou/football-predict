@@ -1,0 +1,83 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Helvetica Neue', Helvetica, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.page-header {
+  margin-bottom: 24px;
+}
+.page-header h2 {
+  font-size: 24px;
+  color: #1a237e;
+  font-weight: 700;
+}
+.page-header p {
+  color: #666;
+  margin-top: 4px;
+}
+
+.stat-card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+  transition: transform 0.2s;
+}
+.stat-card:hover {
+  transform: translateY(-2px);
+}
+
+.flex-between {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.team-flag {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: #e0e0e0;
+}
+
+.prediction-bar {
+  display: flex;
+  height: 8px;
+  border-radius: 4px;
+  overflow: hidden;
+  background: #eee;
+}
+.prediction-bar .win { background: #4caf50; }
+.prediction-bar .draw { background: #ff9800; }
+.prediction-bar .lose { background: #f44336; }
+
+.text-win { color: #4caf50; font-weight: 600; }
+.text-draw { color: #ff9800; font-weight: 600; }
+.text-lose { color: #f44336; font-weight: 600; }
+
+/* ── Responsive utilities ── */
+.hide-on-mobile { display: block; }
+.show-on-mobile { display: none; }
+
+.table-responsive {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ── Mobile breakpoint (<768px) ── */
+@media (max-width: 767px) {
+  .hide-on-mobile { display: none !important; }
+  .show-on-mobile { display: block !important; }
+
+  .page-header { margin-bottom: 16px; }
+  .page-header h2 { font-size: 18px; }
+
+  .stat-card { padding: 12px; }
+}

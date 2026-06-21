@@ -1,0 +1,18 @@
+# Windows batch must use CRLF (cmd.exe breaks on LF-only .bat)
+*.bat text eol=crlf
+build.bat text eol=crlf
+start.bat text eol=crlf
+stop.bat text eol=crlf
+
+# Shell scripts must use LF on Linux servers
+*.sh text eol=lf
+update.sh text eol=lf
+install.sh text eol=lf
+start.sh text eol=lf
+start-prod.sh text eol=lf
+stop.sh text eol=lf
+stop-prod.sh text eol=lf
+build.sh text eol=lf
+lib/*.sh text eol=lf
+.env text eol=lf
+.env.example text eol=lf

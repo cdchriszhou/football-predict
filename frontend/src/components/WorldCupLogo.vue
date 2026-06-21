@@ -1,0 +1,45 @@
+<template>
+  <svg
+    :width="size"
+    :height="size"
+    viewBox="0 0 120 120"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <!-- Circle background -->
+    <circle cx="60" cy="60" r="58" fill="url(#bg-gradient)" stroke="#D4AF37" stroke-width="2"/>
+
+    <!-- Trophy cup -->
+    <path d="M60 20 L48 52 L35 52 C32 52 28 55 28 58 C28 70 40 78 55 80.5 L55 90 L45 90 L42 96 L78 96 L75 90 L65 90 L65 80.5 C80 78 92 70 92 58 C92 55 88 52 85 52 L72 52 Z"
+          fill="url(#trophy-gold)" stroke="#B8960C" stroke-width="1.5"/>
+
+    <!-- Trophy handles -->
+    <path d="M48 52 C40 48 32 44 28 44 C25 44 22 47 22 52 C22 58 26 62 30 62 C35 62 40 58 42 55"
+          fill="none" stroke="url(#trophy-gold)" stroke-width="4" stroke-linecap="round"/>
+    <path d="M72 52 C80 48 88 44 92 44 C95 44 98 47 98 52 C98 58 94 62 90 62 C85 62 80 58 78 55"
+          fill="none" stroke="url(#trophy-gold)" stroke-width="4" stroke-linecap="round"/>
+
+    <!-- 26 text -->
+    <text x="60" y="110" text-anchor="middle" font-size="18" font-weight="900"
+          fill="#D4AF37" font-family="Arial, sans-serif" letter-spacing="2">26</text>
+
+    <!-- Gradients -->
+    <defs>
+      <linearGradient id="bg-gradient" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stop-color="#1a237e"/>
+        <stop offset="100%" stop-color="#0d47a1"/>
+      </linearGradient>
+      <linearGradient id="trophy-gold" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#FFD700"/>
+        <stop offset="50%" stop-color="#D4AF37"/>
+        <stop offset="100%" stop-color="#B8960C"/>
+      </linearGradient>
+    </defs>
+  </svg>
+</template>
+
+<script setup>
+defineProps({
+  size: { type: [Number, String], default: 48 }
+})
+</script>

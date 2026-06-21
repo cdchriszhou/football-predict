@@ -1,0 +1,20 @@
+# Clash 体彩规则 — 按部署环境二选一
+#
+# ========== 国内电脑部署（你的情况）==========
+# 体彩必须 DIRECT 直连，不要走代理节点（尤其勿走海外节点）：
+rules:
+  - DOMAIN-SUFFIX,sporttery.cn,DIRECT
+  - DOMAIN-SUFFIX,webapi.sporttery.cn,DIRECT
+#
+# .env:
+#   SPORTTERY_DIRECT=true
+#   不要设置 SPORTTERY_PROXY
+#   CRAWLER_PROXY 仅给 The Odds API 用，体彩会自动直连
+#
+# ========== 海外服务器部署 ==========
+# 将「中国大陆」替换为 Clash 里的中国节点策略组：
+#   - DOMAIN-SUFFIX,sporttery.cn,中国大陆
+#   - DOMAIN-SUFFIX,webapi.sporttery.cn,中国大陆
+# .env: SPORTTERY_PROXY=http://127.0.0.1:7890
+#
+# 修改后: 重载 Clash → 重启后端 → 管理后台「检测体彩连通性」
