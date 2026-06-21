@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url'
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url))
 const DIST = join(__dirname, 'dist')
-const API_TARGET = 'http://localhost:8888'
+const API_TARGET = process.env.BACKEND_URL || process.env.API_TARGET || 'http://127.0.0.1:8888'
 const PORT = parseInt(process.env.PORT || '4173', 10)
 
 const MIME = {

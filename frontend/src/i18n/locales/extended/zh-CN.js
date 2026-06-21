@@ -225,6 +225,8 @@ export default {
     statusRunning: '运行中',
     statusChecking: '检测中...',
     statusConnectFail: '连接失败',
+    statusBackendUnreachable: '后端不可达（检查 start-prod / 登录服务器地址留空）',
+    statusDbEmpty: '数据库为空（{n} 场），请运行爬虫或恢复 worldcup2026.db',
     notConfigured: '未配置',
     configured: '已配置',
     apiKey: 'API Key',

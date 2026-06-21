@@ -81,6 +81,25 @@ async def lifespan(app: FastAPI):
                     logger.warning(f"World Cup match maintenance on startup failed: {e}")
     except Exception as e:
         logger.error(f"Database init failed: {e}")
+    else:
+        # Fresh deploy: empty DB → seed schedule so dashboard is not blank
+        try:
+            from sqlalchemy import func, select
+            from db.models import Match
+            from db import async_session
+            from db.sqlite_write import commit_session, write_lock
+            async with async_session() as session:
+                n = (await session.execute(select(func.count(Match.id)))).scalar() or 0
+            if n == 0:
+                logger.warning("Database has no matches — running initial schedule crawl")
+                async with write_lock:
+                    async with async_session() as session:
+                        from crawler.schedule_crawler import run_schedule_crawler
+                        result = await run_schedule_crawler(session)
+                        await commit_session(session)
+                        logger.info(f"Initial schedule crawl: {result}")
+        except Exception as e:
+            logger.warning(f"Initial schedule crawl skipped: {e}")
     try:
         await init_redis()
     except Exception as e:
@@ -160,7 +179,9 @@ from api.data import router as data_router
 from api.competitions import router as competitions_router
 from api.sporttery import router as sporttery_router
 from api.hkjc import router as hkjc_router
+from api.system import router as system_router
 
+app.include_router(system_router, prefix="/api/v1/system", tags=["系统"])
 app.include_router(auth_router, prefix="/api/v1/auth", tags=["认证"])
 app.include_router(competitions_router, prefix="/api/v1/competitions", tags=["赛事"])
 app.include_router(matches_router, prefix="/api/v1/matches", tags=["赛程"])

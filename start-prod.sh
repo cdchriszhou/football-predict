@@ -112,6 +112,20 @@ if [ -f "$DIR/.env" ]; then
     log "Loaded $DIR/.env"
 fi
 
+# Production defaults when .env missing or APP_ENV unset
+export APP_ENV="${APP_ENV:-production}"
+if [ "$APP_ENV" = "production" ]; then
+    if [ -z "${ADMIN_PASSWORD:-}" ] || [ "$ADMIN_PASSWORD" = "change-me-in-production" ]; then
+        err "APP_ENV=production but ADMIN_PASSWORD is unset or still placeholder — edit .env"
+        exit 1
+    fi
+    if [ -z "${JWT_SECRET:-}" ] || [ "$JWT_SECRET" = "change-me-in-production" ]; then
+        err "APP_ENV=production but JWT_SECRET is unset or still placeholder — edit .env"
+        exit 1
+    fi
+    log "APP_ENV=production"
+fi
+
 ensure_python_venv "$BACKEND_DIR"
 log "Python venv ready"
 pip install -r "$BACKEND_DIR/requirements.txt" -q
@@ -122,13 +136,20 @@ fuser -k ${BACKEND_PORT}/tcp 2>/dev/null || true
 sleep 1
 
 cd "$BACKEND_DIR"
-nohup python3 -m uvicorn main:app --host 0.0.0.0 --port $BACKEND_PORT \
+nohup env APP_ENV="${APP_ENV:-production}" python3 -m uvicorn main:app --host 0.0.0.0 --port $BACKEND_PORT \
     > "$DIR/backend.log" 2>&1 &
 BACKEND_PID=$!
 echo "$BACKEND_PID" > "$DIR/.backend.pid"
 log "Backend started (PID $BACKEND_PID)"
 
-sleep 2
+sleep 3
+if ! curl -sf "http://127.0.0.1:${BACKEND_PORT}/api/v1/system/health" > /dev/null 2>&1; then
+    err "Backend failed health check — last 20 lines of backend.log:"
+    tail -n 20 "$DIR/backend.log" 2>/dev/null || true
+    err "Fix .env (ADMIN_PASSWORD, JWT_SECRET) or see backend.log"
+    exit 1
+fi
+log "Backend health OK"
 
 # ── Frontend prod server ─────────────────────────────────
 

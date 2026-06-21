@@ -487,6 +487,7 @@
 import { ref, reactive, computed, onMounted, onUnmounted, inject, watch, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { healthCheck, triggerCrawler, getCrawlerStatus, triggerBatchPredict, getBatchPredictStatus, getConfig, saveConfig, testApiConnection, testOddsApiConnection, testFootballDataConnection, probeSporttery, generateInviteCode, getInviteCodes, deleteInviteCode, getUsers, resetUserPassword, toggleUserActive, updateUserAccess, getRuntimeLogs } from '@/api/admin'
+import { getSystemHealth } from '@/api/system'
 import { Plus, CopyDocument, User, UserFilled, Refresh } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { modelLabel, useModelOptions } from '@/i18n/helpers'
@@ -559,17 +560,31 @@ function displayModelLabel(m) {
 async function checkHealth() {
   healthState.value.forEach(h => { h.msg = t('admin.statusChecking') })
   try {
-    const res = await healthCheck()
+    const res = await getSystemHealth()
     healthState.value[0].ok = res.data.database === 'ok'
-    healthState.value[0].msg = res.data.database === 'ok' ? t('admin.statusOk') : t('admin.statusError')
+    healthState.value[0].msg = res.data.database === 'ok'
+      ? (res.data.match_count > 0
+        ? t('admin.statusOk')
+        : t('admin.statusDbEmpty', { n: res.data.match_count ?? 0 }))
+      : t('admin.statusError')
     const redisStatus = res.data.redis
     healthState.value[1].ok = redisStatus === 'ok' || redisStatus === 'memory'
     healthState.value[1].msg = redisStatus === 'ok' ? t('admin.statusOk') : redisStatus === 'memory' ? t('admin.statusMemory') : t('admin.statusUnavailable')
-  } catch {
+    healthState.value[2].ok = !!res.data.ai_configured
+    healthState.value[2].msg = res.data.ai_configured
+      ? (res.data.active_model || t('admin.statusOk'))
+      : t('admin.noApiKey')
+    healthState.value[3].ok = res.data.status === 'running'
+    healthState.value[3].msg = res.data.status === 'running' ? t('admin.statusRunning') : t('admin.statusError')
+  } catch (e) {
     healthState.value[0].ok = false
-    healthState.value[0].msg = t('admin.statusConnectFail')
+    healthState.value[0].msg = t('admin.statusBackendUnreachable')
     healthState.value[1].ok = false
-    healthState.value[1].msg = t('admin.statusConnectFail')
+    healthState.value[1].msg = t('admin.statusBackendUnreachable')
+    healthState.value[2].ok = false
+    healthState.value[2].msg = t('admin.statusBackendUnreachable')
+    healthState.value[3].ok = false
+    healthState.value[3].msg = e?.message || t('admin.statusConnectFail')
   }
 }
 
@@ -588,17 +603,21 @@ async function loadConfig() {
     configSaved.value = false
 
     const anyConfigured = config.deepseek_configured || config.qwen_configured || config.glm_configured || config.fallback_configured
-    healthState.value[2].ok = anyConfigured
-    healthState.value[2].msg = anyConfigured
-      ? config.available_models?.map(m => displayModelLabel(m)).join(' / ') || displayModelLabel(config.active_model)
-      : t('admin.noApiKey')
-    healthState.value[3].ok = true
-    healthState.value[3].msg = t('admin.statusRunning')
+    if (!healthState.value[2].ok) {
+      healthState.value[2].ok = anyConfigured
+      healthState.value[2].msg = anyConfigured
+        ? config.available_models?.map(m => displayModelLabel(m)).join(' / ') || displayModelLabel(config.active_model)
+        : t('admin.noApiKey')
+    }
+    if (!healthState.value[3].ok) {
+      healthState.value[3].ok = true
+      healthState.value[3].msg = t('admin.statusRunning')
+    }
   } catch {
-    healthState.value[2].ok = false
-    healthState.value[2].msg = t('admin.statusConnectFail')
-    healthState.value[3].ok = false
-    healthState.value[3].msg = t('admin.statusConnectFail')
+    if (!healthState.value[2].msg || healthState.value[2].msg === t('admin.statusChecking')) {
+      healthState.value[2].ok = false
+      healthState.value[2].msg = t('admin.statusConnectFail')
+    }
   }
 }
 

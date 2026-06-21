@@ -7,8 +7,10 @@ check_service_health() {
     local ok=true
 
     if command -v curl &> /dev/null; then
-        if curl -sf "http://127.0.0.1:${backend_port}/" > /dev/null 2>&1; then
-            echo "[health] Backend :${backend_port} OK"
+        if curl -sf "http://127.0.0.1:${backend_port}/api/v1/system/health" > /dev/null 2>&1; then
+            echo "[health] Backend :${backend_port} OK (system/health)"
+        elif curl -sf "http://127.0.0.1:${backend_port}/" > /dev/null 2>&1; then
+            echo "[health] Backend :${backend_port} OK (root)"
         else
             echo "[health] Backend :${backend_port} FAILED"
             ok=false

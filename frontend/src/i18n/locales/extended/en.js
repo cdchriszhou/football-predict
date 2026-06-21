@@ -226,6 +226,8 @@ export default {
     statusRunning: 'Running',
     statusChecking: 'Checking...',
     statusConnectFail: 'Connection failed',
+    statusBackendUnreachable: 'Backend unreachable (check start-prod; leave server URL empty on :4173)',
+    statusDbEmpty: 'Database empty ({n} matches) — run crawler or restore worldcup2026.db',
     notConfigured: 'Not configured',
     configured: 'Configured',
     apiKey: 'API Key',
