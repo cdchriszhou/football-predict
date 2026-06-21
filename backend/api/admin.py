@@ -5,6 +5,7 @@ from pydantic import BaseModel
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from db import get_db
+from db.sqlite_write import IS_SQLITE, commit_session, write_lock
 from db.models import CrawlerLog, InviteCode, User
 from crawler import run_all_crawlers, run_schedule_crawler, run_team_crawler, run_all_odds_crawlers
 from crawler.league_crawler import run_league_crawler
@@ -81,8 +82,17 @@ async def probe_sporttery(current_user: str = Depends(get_current_admin_user)):
 
 @router.post("/crawler/run")
 async def trigger_crawler(db: AsyncSession = Depends(get_db), current_user: str = Depends(get_current_admin_user)):
+    from service.write_guard import is_heavy_job_running
+
+    if is_heavy_job_running():
+        return error(409, "批量预测或数据刷新正在进行，请稍后再运行爬虫")
     logger.info("Manual crawler run triggered")
-    result = await run_all_crawlers(db)
+    if IS_SQLITE:
+        async with write_lock:
+            result = await run_all_crawlers(db)
+            await commit_session(db)
+    else:
+        result = await run_all_crawlers(db)
     return success(result, "爬虫任务已完成")
 
 
@@ -96,7 +106,16 @@ async def trigger_crawler_type(crawler_type: str, db: AsyncSession = Depends(get
     if crawler_type not in crawlers:
         return {"code": 400, "message": f"Invalid crawler type: {crawler_type}"}
 
-    result = await crawlers[crawler_type](db)
+    from service.write_guard import is_heavy_job_running
+    if is_heavy_job_running():
+        return error(409, "批量预测或数据刷新正在进行，请稍后再运行爬虫")
+
+    if IS_SQLITE:
+        async with write_lock:
+            result = await crawlers[crawler_type](db)
+            await commit_session(db)
+    else:
+        result = await crawlers[crawler_type](db)
     return success(result, f"{crawler_type}爬虫已完成")
 
 

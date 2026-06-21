@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete as sqldelete
 from db.models import Match, Odds, Prediction
 from data.status_constants import MATCH_FINISHED, MATCH_UPCOMING
-from data.worldcup_venues import venue_for_match
+from data.worldcup_venues import venue_for_match, canonical_team_order
 from .base_crawler import _log_crawler, _safe_crawler_fail, crawler_lock
 from utils.logger import logger
 
@@ -162,19 +162,20 @@ def _build_expected_matches():
         matchday = md_i + 1
         for group_name, teams in WORLDCUP_GROUPS.items():
             for i, j in pairings:
-                venue = venue_for_match(teams[i], teams[j])
+                team_a, team_b = canonical_team_order(teams[i], teams[j])
+                venue = venue_for_match(team_a, team_b)
                 if not venue:
-                    venue = _venue_for_host(teams[i], teams[j], matchday) or VENUES[idx % len(VENUES)]
+                    venue = _venue_for_host(team_a, team_b, matchday) or VENUES[idx % len(VENUES)]
                 expected.append({
                     "stage": "小组赛",
                     "group_name": group_name,
-                    "team_a": teams[i],
-                    "team_b": teams[j],
+                    "team_a": team_a,
+                    "team_b": team_b,
                     "match_time": time_slots[idx],
                     "location": venue[0],
                     "stadium": venue[1],
                 })
-                pair = (teams[i], teams[j])
+                pair = (team_a, team_b)
                 from data.worldcup_schedule_lookup import KICKOFF_OVERRIDES_BEIJING
                 if pair in KICKOFF_OVERRIDES_BEIJING:
                     expected[-1]["match_time"] = KICKOFF_OVERRIDES_BEIJING[pair]
@@ -223,6 +224,9 @@ async def _repair_misaligned_fixtures(db: AsyncSession, expected: list[dict]) ->
 
 async def _sync_schedule(db: AsyncSession) -> dict:
     """Upsert schedule rows instead of wiping the whole matches table."""
+    from data.match_status import repair_canonical_team_order
+
+    await repair_canonical_team_order(db, "worldcup-2026")
     expected = _build_expected_matches()
     repaired_ids = await _repair_misaligned_fixtures(db, expected)
     repaired = len(repaired_ids)
@@ -297,7 +301,9 @@ async def _sync_schedule(db: AsyncSession) -> dict:
         await db.delete(match)
         removed += 1
 
-    await db.flush()
+    from db.sqlite_write import flush_session
+
+    await flush_session(db)
     total = created + updated
     return {
         "status": "success",
@@ -311,6 +317,12 @@ async def _sync_schedule(db: AsyncSession) -> dict:
 
 async def run_schedule_crawler(db: AsyncSession):
     """Sync group stage match schedule from real FIFA data (upsert, no full wipe)."""
+    from service.write_guard import is_heavy_job_running
+
+    if is_heavy_job_running():
+        logger.info("Schedule crawler skipped (batch predict / data refresh in progress)")
+        return {"status": "skipped", "reason": "heavy_job_running"}
+
     async with crawler_lock:
         start_time = datetime.now()
         try:

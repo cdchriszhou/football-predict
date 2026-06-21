@@ -32,6 +32,7 @@ async def _background_startup():
 
     from data.match_status import maintain_competition_matches
     from crawler.worldcup_score_sync import refresh_fd_cache
+    from service.prediction_consistency import repair_stale_predictions
     async with write_lock:
         async with async_session() as session:
             try:
@@ -39,6 +40,9 @@ async def _background_startup():
                 wc = await maintain_competition_matches(session, "worldcup-2026")
                 if any(wc.values()):
                     logger.info(f"World Cup match maintenance on startup: {wc}")
+                repaired = await repair_stale_predictions(session, "worldcup-2026", upcoming_only=True)
+                if repaired:
+                    logger.info("Startup prediction consistency repair: %d fixture(s)", repaired)
                 await commit_session(session)
             except Exception as e:
                 logger.warning(f"World Cup match maintenance on startup failed: {e}")

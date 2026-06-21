@@ -7,6 +7,12 @@ from utils.logger import logger
 
 
 async def run_all_crawlers(db: AsyncSession) -> dict:
+    from service.write_guard import is_heavy_job_running
+
+    if is_heavy_job_running():
+        logger.info("Crawler run skipped (heavy job in progress)")
+        return {"status": "skipped", "reason": "heavy_job_running"}
+
     results = {}
 
     logger.info("Starting schedule crawler...")

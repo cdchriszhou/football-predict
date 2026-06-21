@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from db import get_db
+from db.sqlite_write import IS_SQLITE, commit_session, write_lock
 from api.auth import get_current_admin_user
 from crawler import run_schedule_crawler, run_team_crawler, run_all_odds_crawlers
 from service.prediction_service import PredictionService
@@ -61,7 +62,12 @@ async def refresh_data(
         return success(state, "数据更新已在后台启动")
 
     logger.info(f"User {current_user} triggered sync data refresh")
-    results = await _refresh_sync(db, actual_model)
+    if IS_SQLITE:
+        async with write_lock:
+            results = await _refresh_sync(db, actual_model)
+            await commit_session(db)
+    else:
+        results = await _refresh_sync(db, actual_model)
     return success(results, "数据刷新完成")
 
 

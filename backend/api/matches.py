@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.exc import SQLAlchemyError
 from db import get_db
 from db.models import Match
 from utils.response import success, paginate
@@ -32,7 +33,11 @@ router = APIRouter(dependencies=[Depends(require_competition_entitlement)])
 
 
 async def _ensure_results_synced(db: AsyncSession, comp_slug: str) -> None:
-    await sync_match_results_throttled(db, comp_slug)
+    try:
+        await sync_match_results_throttled(db, comp_slug)
+    except SQLAlchemyError:
+        await db.rollback()
+        raise
 
 
 def _sort_stages(stages: list[str]) -> list[str]:

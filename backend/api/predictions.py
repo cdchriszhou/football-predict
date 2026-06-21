@@ -12,7 +12,6 @@ from service.score_backtest import compute_score_backtest, get_or_compute_daily_
 from service.score_pick import (
     run_full_score_pipeline,
     score_matches_pick,
-    canonical_score_recommendations,
 )
 from service.match_context import build_group_context
 from data.worldcup_group_standings import load_group_standings
@@ -21,75 +20,41 @@ from api.auth import get_current_user
 from api.competitions import resolve_competition
 from api.deps import require_competition_entitlement
 from data.status_constants import MATCH_FINISHED
-from utils.score_prediction import normalize_score_prediction
+from utils.score_prediction import (
+    normalize_score_prediction,
+    parse_best_score_payload,
+    reconcile_prediction_view,
+)
+from service.prediction_consistency import ensure_prediction_consistency
 
 router = APIRouter(dependencies=[Depends(require_competition_entitlement)])
 prediction_service = PredictionService()
 rule_engine = CalibratedRuleEngine()
 
 
-def _parse_best_score_payload(val):
-    """Parse best_score DB field — supports array, object, or legacy string."""
-    if val is None:
-        return {"scores": ["?"], "upset": None}
-    if isinstance(val, dict):
-        scores = val.get("scores") or ["?"]
-        upset = val.get("upset")
-        return {"scores": scores, "upset": upset}
-    if isinstance(val, list):
-        return {"scores": val, "upset": None}
-    if isinstance(val, str):
-        if val.startswith("{") or val.startswith("["):
-            try:
-                parsed = json.loads(val)
-                return _parse_best_score_payload(parsed)
-            except json.JSONDecodeError:
-                pass
-        return {"scores": [val] if val != "?" else ["?"], "upset": None}
-    return {"scores": [str(val)], "upset": None}
-
-
 def _parse_best_score(val):
     """Parse best_score from DB. New format is JSON array, old format is plain string."""
-    return _parse_best_score_payload(val)["scores"]
+    return parse_best_score_payload(val)["scores"]
 
 
 def _parse_upset_score(val):
-    upset = _parse_best_score_payload(val)["upset"]
+    upset = parse_best_score_payload(val)["upset"]
     return upset if upset and upset != "?" else None
 
 
-def _normalized_prediction_scores(
+async def _normalized_prediction_scores(
     pred: Prediction,
+    match: Match,
+    db: AsyncSession,
     *,
+    persist: bool = True,
     crs: dict | None = None,
     odds_row: Odds | None = None,
     rank_a: int | None = None,
     rank_b: int | None = None,
 ) -> dict:
-    """Return two likely + upset via the unified score pipeline."""
-    hints = _parse_best_score(pred.best_score)
-    upset_hint = _parse_upset_score(pred.best_score)
-    dr = pred.draw_rate if pred.draw_rate is not None else max(
-        0.0, 100.0 - (pred.win_rate or 0) - (pred.lose_rate or 0),
-    )
-    if crs:
-        picks, upset = canonical_score_recommendations(
-            crs,
-            win_rate=pred.win_rate or 50.0,
-            draw_rate=dr,
-            lose_rate=pred.lose_rate or 50.0,
-            model_scores=hints,
-            sp_win=odds_row.win_win if odds_row else None,
-            sp_draw=odds_row.draw if odds_row else None,
-            sp_lose=odds_row.win_lose if odds_row else None,
-            handicap=odds_row.handicap if odds_row else None,
-            rank_a=rank_a,
-            rank_b=rank_b,
-        )
-    else:
-        picks, upset = hints[:2], upset_hint
-    return normalize_score_prediction(picks, upset)
+    """Return stored score picks; auto-repair and persist when W/D/L drifted."""
+    return await ensure_prediction_consistency(db, pred, match, persist=persist)
 
 
 @router.post("/batch")
@@ -142,21 +107,13 @@ async def get_predictions_batch(
             if odds_row and match:
                 fused = prepare_fused_odds(odds_row, match.team_a, match.team_b)
                 crs = (fused or {}).get("score_odds")
-            ta = teams_by_key.get((match.competition_slug, match.team_a)) if match else None
-            tb = teams_by_key.get((match.competition_slug, match.team_b)) if match else None
-            norm = _normalized_prediction_scores(
-                p,
-                crs=crs,
-                odds_row=odds_row,
-                rank_a=ta.rank if ta else None,
-                rank_b=tb.rank if tb else None,
-            )
+            if not match:
+                continue
+            norm = await _normalized_prediction_scores(p, match, db, persist=True)
             result[p.match_id] = {
                 **norm,
-                "win_rate": p.win_rate,
-                "draw_rate": p.draw_rate,
-                "lose_rate": p.lose_rate,
                 "confidence": p.confidence,
+                "reason": norm.get("reason") or p.reason,
             }
             existing_ids.add(p.match_id)
 
@@ -189,6 +146,30 @@ async def get_predictions_batch(
                 location=match.location or "",
                 standings=standings,
             )
+            if match.stage == "小组赛" and match.group_name and matchday >= 2:
+                from data.worldcup_group_standings import load_group_fifa_ranks
+                from service.score_context import enrich_knockout_outlook
+                from service.score_context import _R16_RUNNER_VS_WINNER, _R16_WINNER_VS_RUNNER
+
+                letter = (match.group_name or "").strip().upper()
+                paired: set[str] = set()
+                if letter in _R16_WINNER_VS_RUNNER:
+                    paired.add(_R16_WINNER_VS_RUNNER[letter])
+                if letter in _R16_RUNNER_VS_WINNER:
+                    paired.add(_R16_RUNNER_VS_WINNER[letter])
+                paired_ranks: dict[str, list[int]] = {}
+                for pg in paired:
+                    paired_ranks[pg] = await load_group_fifa_ranks(
+                        db, match.competition_slug, pg,
+                    )
+                enrich_knockout_outlook(
+                    group_context,
+                    match.team_a,
+                    match.team_b,
+                    int(ta_dict.get("rank") or 50),
+                    int(tb_dict.get("rank") or 50),
+                    paired_group_ranks=paired_ranks,
+                )
 
             if score_odds:
                 r = rule_engine.evaluate(
@@ -219,26 +200,32 @@ async def get_predictions_batch(
                     team_b=tb_dict,
                 )
                 norm = normalize_score_prediction(best, upset)
-                result[mid] = {
-                    **norm,
-                    "win_rate": r.win_rate,
-                    "draw_rate": r.draw_rate,
-                    "lose_rate": r.lose_rate,
-                    "confidence": 0.5,
-                }
+                view = reconcile_prediction_view(
+                    norm["best_scores"],
+                    norm.get("upset_score"),
+                    r.win_rate,
+                    r.draw_rate,
+                    r.lose_rate,
+                )
+                from service.prediction_consistency import sync_reason_with_view
+                view["reason"] = sync_reason_with_view(None, match.team_a, match.team_b, view)
+                result[mid] = {**view, "confidence": 0.5}
             else:
                 r = rule_engine.evaluate(ta_dict, tb_dict, group_context=group_context)
                 norm = normalize_score_prediction(
                     r.best_scores,
                     r.upset_score if r.upset_score != "?" else None,
                 )
-                result[mid] = {
-                    **norm,
-                    "win_rate": r.win_rate,
-                    "draw_rate": r.draw_rate,
-                    "lose_rate": r.lose_rate,
-                    "confidence": 0.5,
-                }
+                view = reconcile_prediction_view(
+                    norm["best_scores"],
+                    norm.get("upset_score"),
+                    r.win_rate,
+                    r.draw_rate,
+                    r.lose_rate,
+                )
+                from service.prediction_consistency import sync_reason_with_view
+                view["reason"] = sync_reason_with_view(None, match.team_a, match.team_b, view)
+                result[mid] = {**view, "confidence": 0.5}
 
     return success(result)
 
@@ -307,16 +294,17 @@ async def get_accuracy(
     confidence_sum = 0.0
 
     for pred, match in predictions:
+        view = await ensure_prediction_consistency(db, pred, match, persist=True)
+        wr, dr, lr = view["win_rate"], view["draw_rate"], view["lose_rate"]
+
         actual_winner = "a" if match.result_a > match.result_b else ("b" if match.result_b > match.result_a else "draw")
-        pred_winner = "a" if pred.win_rate > pred.lose_rate and pred.win_rate > pred.draw_rate else \
-            ("b" if pred.lose_rate > pred.win_rate and pred.lose_rate > pred.draw_rate else "draw")
+        pred_winner = "a" if wr > lr and wr > dr else ("b" if lr > wr and lr > dr else "draw")
 
         if actual_winner == pred_winner:
             correct_results += 1
 
-        # Score accuracy: actual in two likely picks or upset pick
-        predicted_scores = list(_parse_best_score(pred.best_score))
-        upset = _parse_upset_score(pred.best_score)
+        predicted_scores = list(view.get("best_scores") or [])
+        upset = view.get("upset_score")
         if upset:
             predicted_scores.append(upset)
         actual_score = f"{match.result_a}:{match.result_b}"
@@ -351,7 +339,19 @@ async def get_prediction(
     if not refresh:
         cached = await cache_get(f"prediction:{match_id}:{model_key}")
         if cached:
-            return success(cached)
+            from service.prediction_consistency import sync_reason_with_view
+            view = reconcile_prediction_view(
+                cached.get("best_scores"),
+                cached.get("upset_score"),
+                cached.get("win_rate") or 50.0,
+                cached.get("draw_rate") or 28.0,
+                cached.get("lose_rate") or 50.0,
+            )
+            ta = cached.get("team_a") or ""
+            tb = cached.get("team_b") or ""
+            if ta and tb:
+                view["reason"] = sync_reason_with_view(cached.get("reason"), ta, tb, view)
+            return success({**cached, **view})
 
         # DB snapshot only for fused auto mode; single-model views must re-run LLM.
         if model_key == "auto":
@@ -361,45 +361,21 @@ async def get_prediction(
 
             if pred:
                 match = (await db.execute(select(Match).where(Match.id == match_id))).scalar_one_or_none()
-                odds_row = (await db.execute(
-                    select(Odds).where(Odds.match_id == match_id).order_by(Odds.id.desc()).limit(1)
-                )).scalar_one_or_none()
-                crs = None
-                rank_a = rank_b = None
-                if match and odds_row:
-                    fused = prepare_fused_odds(odds_row, match.team_a, match.team_b)
-                    crs = (fused or {}).get("score_odds")
-                    ta = (await db.execute(
-                        select(Team).where(Team.name == match.team_a, Team.competition_slug == match.competition_slug)
-                    )).scalar_one_or_none()
-                    tb = (await db.execute(
-                        select(Team).where(Team.name == match.team_b, Team.competition_slug == match.competition_slug)
-                    )).scalar_one_or_none()
-                    rank_a = ta.rank if ta else None
-                    rank_b = tb.rank if tb else None
-                norm = _normalized_prediction_scores(
-                    pred,
-                    crs=crs,
-                    odds_row=odds_row,
-                    rank_a=rank_a,
-                    rank_b=rank_b,
-                )
-                return success({
-                    "match_id": match_id,
-                    "team_a": match.team_a if match else "",
-                    "team_b": match.team_b if match else "",
-                    "stage": match.stage if match else "",
-                    "win_rate": pred.win_rate,
-                    "draw_rate": pred.draw_rate,
-                    "lose_rate": pred.lose_rate,
-                    **norm,
-                    "handicap_result": pred.handicap_result,
-                    "total_goals": pred.total_goals,
-                    "reason": pred.reason,
-                    "model_used": pred.model_used,
-                    "confidence": pred.confidence,
-                    "create_time": pred.create_time.isoformat() if pred.create_time else None,
-                })
+                if match:
+                    norm = await _normalized_prediction_scores(pred, match, db, persist=True)
+                    return success({
+                        "match_id": match_id,
+                        "team_a": match.team_a,
+                        "team_b": match.team_b,
+                        "stage": match.stage,
+                        **norm,
+                        "handicap_result": pred.handicap_result,
+                        "total_goals": pred.total_goals,
+                        "reason": norm.get("reason") or pred.reason,
+                        "model_used": pred.model_used,
+                        "confidence": pred.confidence,
+                        "create_time": pred.create_time.isoformat() if pred.create_time else None,
+                    })
 
     # Generate fresh prediction (per-model cache key inside service)
     actual_model = None if model_key == "auto" else model_key

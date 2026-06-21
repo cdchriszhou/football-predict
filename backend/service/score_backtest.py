@@ -145,6 +145,8 @@ def run_score_prediction(
         rank_b=rb,
     )
     wr, dr, lr = refine_wdl_after_score_pick(best, wr, dr, lr)
+    from service.score_pick import reconcile_wdl_with_score_picks
+    wr, dr, lr = reconcile_wdl_with_score_picks(best, wr, dr, lr)
     p1 = best[0] if best else "?"
     p2 = best[1] if len(best) > 1 else "-"
     return p1, p2, upset, picks

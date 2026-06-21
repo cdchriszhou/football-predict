@@ -1,5 +1,6 @@
 import json
 import os
+import re
 from typing import Optional
 import httpx
 from .base_client import BaseLLMClient, PredictionInput, PredictionOutput
@@ -7,17 +8,40 @@ from config import DEEPSEEK_API_KEY, DEEPSEEK_API_URL
 from utils.logger import logger
 
 
+def _strip_code_fence(content: str) -> str:
+    text = (content or "").strip()
+    if text.startswith("```"):
+        text = re.sub(r"^```(?:json)?\s*", "", text, flags=re.I)
+        text = re.sub(r"\s*```$", "", text)
+    return text.strip()
+
+
+def _parse_llm_json(content: str) -> dict | None:
+    """Best-effort JSON parse for LLM outputs (code fences, trailing commas)."""
+    text = _strip_code_fence(content)
+    if not text:
+        return None
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        pass
+    match = re.search(r"\{[\s\S]*\}", text)
+    if not match:
+        return None
+    blob = re.sub(r",\s*([}\]])", r"\1", match.group(0))
+    try:
+        return json.loads(blob)
+    except json.JSONDecodeError:
+        return None
+
+
 def _parse_response(data: dict, model_name: str) -> Optional[PredictionOutput]:
     """Parse OpenAI-compatible chat completion response into PredictionOutput."""
     try:
-        content = data["choices"][0]["message"]["content"].strip()
-        # Handle markdown code block wrapping
-        if content.startswith("```"):
-            content = content.split("\n", 1)[1]
-            if content.endswith("```"):
-                content = content[:-3]
-            content = content.strip()
-        result = json.loads(content)
+        content = data["choices"][0]["message"]["content"]
+        result = _parse_llm_json(content)
+        if result is None:
+            raise json.JSONDecodeError("Unable to parse LLM JSON", content or "", 0)
 
         # Parse best_scores: array of 3 scores, or single score fallback
         raw_scores = result.get("best_scores", [])
@@ -42,7 +66,12 @@ def _parse_response(data: dict, model_name: str) -> Optional[PredictionOutput]:
             confidence=float(result.get("confidence", 0.8))
         )
     except (json.JSONDecodeError, KeyError, ValueError, IndexError) as e:
-        logger.error(f"Failed to parse {model_name} response: {e}")
+        raw = ""
+        try:
+            raw = (data["choices"][0]["message"]["content"] or "")[:500]
+        except (KeyError, IndexError, TypeError):
+            pass
+        logger.error(f"Failed to parse {model_name} response: {e}; content={raw!r}")
         return None
 
 
@@ -66,8 +95,17 @@ def _validate_score(score: str) -> str:
 
 
 async def _call_api(api_key: str, base_url: str, model: str, prompt: str,
-                    temperature: float = 0.1, max_tokens: int = 500) -> Optional[dict]:
+                    temperature: float = 0.1, max_tokens: int = 1024,
+                    json_mode: bool = True) -> Optional[dict]:
     """Generic OpenAI-compatible API call."""
+    payload = {
+        "model": model,
+        "messages": [{"role": "user", "content": prompt}],
+        "temperature": temperature,
+        "max_tokens": max_tokens,
+    }
+    if json_mode:
+        payload["response_format"] = {"type": "json_object"}
     async with httpx.AsyncClient(timeout=30.0) as client:
         resp = await client.post(
             base_url,
@@ -75,13 +113,18 @@ async def _call_api(api_key: str, base_url: str, model: str, prompt: str,
                 "Authorization": f"Bearer {api_key}",
                 "Content-Type": "application/json"
             },
-            json={
-                "model": model,
-                "messages": [{"role": "user", "content": prompt}],
-                "temperature": temperature,
-                "max_tokens": max_tokens
-            }
+            json=payload,
         )
+        if resp.status_code == 400 and json_mode:
+            payload.pop("response_format", None)
+            resp = await client.post(
+                base_url,
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json"
+                },
+                json=payload,
+            )
         if resp.status_code >= 400:
             logger.error(f"{model} API error {resp.status_code}: {resp.text[:500]}")
         resp.raise_for_status()

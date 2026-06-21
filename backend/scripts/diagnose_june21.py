@@ -8,8 +8,6 @@ from sqlalchemy import select
 
 from db import async_session
 from db.models import Match, Prediction, Odds, Team
-from api.predictions import _normalized_prediction_scores
-from service.prediction_service import prepare_fused_odds
 from service.score_backtest import run_score_prediction, score_matches_pick
 from service.score_pick import run_full_score_pipeline
 

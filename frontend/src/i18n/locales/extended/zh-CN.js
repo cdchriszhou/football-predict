@@ -298,6 +298,7 @@ export default {
     batchPredict: '批量预测所有未开始比赛',
     batchPredicting: '预测中，请耐心等待...',
     batchProgress: '预测进度 {done}/{total}',
+    batchProgressCurrent: '预测进度 {done}/{total}（{match}）',
     batchTimeout: '批量预测超时，请查看后端日志',
     batchDone: '完成: 处理{n}场',
     batchFailed: '批量预测失败: {msg}',

@@ -87,3 +87,17 @@ FIFA_GROUP_VENUES: dict[tuple[str, str], tuple[str, str]] = {
 
 def venue_for_match(team_a: str, team_b: str) -> tuple[str, str] | None:
     return FIFA_GROUP_VENUES.get((team_a, team_b))
+
+
+def canonical_team_order(team_a: str, team_b: str) -> tuple[str, str]:
+    """Return FIFA official home/away (team_a=home) order for a group fixture."""
+    if (team_a, team_b) in FIFA_GROUP_VENUES:
+        return team_a, team_b
+    if (team_b, team_a) in FIFA_GROUP_VENUES:
+        return team_b, team_a
+    return team_a, team_b
+
+
+def is_canonical_team_order(team_a: str, team_b: str) -> bool:
+    ca, cb = canonical_team_order(team_a, team_b)
+    return team_a == ca and team_b == cb

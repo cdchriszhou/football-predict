@@ -10,6 +10,7 @@ import time
 from datetime import datetime, timedelta
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from crawler.football_data_client import (
@@ -101,6 +102,70 @@ def _kickoff_delta(db_time: datetime | None, api_time: datetime | None) -> timed
     return abs(db_time - api_time)
 
 
+def _normalize_ext_id(ext_id) -> int | None:
+    if ext_id is None:
+        return None
+    try:
+        return int(ext_id)
+    except (TypeError, ValueError):
+        return None
+
+
+def _same_fixture(m1: Match, m2: Match) -> bool:
+    return tuple(sorted([m1.team_a, m1.team_b])) == tuple(sorted([m2.team_a, m2.team_b]))
+
+
+def _assign_external_id(
+    match: Match,
+    ext_id: int,
+    ext_index: dict[int, Match],
+) -> bool:
+    """Assign football-data fixture id; skip or transfer when duplicates conflict."""
+    current = _normalize_ext_id(match.external_id)
+    if current == ext_id:
+        return False
+
+    owner = ext_index.get(ext_id)
+    if owner and owner.id != match.id:
+        if _same_fixture(owner, match):
+            keep, drop = (owner, match) if (owner.id or 0) <= (match.id or 0) else (match, owner)
+            if drop is match:
+                logger.debug(
+                    "Skip external_id=%s for duplicate match %s (%s vs %s); kept on id=%s",
+                    ext_id, match.id, match.team_a, match.team_b, keep.id,
+                )
+                return False
+            drop.external_id = None
+            ext_index.pop(ext_id, None)
+        else:
+            logger.warning(
+                "external_id=%s already on match %s (%s vs %s); skip match %s (%s vs %s)",
+                ext_id, owner.id, owner.team_a, owner.team_b,
+                match.id, match.team_a, match.team_b,
+            )
+            return False
+
+    match.external_id = ext_id
+    ext_index[ext_id] = match
+    return True
+
+
+def _build_ext_index(rows: list[Match]) -> dict[int, Match]:
+    index: dict[int, Match] = {}
+    for row in rows:
+        ext_id = _normalize_ext_id(row.external_id)
+        if ext_id is None:
+            continue
+        existing = index.get(ext_id)
+        if existing and existing.id != row.id and _same_fixture(existing, row):
+            keep, drop = (existing, row) if (existing.id or 0) <= (row.id or 0) else (row, existing)
+            drop.external_id = None
+            index[ext_id] = keep
+        else:
+            index[ext_id] = row
+    return index
+
+
 def _find_db_match(rows: list[Match], fd_row: dict) -> tuple[Match | None, bool]:
     home_en = fd_row.get("home_name_en") or ""
     away_en = fd_row.get("away_name_en") or ""
@@ -138,6 +203,7 @@ async def _apply_fd_rows(db: AsyncSession, fd_rows: list[dict]) -> dict:
         )
     )).scalars().all())
 
+    ext_index = _build_ext_index(db_rows)
     updated = live = finished = 0
     for fd in fd_rows:
         match, a_is_home = _find_db_match(db_rows, fd)
@@ -165,9 +231,8 @@ async def _apply_fd_rows(db: AsyncSession, fd_rows: list[dict]) -> dict:
                 match.result_a = ra
                 match.result_b = rb
                 changed = True
-        ext_id = fd.get("external_id")
-        if ext_id and match.external_id != str(ext_id):
-            match.external_id = str(ext_id)
+        ext_id = _normalize_ext_id(fd.get("external_id"))
+        if ext_id is not None and _assign_external_id(match, ext_id, ext_index):
             changed = True
 
         if not changed:
@@ -179,7 +244,12 @@ async def _apply_fd_rows(db: AsyncSession, fd_rows: list[dict]) -> dict:
             finished += 1
 
     if updated:
-        await db.flush()
+        try:
+            await db.flush()
+        except IntegrityError as exc:
+            await db.rollback()
+            logger.warning("World Cup score sync flush failed (duplicate external_id): %s", exc)
+            return {"status": "failed", "error": "integrity_error", "updated": 0}
         logger.info(
             "World Cup score sync: updated=%d live=%d finished=%d (cache_age=%.0fs)",
             updated, live, finished, fd_cache_age_sec(),

@@ -34,6 +34,7 @@ from service.prediction_service import (
     get_players,
     infer_matchday,
     prepare_fused_odds,
+    maybe_correct_odds_orientation,
     team_to_dict,
 )
 
@@ -461,6 +462,9 @@ async def _build_match_analysis(
         select(Odds).where(Odds.match_id == db_match.id).order_by(Odds.id.desc())
     )).scalars().first()
     fused = prepare_fused_odds(odds_row, db_match.team_a, db_match.team_b)
+    fused = maybe_correct_odds_orientation(
+        fused, team_a_dict.get("rank"), team_b_dict.get("rank"),
+    )
 
     matchday = await infer_matchday(db_match, db)
     standings = None
@@ -525,10 +529,22 @@ async def _build_match_analysis(
     data_sources.append("球队爬虫+规则引擎")
 
     if prediction:
+        from utils.score_prediction import parse_best_score_payload, reconcile_prediction_view
+        payload = parse_best_score_payload(prediction.best_score)
+        dr = prediction.draw_rate if prediction.draw_rate is not None else max(
+            0.0, 100.0 - (prediction.win_rate or 0) - (prediction.lose_rate or 0),
+        )
+        ai_view = reconcile_prediction_view(
+            payload.get("scores"),
+            payload.get("upset"),
+            prediction.win_rate or 50.0,
+            dr,
+            prediction.lose_rate or 50.0,
+        )
         blend_sources["ai"] = {
-            "win": prediction.win_rate,
-            "draw": prediction.draw_rate,
-            "lose": prediction.lose_rate,
+            "win": ai_view["win_rate"],
+            "draw": ai_view["draw_rate"],
+            "lose": ai_view["lose_rate"],
         }
         data_sources.append(f"AI预测({prediction.model_used or 'fusion'})")
     elif team_a_obj and team_b_obj:
@@ -800,15 +816,20 @@ def _build_single_pick(
     db_match: Optional[Match],
     analysis: dict,
 ) -> Optional[dict]:
+    from data.worldcup_venues import canonical_team_order
+
+    st_home, st_away = st_match["home_team"], st_match["away_team"]
     if db_match:
-        home, away = db_match.team_a, db_match.team_b
+        home, away = canonical_team_order(db_match.team_a, db_match.team_b)
+        odds_team_a, odds_team_b = db_match.team_a, db_match.team_b
     else:
-        home, away = st_match["home_team"], st_match["away_team"]
+        home, away = st_home, st_away
+        odds_team_a, odds_team_b = home, away
 
     st_for_odds = find_sporttery_match(
-        home, away, st_match.get("kickoff"), [st_match], league_hint=""
+        odds_team_a, odds_team_b, st_match.get("kickoff"), [st_match], league_hint=""
     ) or st_match
-    odds_row = to_db_odds(st_for_odds, home, away)
+    odds_row = to_db_odds(st_for_odds, odds_team_a, odds_team_b)
     if not odds_row:
         return None
 
@@ -844,8 +865,8 @@ def _build_single_pick(
         handicap = odds_row.get("handicap")
         pipeline_crs = crs_odds
 
-    from service.score_pick import canonical_score_recommendations
-    from utils.score_prediction import normalize_score_prediction
+    from utils.score_prediction import reconcile_prediction_view
+    from service.prediction_consistency import sync_reason_with_view
 
     model_hints: list[str] = []
     stored_upset: Optional[str] = None
@@ -868,13 +889,18 @@ def _build_single_pick(
         draw_rate = blend.get("draw", 33.3)
         lose_rate = blend.get("lose", 33.4)
 
-    if pipeline_crs:
+    if model_hints:
+        norm = reconcile_prediction_view(
+            model_hints, stored_upset, win_rate, draw_rate, lose_rate,
+        )
+    elif pipeline_crs:
+        from service.score_pick import canonical_score_recommendations
         likely_scores, upset_score = canonical_score_recommendations(
             pipeline_crs,
             win_rate=win_rate,
             draw_rate=draw_rate,
             lose_rate=lose_rate,
-            model_scores=model_hints,
+            model_scores=None,
             sp_win=sp_win,
             sp_draw=sp_draw,
             sp_lose=sp_lose,
@@ -882,12 +908,27 @@ def _build_single_pick(
             rank_a=rank_a,
             rank_b=rank_b,
         )
-        norm = normalize_score_prediction(likely_scores, upset_score)
+        norm = reconcile_prediction_view(
+            likely_scores, upset_score, win_rate, draw_rate, lose_rate,
+        )
     else:
-        norm = normalize_score_prediction(model_hints, stored_upset)
+        norm = reconcile_prediction_view(
+            model_hints, stored_upset, win_rate, draw_rate, lose_rate,
+        )
 
     canonical_likely = norm["best_scores"]
-    canonical_upset = norm["upset_score"]
+    canonical_upset = norm.get("upset_score")
+    norm["reason"] = sync_reason_with_view(
+        (prediction.reason if prediction else None),
+        home,
+        away,
+        norm,
+    )
+    blend = {
+        "win": norm["win_rate"],
+        "draw": norm["draw_rate"],
+        "lose": norm["lose_rate"],
+    }
 
     display_crs = {**pipeline_crs, **crs_odds}
     score_picks = _build_score_picks(
@@ -1108,10 +1149,15 @@ async def get_today_sporttery_plan(db: AsyncSession, competition_slug: str = "wo
             continue
         pred = preds.get(dm.id) if dm else None
 
-        home = dm.team_a if dm else st["home_team"]
-        away = dm.team_b if dm else st["away_team"]
-        st_for_odds = find_sporttery_match(home, away, st.get("kickoff"), [st], league_hint="") or st
-        sporttery_odds = to_db_odds(st_for_odds, home, away) or {}
+        from data.worldcup_venues import canonical_team_order
+        if dm:
+            home, away = canonical_team_order(dm.team_a, dm.team_b)
+            odds_a, odds_b = dm.team_a, dm.team_b
+        else:
+            home, away = st["home_team"], st["away_team"]
+            odds_a, odds_b = home, away
+        st_for_odds = find_sporttery_match(odds_a, odds_b, st.get("kickoff"), [st], league_hint="") or st
+        sporttery_odds = to_db_odds(st_for_odds, odds_a, odds_b) or {}
 
         analysis = await _build_match_analysis(db, dm, pred, sporttery_odds)
         pick = _build_single_pick(st, dm, analysis)

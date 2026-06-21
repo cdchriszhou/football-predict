@@ -23,7 +23,10 @@ def _schedule_by_teams() -> dict[tuple[str, str], datetime]:
 
 def canonical_kickoff_beijing(team_a: str, team_b: str) -> datetime | None:
     """Return official schedule kickoff (naive Beijing local) for a group fixture."""
-    key = (team_a, team_b)
+    from data.worldcup_venues import canonical_team_order
+
+    ca, cb = canonical_team_order(team_a, team_b)
+    key = (ca, cb)
     if key in KICKOFF_OVERRIDES_BEIJING:
         return KICKOFF_OVERRIDES_BEIJING[key]
     return _schedule_by_teams().get(key)

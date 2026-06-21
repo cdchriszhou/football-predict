@@ -219,6 +219,22 @@ class CalibratedRuleEngine(RuleEngine):
                 sp_win=(odds or {}).get("win_win"),
                 sp_lose=(odds or {}).get("win_lose"),
             )
+            from service.score_context import apply_contextual_score_adjustments
+            result.best_scores = apply_contextual_score_adjustments(
+                result.best_scores,
+                score_odds,
+                group_context=group_context,
+                odds_dict=odds,
+                win_rate=result.win_rate,
+                lose_rate=result.lose_rate,
+                draw_rate=result.draw_rate,
+                expected_a=result.expected_a,
+                expected_b=result.expected_b,
+                rank_a=(team_a or {}).get("rank"),
+                rank_b=(team_b or {}).get("rank"),
+                team_a=(team_a or {}).get("name", ""),
+                team_b=(team_b or {}).get("name", ""),
+            )
 
         is_knockout = (group_context or {}).get("stage", "") not in ("", "小组赛")
         over_under = float((odds or {}).get("over_under", 2.5) or 2.5)
@@ -233,6 +249,24 @@ class CalibratedRuleEngine(RuleEngine):
             is_knockout,
             context_analysis,
         )
+
+        from service.score_pick import align_score_picks_to_wdl, reconcile_wdl_with_score_picks
+        if score_odds:
+            result.best_scores = align_score_picks_to_wdl(
+                result.best_scores,
+                score_odds,
+                win_rate=result.win_rate,
+                draw_rate=result.draw_rate,
+                lose_rate=result.lose_rate,
+                model_scores=result.best_scores,
+            )
+        wr, dr, lr = reconcile_wdl_with_score_picks(
+            result.best_scores,
+            result.win_rate,
+            result.draw_rate,
+            result.lose_rate,
+        )
+        result.win_rate, result.draw_rate, result.lose_rate = wr, dr, lr
 
         return result
 
@@ -454,20 +488,23 @@ def predict_historical_match(engine: CalibratedRuleEngine, match: dict) -> dict:
     )
 
     upset = result.upset_score if result.upset_score and result.upset_score != "?" else None
-    norm = normalize_score_prediction(result.best_scores, upset)
+    from utils.score_prediction import reconcile_prediction_view
+    view = reconcile_prediction_view(
+        result.best_scores, upset, result.win_rate, result.draw_rate, result.lose_rate,
+    )
 
     return {
-        "win_rate": result.win_rate,
-        "draw_rate": result.draw_rate,
-        "lose_rate": result.lose_rate,
-        "best_scores": result.best_scores,
-        "score_picks": norm,
-        "upset_score": upset,
+        "win_rate": view["win_rate"],
+        "draw_rate": view["draw_rate"],
+        "lose_rate": view["lose_rate"],
+        "best_scores": view["best_scores"],
+        "score_picks": view,
+        "upset_score": view.get("upset_score"),
         "actual": f"{match['result_a']}:{match['result_b']}",
         "actual_winner": _actual_winner(match["result_a"], match["result_b"]),
-        "predicted_winner": _predict_winner(result.win_rate, result.draw_rate, result.lose_rate),
+        "predicted_winner": _predict_winner(view["win_rate"], view["draw_rate"], view["lose_rate"]),
         "context_alerts": context.alerts,
-        "w_d_l": f"{result.win_rate}/{result.draw_rate}/{result.lose_rate}",
+        "w_d_l": f"{view['win_rate']}/{view['draw_rate']}/{view['lose_rate']}",
     }
 
 

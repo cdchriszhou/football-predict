@@ -299,6 +299,7 @@ export default {
     batchPredict: 'Batch predict all upcoming matches',
     batchPredicting: 'Predicting, please wait...',
     batchProgress: 'Progress {done}/{total}',
+    batchProgressCurrent: 'Progress {done}/{total} ({match})',
     batchTimeout: 'Batch predict timed out — check server logs',
     batchDone: 'Done: {n} matches processed',
     batchFailed: 'Batch prediction failed: {msg}',

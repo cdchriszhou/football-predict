@@ -15,9 +15,16 @@ from data.status_constants import MATCH_UPCOMING
 from db.redis_client import cache_get, cache_set
 from db.sqlite_write import IS_SQLITE, run_db_write
 from utils.logger import logger
-from utils.score_prediction import normalize_score_prediction
+from utils.score_prediction import normalize_score_prediction, reconcile_prediction_view
+from service.prediction_consistency import (
+    encode_best_score,
+    sync_reason_with_view,
+    ensure_prediction_consistency,
+    repair_stale_predictions,
+)
 from service.score_pick import (
     align_wdl_to_score_picks,
+    reconcile_wdl_with_score_picks,
     dominant_wdl_outcome,
     run_full_score_pipeline,
     _score_outcome,
@@ -57,8 +64,21 @@ def _append_calibrated_score_note(
     reason: str,
     best_scores: list[str] | None,
     upset: str | None,
+    *,
+    team_a: str = "",
+    team_b: str = "",
+    win_rate: float = 0,
+    draw_rate: float = 0,
+    lose_rate: float = 0,
 ) -> str:
-    """Append final CRS-calibrated picks so AI narrative matches displayed badges."""
+    """Append synced W/D/L + score tail so narrative matches displayed badges."""
+    if team_a and team_b:
+        return sync_reason_with_view(
+            reason,
+            team_a,
+            team_b,
+            reconcile_prediction_view(best_scores, upset, win_rate, draw_rate, lose_rate),
+        )
     picks = [s for s in (best_scores or []) if s and s != "?"][:2]
     if not picks:
         return reason or ""
@@ -279,13 +299,25 @@ def _fuse_predictions(llm_results: list, rule_result, odds_dict: dict = None,
     model_used = "+".join(short_name(r.model_used) for r in llm_results)
 
     normalized = normalize_score_prediction(best_scores, upset_score)
+    win_rate, draw_rate, lose_rate = reconcile_wdl_with_score_picks(
+        normalized["best_scores"], win_rate, draw_rate, lose_rate,
+    )
     win_rate, draw_rate, lose_rate = align_wdl_to_score_picks(
         normalized["best_scores"], win_rate, draw_rate, lose_rate,
     )
     win_rate, draw_rate, lose_rate = _validate_rates(win_rate, draw_rate, lose_rate)
     if pick_warnings:
         reason = reason + " | [校验] " + "; ".join(pick_warnings[:2])
-    reason = _append_calibrated_score_note(reason, normalized["best_scores"], normalized.get("upset_score"))
+    reason = _append_calibrated_score_note(
+        reason,
+        normalized["best_scores"],
+        normalized.get("upset_score"),
+        team_a=(team_a or {}).get("name", ""),
+        team_b=(team_b or {}).get("name", ""),
+        win_rate=win_rate,
+        draw_rate=draw_rate,
+        lose_rate=lose_rate,
+    )
     return {
         "win_rate": win_rate,
         "draw_rate": draw_rate,
@@ -323,6 +355,59 @@ def _implied_wdl(win_win: float, draw: float, win_lose: float) -> dict | None:
         "imp_draw": inv[1] / total * 100,
         "imp_lose": inv[2] / total * 100,
     }
+
+
+def maybe_correct_odds_orientation(
+    odds_dict: dict,
+    rank_a: int | None,
+    rank_b: int | None,
+    *,
+    rank_gap: int = 25,
+    imp_margin: float = 12.0,
+) -> dict:
+    """Swap inverted W/D/L when FIFA rank gap strongly disagrees with market favourite."""
+    if not odds_dict or rank_a is None or rank_b is None:
+        return odds_dict
+    win_win = odds_dict.get("win_win")
+    draw = odds_dict.get("draw")
+    win_lose = odds_dict.get("win_lose")
+    imp = _implied_wdl(win_win, draw, win_lose)
+    if not imp:
+        return odds_dict
+
+    ra, rb = int(rank_a), int(rank_b)
+    invert = False
+    if rb + rank_gap < ra and imp["imp_win"] - imp["imp_lose"] >= imp_margin:
+        invert = True
+    elif ra + rank_gap < rb and imp["imp_lose"] - imp["imp_win"] >= imp_margin:
+        invert = True
+    if not invert:
+        return odds_dict
+
+    from crawler.sporttery_client import _flip_handicap
+    from data.match_status import _mirror_score_odds_value
+
+    out = dict(odds_dict)
+    out["win_win"], out["win_lose"] = win_lose, win_win
+    if out.get("handicap_win") is not None and out.get("handicap_lose") is not None:
+        out["handicap_win"], out["handicap_lose"] = out["handicap_lose"], out["handicap_win"]
+    if out.get("handicap"):
+        out["handicap"] = _flip_handicap(str(out["handicap"]))
+    if out.get("score_odds"):
+        mirrored = _mirror_score_odds_value(out["score_odds"])
+        out["score_odds"] = json.loads(mirrored) if isinstance(mirrored, str) else mirrored
+    if out.get("half_full_odds"):
+        from data.match_status import _mirror_half_full_value
+        mirrored_hf = _mirror_half_full_value(out["half_full_odds"])
+        out["half_full_odds"] = json.loads(mirrored_hf) if isinstance(mirrored_hf, str) else mirrored_hf
+    imp2 = _implied_wdl(out["win_win"], out["draw"], out["win_lose"])
+    if imp2:
+        out.update(imp2)
+    logger.warning(
+        "Corrected inverted market odds for rank %s vs %s (was imp %.0f/%.0f/%.0f)",
+        ra, rb, imp["imp_win"], imp["imp_draw"], imp["imp_lose"],
+    )
+    return out
 
 
 def prepare_fused_odds(odds: Odds = None, team_a: str = "", team_b: str = "") -> dict:
@@ -400,11 +485,20 @@ class PredictionService:
         if not skip_cache:
             cached = await cache_get(cache_key)
             if cached:
-                norm = normalize_score_prediction(
+                view = reconcile_prediction_view(
                     cached.get("best_scores"),
                     cached.get("upset_score"),
+                    cached.get("win_rate") or 50.0,
+                    cached.get("draw_rate") or 28.0,
+                    cached.get("lose_rate") or 50.0,
                 )
-                return {**cached, **norm}
+                view["reason"] = sync_reason_with_view(
+                    cached.get("reason"),
+                    cached.get("team_a") or "",
+                    cached.get("team_b") or "",
+                    view,
+                )
+                return {**cached, **view}
 
         # 1. Collect match data
         match = (await db.execute(select(Match).where(Match.id == match_id))).scalar_one_or_none()
@@ -423,6 +517,11 @@ class PredictionService:
 
         odds = (await db.execute(select(Odds).where(Odds.match_id == match_id))).scalar_one_or_none()
         odds_dict = prepare_fused_odds(odds, match.team_a, match.team_b)
+        odds_dict = maybe_correct_odds_orientation(
+            odds_dict,
+            (team_a_dict or {}).get("rank"),
+            (team_b_dict or {}).get("rank"),
+        )
         score_odds = odds_dict.get("score_odds", {})
         half_full_odds = odds_dict.get("half_full_odds", {})
         market_odds = odds_dict if odds_dict.get("has_real_market") else None
@@ -444,6 +543,30 @@ class PredictionService:
             location=match.location or "",
             standings=standings,
         )
+        if match.stage == "小组赛" and match.group_name and matchday >= 2:
+            from data.worldcup_group_standings import load_group_fifa_ranks
+            from service.score_context import enrich_knockout_outlook
+            from service.score_context import _R16_RUNNER_VS_WINNER, _R16_WINNER_VS_RUNNER
+
+            letter = (match.group_name or "").strip().upper()
+            paired: set[str] = set()
+            if letter in _R16_WINNER_VS_RUNNER:
+                paired.add(_R16_WINNER_VS_RUNNER[letter])
+            if letter in _R16_RUNNER_VS_WINNER:
+                paired.add(_R16_RUNNER_VS_WINNER[letter])
+            paired_ranks: dict[str, list[int]] = {}
+            for pg in paired:
+                paired_ranks[pg] = await load_group_fifa_ranks(
+                    db, match.competition_slug, pg,
+                )
+            enrich_knockout_outlook(
+                group_context,
+                match.team_a,
+                match.team_b,
+                int(team_a_dict.get("rank") or 50),
+                int(team_b_dict.get("rank") or 50),
+                paired_group_ranks=paired_ranks,
+            )
 
         pre_result = self.rule_engine.evaluate(
             team_a_dict, team_b_dict, odds=None, group_context=group_context
@@ -541,11 +664,14 @@ class PredictionService:
                 scores = rule_result.best_scores
                 upset = rule_result.upset_score if rule_result.upset_score != "?" else None
             rule_norm = normalize_score_prediction(scores, upset)
-            w, d, l = align_wdl_to_score_picks(
+            w, d, l = reconcile_wdl_with_score_picks(
                 rule_norm["best_scores"],
                 rule_result.win_rate,
                 rule_result.draw_rate,
                 rule_result.lose_rate,
+            )
+            w, d, l = align_wdl_to_score_picks(
+                rule_norm["best_scores"], w, d, l,
             )
             w, d, l = _validate_rates(w, d, l)
             if pick_warnings:
@@ -554,6 +680,11 @@ class PredictionService:
                 " | ".join(reason_parts),
                 rule_norm["best_scores"],
                 rule_norm.get("upset_score"),
+                team_a=team_a_dict.get("name", match.team_a),
+                team_b=team_b_dict.get("name", match.team_b),
+                win_rate=w,
+                draw_rate=d,
+                lose_rate=l,
             )
             blend = {"win": w, "draw": d, "lose": l}
             fav = max(blend, key=blend.get)
@@ -610,7 +741,7 @@ class PredictionService:
                     win_rate=result["win_rate"],
                     draw_rate=result["draw_rate"],
                     lose_rate=result["lose_rate"],
-                    best_score=_encode_best_score(
+                    best_score=encode_best_score(
                         result["best_scores"], result.get("upset_score")
                     ),
                     handicap_result=result["handicap_result"],
@@ -653,17 +784,21 @@ class PredictionService:
             return []
 
         total = len(matches)
-        # SQLite: single session + serial writes to avoid lock storms during manual refresh.
+        # SQLite: serial per match; DB writes use run_db_write — do not hold write_lock
+        # across LLM calls (would block on startup/crawler and freeze progress at 0/N).
         if IS_SQLITE:
             results: list = []
             failed_ids: list[int] = []
+
+            await _report_progress(on_progress, 0, 0, 0)
             for idx, match in enumerate(matches, start=1):
+                await _report_progress(
+                    on_progress, idx - 1, len(results), len(failed_ids), match=match,
+                )
                 try:
                     result = await self.predict_match(match.id, db, model)
                     if result:
                         results.append(result)
-                    if on_progress:
-                        await _maybe_await(on_progress(idx, len(results), len(failed_ids)))
                 except Exception as e:
                     logger.error(f"Batch predict failed for match {match.id}: {e}")
                     failed_ids.append(match.id)
@@ -671,8 +806,9 @@ class PredictionService:
                         await db.rollback()
                     except Exception:
                         pass
-                    if on_progress:
-                        await _maybe_await(on_progress(idx, len(results), len(failed_ids)))
+                await _report_progress(
+                    on_progress, idx, len(results), len(failed_ids), match=match,
+                )
             if failed_ids:
                 logger.warning(
                     f"Batch predict: {len(failed_ids)}/{total} matches failed: {failed_ids}"
@@ -720,6 +856,7 @@ class PredictionService:
             f"Batch predict start: {total} matches, model={model or 'auto'}, "
             f"competition={competition_slug or 'all'}, concurrency={concurrency}"
         )
+        await _report_progress(on_progress, 0, 0, 0)
         results_raw = await asyncio.gather(*[predict_one(m) for m in matches])
         results = [r for r in results_raw if r is not None]
 
@@ -766,13 +903,18 @@ async def _maybe_await(result) -> None:
         await result
 
 
+async def _report_progress(on_progress, done: int, success: int, failed: int, *, match=None) -> None:
+    if not on_progress:
+        return
+    extra = {}
+    if match is not None:
+        extra["current_match"] = f"{match.team_a} vs {match.team_b}"
+    await _maybe_await(on_progress(done, success, failed, **extra))
+
+
 def _encode_best_score(scores: list, upset: str | None = None) -> str:
-    """Persist two likely scores and optional upset scoreline."""
-    clean = normalize_score_prediction(scores, upset)["best_scores"]
-    upset_val = upset if upset and upset != "?" else None
-    if upset_val:
-        return json.dumps({"scores": clean, "upset": upset_val}, ensure_ascii=False)
-    return json.dumps(clean or ["?"], ensure_ascii=False)
+    """Backward-compatible alias."""
+    return encode_best_score(scores, upset)
 
 
 def _parse_odds_json(val):

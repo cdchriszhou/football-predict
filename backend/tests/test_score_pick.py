@@ -433,6 +433,18 @@ def test_align_draw_fav_keeps_draw_primary():
     assert _score_outcome(out[1]) in ("draw", "win")
 
 
+def test_reconcile_wdl_with_score_picks_fixes_market_ai_mismatch():
+    from service.score_pick import reconcile_wdl_with_score_picks, dominant_wdl_outcome
+
+    # NZ vs Egypt style: market W/D/L favours team_a win, scores say team_b win
+    w, d, l = reconcile_wdl_with_score_picks(["0:1", "0:2"], 66.8, 19.0, 14.2)
+    assert dominant_wdl_outcome(w, d, l) == "lose"
+    assert w < l
+    # Already aligned — no change
+    w2, d2, l2 = reconcile_wdl_with_score_picks(["1:0", "2:0"], 62.0, 22.0, 16.0)
+    assert dominant_wdl_outcome(w2, d2, l2) == "win"
+
+
 def test_reconcile_cluster_swaps_likelier_score_from_upset():
     picks, upset = reconcile_likely_upset_cluster(["2:0", "4:0"], "3:0", {
         "2:0": 6.0, "3:0": 6.0, "4:0": 7.5, "1:1": 15.0,

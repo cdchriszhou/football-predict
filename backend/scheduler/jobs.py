@@ -7,17 +7,26 @@ from data.competitions import list_competitions
 from data.match_status import maintain_competition_matches
 from service.prediction_service import PredictionService
 from db import async_session
-from db.sqlite_write import commit_session
+from db.sqlite_write import IS_SQLITE, commit_session, write_lock, _commit_with_retry
 from utils.logger import logger
 
 scheduler = AsyncIOScheduler()
 
 
 async def _crawl_all():
+    from service.write_guard import is_heavy_job_running
+    if is_heavy_job_running():
+        logger.info("Scheduled crawl skipped (heavy job in progress)")
+        return
     async with async_session() as db:
         try:
-            await run_all_crawlers(db)
-            await commit_session(db)
+            if IS_SQLITE:
+                async with write_lock:
+                    await run_all_crawlers(db)
+                    await _commit_with_retry(db)
+            else:
+                await run_all_crawlers(db)
+                await commit_session(db)
         except Exception as e:
             await db.rollback()
             logger.error(f"Scheduled crawl failed: {e}")
@@ -30,8 +39,13 @@ async def _crawl_odds():
         return
     async with async_session() as db:
         try:
-            await run_all_odds_crawlers(db)
-            await commit_session(db)
+            if IS_SQLITE:
+                async with write_lock:
+                    await run_all_odds_crawlers(db)
+                    await _commit_with_retry(db)
+            else:
+                await run_all_odds_crawlers(db)
+                await commit_session(db)
         except Exception as e:
             await db.rollback()
             logger.error(f"Scheduled odds crawl failed: {e}")
@@ -45,11 +59,19 @@ async def _sync_live_scores():
         try:
             from data.match_status import sync_live_scores
             from service.score_backtest import invalidate_daily_report_cache
-            result = await sync_live_scores(db, "worldcup-2026", network=True)
-            if int(result.get("updated") or 0):
-                logger.info(f"Scheduled live score sync: {result}")
-                await invalidate_daily_report_cache("worldcup-2026")
-            await commit_session(db)
+            if IS_SQLITE:
+                async with write_lock:
+                    result = await sync_live_scores(db, "worldcup-2026", network=True)
+                    if int(result.get("updated") or 0):
+                        logger.info(f"Scheduled live score sync: {result}")
+                        await invalidate_daily_report_cache("worldcup-2026")
+                    await _commit_with_retry(db)
+            else:
+                result = await sync_live_scores(db, "worldcup-2026", network=True)
+                if int(result.get("updated") or 0):
+                    logger.info(f"Scheduled live score sync: {result}")
+                    await invalidate_daily_report_cache("worldcup-2026")
+                await commit_session(db)
         except Exception as e:
             await db.rollback()
             logger.error(f"Scheduled live score sync failed: {e}")
@@ -62,15 +84,27 @@ async def _maintain_matches():
         return
     async with async_session() as db:
         try:
-            for comp in list_competitions():
-                if comp.get("type") == "racing":
-                    continue
-                try:
-                    await maintain_competition_matches(db, comp["slug"])
-                except Exception as e:
-                    logger.warning(f"Scheduled maintain failed [{comp['slug']}]: {e}")
-                    await db.rollback()
-            await commit_session(db)
+            if IS_SQLITE:
+                async with write_lock:
+                    for comp in list_competitions():
+                        if comp.get("type") == "racing":
+                            continue
+                        try:
+                            await maintain_competition_matches(db, comp["slug"])
+                        except Exception as e:
+                            logger.warning(f"Scheduled maintain failed [{comp['slug']}]: {e}")
+                            await db.rollback()
+                    await _commit_with_retry(db)
+            else:
+                for comp in list_competitions():
+                    if comp.get("type") == "racing":
+                        continue
+                    try:
+                        await maintain_competition_matches(db, comp["slug"])
+                    except Exception as e:
+                        logger.warning(f"Scheduled maintain failed [{comp['slug']}]: {e}")
+                        await db.rollback()
+                await commit_session(db)
         except Exception as e:
             await db.rollback()
             logger.error(f"Scheduled match maintenance failed: {e}")

@@ -22,6 +22,7 @@ _batch_state: dict[str, Any] = {
     "total": 0,
     "success": 0,
     "failed": 0,
+    "current_match": None,
     "competition": None,
     "model": None,
     "error": None,
@@ -56,6 +57,7 @@ async def run_batch_predict_job(
             "total": 0,
             "success": 0,
             "failed": 0,
+            "current_match": None,
             "competition": competition_slug,
             "model": model or "auto",
             "error": None,
@@ -72,10 +74,12 @@ async def run_batch_predict_job(
             total = (await db.execute(query)).scalar() or 0
             _batch_state["total"] = total
 
-        async def on_progress(done: int, success: int, failed: int) -> None:
+        async def on_progress(done: int, success: int, failed: int, **extra) -> None:
             _batch_state["done"] = done
             _batch_state["success"] = success
             _batch_state["failed"] = failed
+            if extra.get("current_match"):
+                _batch_state["current_match"] = extra["current_match"]
 
         async with async_session() as db:
             await service.batch_predict(
@@ -93,6 +97,7 @@ async def run_batch_predict_job(
         _batch_state["error"] = str(e)
     finally:
         _batch_state["running"] = False
+        _batch_state["current_match"] = None
         _batch_state["finished_at"] = datetime.utcnow().isoformat()
         release_heavy_job("batch")
 

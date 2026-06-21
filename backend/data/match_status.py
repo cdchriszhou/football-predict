@@ -4,7 +4,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 
 from sqlalchemy import delete, func, select, update
-from sqlalchemy.exc import OperationalError
+from sqlalchemy.exc import OperationalError, IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from utils.logger import logger
@@ -117,6 +117,14 @@ async def backfill_team_seasons(db: AsyncSession, slug: str) -> int:
     return updated
 
 
+def _dedupe_fixture_key(slug: str, m: Match) -> tuple:
+    """Grouping key for duplicate fixture detection."""
+    if slug == "worldcup-2026":
+        pair = tuple(sorted([m.team_a, m.team_b]))
+        return (m.stage, m.group_name or "", pair)
+    return (m.stage, m.group_name or "", m.team_a, m.team_b)
+
+
 async def dedupe_duplicate_fixtures(db: AsyncSession, slug: str) -> int:
     """Remove duplicate match rows sharing the same stage/group/teams (schedule re-sync artifact)."""
     rows = (await db.execute(
@@ -124,21 +132,28 @@ async def dedupe_duplicate_fixtures(db: AsyncSession, slug: str) -> int:
     )).scalars().all()
     groups: dict[tuple, list[Match]] = {}
     for m in rows:
-        key = (m.stage, m.group_name or "", m.team_a, m.team_b)
+        key = _dedupe_fixture_key(slug, m)
         groups.setdefault(key, []).append(m)
 
     removed = 0
     for items in groups.values():
         if len(items) <= 1:
             continue
+        from data.worldcup_venues import is_canonical_team_order
+
         items.sort(
             key=lambda m: (
+                1 if slug == "worldcup-2026" and is_canonical_team_order(m.team_a, m.team_b) else 0,
                 1 if m.status == MATCH_FINISHED and m.result_a is not None else 0,
                 1 if m.status == MATCH_LIVE else 0,
+                1 if m.external_id is not None else 0,
+                1 if m.group_name else 0,
                 -(m.id or 0),
             ),
             reverse=True,
         )
+        if slug == "worldcup-2026" and items[0].stage == "小组赛":
+            await _apply_canonical_team_swap(db, items[0])
         for dup in items[1:]:
             await db.execute(delete(Prediction).where(Prediction.match_id == dup.id))
             await db.execute(delete(Odds).where(Odds.match_id == dup.id))
@@ -296,6 +311,7 @@ async def apply_confirmed_results(db: AsyncSession, slug: str) -> int:
             )
         )
         match = row.scalar_one_or_none()
+        reversed_match = False
         if not match:
             row = await db.execute(
                 select(Match).where(
@@ -306,13 +322,18 @@ async def apply_confirmed_results(db: AsyncSession, slug: str) -> int:
                 )
             )
             match = row.scalar_one_or_none()
+            reversed_match = match is not None
         if not match:
             continue
-        match.result_a = int(item["result_a"])
-        match.result_b = int(item["result_b"])
+        ra, rb = int(item["result_a"]), int(item["result_b"])
+        if reversed_match:
+            ra, rb = rb, ra
+        match.result_a = ra
+        match.result_b = rb
         match.status = MATCH_FINISHED
-        from data.worldcup_venues import venue_for_match
-        vn = venue_for_match(item["team_a"], item["team_b"])
+        from data.worldcup_venues import venue_for_match, canonical_team_order
+        ca, cb = canonical_team_order(item["team_a"], item["team_b"])
+        vn = venue_for_match(ca, cb)
         if vn:
             match.location, match.stadium = vn
         elif item.get("location"):
@@ -472,6 +493,196 @@ _RESULT_SYNC_INTERVAL_SEC = 60
 _LIVE_CACHE_TTL_SEC = 45
 
 
+def _mirror_score_token(score: str) -> str:
+    if not score or score == "?":
+        return score
+    normalized = str(score).replace("：", ":").strip()
+    if ":" not in normalized:
+        return score
+    left, right = normalized.split(":", 1)
+    return f"{right}:{left}"
+
+
+_SCORE_ODDS_OTHER_SWAP = {"胜其它": "负其它", "负其它": "胜其它", "平其它": "平其它"}
+_HAFU_SWAP = str.maketrans("胜负", "负胜")
+
+
+def _mirror_half_full_key(key: str) -> str:
+    return key.translate(_HAFU_SWAP) if key else key
+
+
+def _mirror_half_full_value(val):
+    import json
+
+    if val is None:
+        return val
+    if isinstance(val, str):
+        try:
+            data = json.loads(val)
+        except json.JSONDecodeError:
+            return val
+        serialized = True
+    else:
+        data = val
+        serialized = False
+    if not isinstance(data, dict):
+        return val
+    out = {_mirror_half_full_key(k): v for k, v in data.items()}
+    return json.dumps(out, ensure_ascii=False) if serialized else out
+
+
+def _mirror_score_odds_value(val):
+    """Flip CRS keys and WDL meta when team_a/team_b are swapped."""
+    import json
+    from crawler.sporttery_client import _flip_handicap
+
+    if val is None:
+        return val
+    if isinstance(val, str):
+        try:
+            data = json.loads(val)
+        except json.JSONDecodeError:
+            return val
+        serialized = True
+    else:
+        data = val
+        serialized = False
+    if not isinstance(data, dict):
+        return val
+
+    out: dict = {}
+    for k, v in data.items():
+        if k == "_meta" and isinstance(v, dict):
+            meta = dict(v)
+            euro = dict(meta.get("european") or {})
+            if euro.get("win_win") is not None and euro.get("win_lose") is not None:
+                euro["win_win"], euro["win_lose"] = euro["win_lose"], euro["win_win"]
+                meta["european"] = euro
+            macau = dict(meta.get("macau") or {})
+            if macau.get("handicap"):
+                macau["handicap"] = _flip_handicap(str(macau["handicap"]))
+            if macau.get("handicap_win") is not None and macau.get("handicap_lose") is not None:
+                macau["handicap_win"], macau["handicap_lose"] = (
+                    macau["handicap_lose"],
+                    macau["handicap_win"],
+                )
+                meta["macau"] = macau
+            out[k] = meta
+        elif ":" in str(k):
+            out[_mirror_score_token(str(k))] = v
+        elif k in _SCORE_ODDS_OTHER_SWAP:
+            out[_SCORE_ODDS_OTHER_SWAP[k]] = v
+        else:
+            out[k] = v
+    return json.dumps(out, ensure_ascii=False) if serialized else out
+
+
+def _swap_match_results_for_side_swap(match: Match) -> None:
+    if match.result_a is not None and match.result_b is not None:
+        match.result_a, match.result_b = match.result_b, match.result_a
+
+
+async def _mirror_match_sidecar_rows(db: AsyncSession, match: Match) -> None:
+    """Sync predictions/odds perspective after team_a/team_b swap."""
+    from crawler.sporttery_client import _flip_handicap
+    from service.prediction_consistency import repair_prediction_record
+
+    preds = (
+        await db.execute(select(Prediction).where(Prediction.match_id == match.id))
+    ).scalars().all()
+    for pred in preds:
+        if pred.best_score:
+            pred.best_score = _mirror_best_score_value(pred.best_score)
+        if pred.win_rate is not None and pred.lose_rate is not None:
+            pred.win_rate, pred.lose_rate = pred.lose_rate, pred.win_rate
+
+    odds_rows = (
+        await db.execute(select(Odds).where(Odds.match_id == match.id))
+    ).scalars().all()
+    for odds in odds_rows:
+        if odds.win_win is not None and odds.win_lose is not None:
+            odds.win_win, odds.win_lose = odds.win_lose, odds.win_win
+        if odds.handicap_win is not None and odds.handicap_lose is not None:
+            odds.handicap_win, odds.handicap_lose = odds.handicap_lose, odds.handicap_win
+        if odds.handicap:
+            odds.handicap = _flip_handicap(odds.handicap)
+        if odds.score_odds:
+            odds.score_odds = _mirror_score_odds_value(odds.score_odds)
+        if odds.half_full_odds:
+            odds.half_full_odds = _mirror_half_full_value(odds.half_full_odds)
+
+    for pred in preds:
+        repair_prediction_record(pred, match)
+
+
+async def _apply_canonical_team_swap(db: AsyncSession, match: Match) -> bool:
+    """Swap fixture to FIFA home/away order and mirror all team-relative fields."""
+    from data.worldcup_venues import canonical_team_order, is_canonical_team_order
+
+    if is_canonical_team_order(match.team_a, match.team_b):
+        return False
+    ca, cb = canonical_team_order(match.team_a, match.team_b)
+    match.team_a, match.team_b = ca, cb
+    _swap_match_results_for_side_swap(match)
+    await _mirror_match_sidecar_rows(db, match)
+    return True
+
+
+def _mirror_best_score_value(val):
+    """Flip team_a:team_b score lines when home/away teams are swapped."""
+    import json
+
+    if val is None:
+        return val
+    if isinstance(val, dict):
+        out = dict(val)
+        if out.get("scores"):
+            out["scores"] = [_mirror_score_token(s) for s in out["scores"]]
+        if out.get("upset"):
+            out["upset"] = _mirror_score_token(out["upset"])
+        return out
+    if isinstance(val, list):
+        return [_mirror_score_token(s) for s in val]
+    if isinstance(val, str):
+        if val.startswith("{") or val.startswith("["):
+            try:
+                parsed = json.loads(val)
+                return json.dumps(_mirror_best_score_value(parsed), ensure_ascii=False)
+            except json.JSONDecodeError:
+                pass
+        return _mirror_score_token(val)
+    return val
+
+
+async def repair_canonical_team_order(db: AsyncSession, slug: str) -> int:
+    """Swap team_a/team_b to FIFA official home/away order when stored reversed."""
+    if slug != "worldcup-2026":
+        return 0
+
+    rows = (
+        await db.execute(
+            select(Match).where(
+                Match.competition_slug == slug,
+                Match.stage == "小组赛",
+            )
+        )
+    ).scalars().all()
+    fixed = 0
+    swapped_ids: list[int] = []
+    for m in rows:
+        if await _apply_canonical_team_swap(db, m):
+            fixed += 1
+            swapped_ids.append(m.id)
+    if swapped_ids:
+        from service.prediction_consistency import invalidate_prediction_cache
+        for mid in swapped_ids:
+            await invalidate_prediction_cache(mid)
+    if fixed:
+        await db.flush()
+        logger.info("Canonical team order repair [%s]: %d fixture(s)", slug, fixed)
+    return fixed
+
+
 async def repair_canonical_kickoffs(db: AsyncSession, slug: str) -> int:
     """Align stored kickoff/status with official schedule (any status, incl. wrong finished)."""
     if slug != "worldcup-2026":
@@ -540,10 +751,16 @@ async def sync_live_scores(db: AsyncSession, slug: str, *, network: bool = False
     if slug != "worldcup-2026":
         return {"status": "skipped"}
     try:
+        await repair_canonical_team_order(db, slug)
         from crawler.worldcup_score_sync import sync_worldcup_scores_from_football_data
         return await sync_worldcup_scores_from_football_data(db, network=network)
+    except IntegrityError as exc:
+        logger.warning(f"Live score sync integrity error [{slug}]: {exc}")
+        await db.rollback()
+        return {"status": "failed", "error": "integrity_error"}
     except Exception as exc:
         logger.warning(f"Live score sync failed [{slug}]: {exc}")
+        await db.rollback()
         return {"status": "failed", "error": str(exc)}
 
 
@@ -551,7 +768,8 @@ async def sync_match_results_throttled(db: AsyncSession, slug: str) -> int:
     """Apply history + cached live scores before serving match lists (fast, non-blocking)."""
     import time
 
-    kickoffs = await repair_canonical_kickoffs(db, slug)
+    kickoffs = await repair_canonical_team_order(db, slug)
+    kickoffs += await repair_canonical_kickoffs(db, slug)
     applied = await apply_confirmed_results(db, slug)
 
     live_sync = {"updated": 0}
@@ -599,6 +817,7 @@ async def maintain_competition_matches(db: AsyncSession, slug: str) -> dict:
     team_seasons = await backfill_team_seasons(db, slug)
     removed = await cleanup_orphan_seed_matches(db, slug)
     deduped = await dedupe_duplicate_fixtures(db, slug)
+    team_order_fixed = await repair_canonical_team_order(db, slug)
     cleared_scores = await clear_placeholder_scores(db, slug)
     reopened = await reopen_prematurely_finished_matches(db, slug)
     confirmed = await apply_confirmed_results(db, slug)
@@ -611,6 +830,8 @@ async def maintain_competition_matches(db: AsyncSession, slug: str) -> dict:
     odds_backfill = await backfill_historical_odds(db, slug)
     repredicted = await refresh_predictions_for_matches(db, repaired_ids)
     predictions_refreshed = await refresh_missed_finished_predictions(db, slug)
+    from service.prediction_consistency import repair_stale_predictions
+    predictions_repaired = await repair_stale_predictions(db, slug, upcoming_only=True)
     try:
         updated = await reconcile_stale_matches(db, slug)
     except OperationalError as exc:
@@ -635,6 +856,7 @@ async def maintain_competition_matches(db: AsyncSession, slug: str) -> dict:
         "team_seasons": team_seasons,
         "removed_orphans": removed,
         "deduped_fixtures": deduped,
+        "team_order_fixed": team_order_fixed,
         "cleared_placeholder_scores": cleared_scores,
         "reopened_premature": reopened,
         "confirmed_results_applied": confirmed,
@@ -643,6 +865,7 @@ async def maintain_competition_matches(db: AsyncSession, slug: str) -> dict:
         "predictions_repredicted": repredicted,
         "historical_odds_backfilled": odds_backfill,
         "predictions_refreshed": predictions_refreshed,
+        "predictions_repaired": predictions_repaired,
         "status_updated": updated,
         "standings_recomputed": standings,
     }

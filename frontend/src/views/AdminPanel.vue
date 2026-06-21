@@ -770,10 +770,13 @@ async function pollBatchPredict() {
     const done = Number(s.done) || 0
     const total = Number(s.total) || 0
     if (s.running) {
+      const cur = s.current_match
       batchResult.value = total > 0
-        ? t('admin.batchProgress', { done, total })
+        ? (cur
+          ? t('admin.batchProgressCurrent', { done, total, match: cur })
+          : t('admin.batchProgress', { done, total }))
         : t('admin.batchPredicting')
-      await sleep(4000)
+      await sleep(2000)
       continue
     }
     if (s.error) {

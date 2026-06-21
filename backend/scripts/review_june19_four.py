@@ -10,7 +10,6 @@ from sqlalchemy import select
 from db import async_session
 from db.models import Match, Prediction, Odds, Team
 from api.predictions import _normalized_prediction_scores
-from service.prediction_service import prepare_fused_odds
 
 TARGETS = [
     ("美国", "澳大利亚"),
@@ -98,21 +97,19 @@ async def main():
             )).scalar_one_or_none()
 
             if pred:
-                fused = prepare_fused_odds(odds_row, m.team_a, m.team_b) if odds_row else None
-                norm = _normalized_prediction_scores(
-                    pred,
-                    crs=(fused or {}).get("score_odds"),
-                    odds_row=odds_row,
-                    rank_a=ta.rank if ta else None,
-                    rank_b=tb.rank if tb else None,
-                )
+                norm = await _normalized_prediction_scores(pred, m, db, persist=False)
                 picks = norm.get("best_scores") or []
                 upset = norm.get("upset_score")
                 row["wdl"] = {
-                    "win": pred.win_rate,
-                    "draw": pred.draw_rate,
-                    "lose": pred.lose_rate,
-                    "check": wdl_hit(actual, pred.win_rate, pred.draw_rate or 0, pred.lose_rate or 0),
+                    "win": norm["win_rate"],
+                    "draw": norm["draw_rate"],
+                    "lose": norm["lose_rate"],
+                    "check": wdl_hit(
+                        actual,
+                        norm["win_rate"],
+                        norm["draw_rate"],
+                        norm["lose_rate"],
+                    ),
                 }
                 row["scores"] = picks
                 row["score_hit"] = score_hit(actual, picks + ([upset] if upset else []))

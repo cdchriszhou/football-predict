@@ -69,6 +69,27 @@ async def _commit_with_retry(db: AsyncSession, *, retries: int = 8) -> None:
             await asyncio.sleep(wait)
 
 
+async def flush_session(db: AsyncSession, *, retries: int = 8) -> None:
+    """Flush pending changes with retry when SQLite is briefly locked."""
+    if not IS_SQLITE:
+        await db.flush()
+        return
+
+    async with write_lock:
+        for attempt in range(retries):
+            try:
+                await db.flush()
+                return
+            except OperationalError as exc:
+                if "locked" not in str(exc).lower() or attempt >= retries - 1:
+                    raise
+                wait = 0.25 * (attempt + 1)
+                logger.warning(
+                    f"SQLite locked on flush, retry {attempt + 1}/{retries} in {wait:.1f}s"
+                )
+                await asyncio.sleep(wait)
+
+
 async def run_db_write(db: AsyncSession, write_fn, *, retries: int = 8) -> None:
     """Run a write callback under the global SQLite lock (no-op lock on other DBs)."""
     if not IS_SQLITE:

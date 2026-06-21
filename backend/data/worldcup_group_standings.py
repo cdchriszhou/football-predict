@@ -279,6 +279,10 @@ def format_group_situation(
     if ctx.get("both_need_draw"):
         lines.append("  ⚠ 末轮积分接近，存在默契平局可能")
 
+    note = ctx.get("knockout_outlook_note")
+    if note:
+        lines.append(f"  出线形势：{note}")
+
     return "\n".join(lines) + "\n"
 
 
@@ -324,3 +328,35 @@ def load_standings_from_history(
 ) -> dict[str, GroupTeamStanding]:
     """Standings for backtest from worldcup_history rows."""
     return compute_standings_from_rows(historical, group_name, before_time=before_time)
+
+
+async def load_group_fifa_ranks(
+    db: AsyncSession,
+    competition_slug: str,
+    group_name: str,
+) -> list[int]:
+    """FIFA ranks for all teams in a group (for knockout path estimation)."""
+    from db.models import Team
+    from crawler.team_crawler import GROUPS
+
+    letter = (group_name or "").strip().upper()
+    names = GROUPS.get(letter) or []
+    if not names:
+        rows = (await db.execute(
+            select(Team.name, Team.rank).where(
+                Team.competition_slug == competition_slug,
+                Team.group_name == group_name,
+            )
+        )).all()
+        return sorted(int(r or 50) for _, r in rows)
+
+    ranks: list[int] = []
+    for name in names:
+        row = (await db.execute(
+            select(Team.rank).where(
+                Team.competition_slug == competition_slug,
+                Team.name == name,
+            )
+        )).scalar_one_or_none()
+        ranks.append(int(row or 50))
+    return sorted(ranks)

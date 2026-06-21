@@ -1219,6 +1219,22 @@ def run_full_score_pipeline(
     best = promote_narrow_home_win_over_draw(
         best, crs, win_rate=win_rate, lose_rate=lose_rate,
     )
+    from service.score_context import apply_contextual_score_adjustments
+    best = apply_contextual_score_adjustments(
+        best,
+        crs,
+        group_context=group_context,
+        odds_dict=odds_dict,
+        win_rate=win_rate,
+        lose_rate=lose_rate,
+        draw_rate=draw_rate,
+        expected_a=expected_a,
+        expected_b=expected_b,
+        rank_a=rank_a,
+        rank_b=rank_b,
+        team_a=(team_a or {}).get("name", ""),
+        team_b=(team_b or {}).get("name", ""),
+    )
     best = align_score_picks_to_wdl(
         best,
         crs,
@@ -1818,6 +1834,44 @@ def align_wdl_to_score_picks(
 ) -> tuple[float, float, float]:
     """Align W/D/L with score picks — only nudge when primary is a draw."""
     return refine_wdl_after_score_pick(best_scores, win_rate, draw_rate, lose_rate)
+
+
+def reconcile_wdl_with_score_picks(
+    best_scores: list[str],
+    win_rate: float,
+    draw_rate: float,
+    lose_rate: float,
+    *,
+    min_wdl_margin: float = 8.0,
+) -> tuple[float, float, float]:
+    """When fused W/D/L and primary score pick disagree, trust the score pick."""
+    picks = [s for s in (best_scores or []) if s and s != "?"]
+    if not picks:
+        return win_rate, draw_rate, lose_rate
+
+    score_out = _score_outcome(picks[0])
+    dom, margin = wdl_outcome_margin(win_rate, draw_rate, lose_rate)
+    if score_out == dom:
+        return refine_wdl_after_score_pick(picks, win_rate, draw_rate, lose_rate)
+    if margin < min_wdl_margin:
+        return win_rate, draw_rate, lose_rate
+
+    rates = {"win": win_rate, "draw": draw_rate, "lose": lose_rate}
+    boosted = max(rates[score_out], rates[dom], 55.0)
+    remainder = max(100.0 - boosted, 0.0)
+    new_draw = round(min(draw_rate, remainder * 0.4), 1) if score_out != "draw" else boosted
+    if score_out == "draw":
+        new_win = round(remainder * (win_rate / max(win_rate + lose_rate, 1.0)), 1)
+        new_lose = round(remainder - new_win, 1)
+        return _normalize_wdl(new_win, boosted, new_lose)
+
+    other = "lose" if score_out == "win" else "win"
+    new_primary = round(boosted, 1)
+    new_other = round(min(rates[other], remainder - new_draw), 1)
+    new_draw = round(remainder - new_other, 1)
+    if score_out == "win":
+        return _normalize_wdl(new_primary, new_draw, new_other)
+    return _normalize_wdl(new_other, new_draw, new_primary)
 
 
 def _normalize_wdl(

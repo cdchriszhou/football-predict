@@ -1320,40 +1320,48 @@ async def run_team_crawler(db: AsyncSession):
                 if canonical != wiki_name:
                     logger.info(f"  Resolved Wikipedia name '{wiki_name}' -> '{canonical}'")
 
-            # 3. Per-team upsert
-            for group_name, team_names in GROUPS.items():
-                for cn_name in team_names:
-                    info = TEAM_DATA.get(cn_name)
-                    if info is None:
-                        logger.warning(f"No TEAM_DATA entry for '{cn_name}', skipping")
-                        continue
+            from db.sqlite_write import IS_SQLITE, write_lock
 
-                    en_name = TEAM_NAME_MAP.get(cn_name, cn_name)
-                    wiki_players = resolved_scraped.get(en_name)
+            async def _persist_teams():
+                # 3. Per-team upsert
+                for group_name, team_names in GROUPS.items():
+                    for cn_name in team_names:
+                        info = TEAM_DATA.get(cn_name)
+                        if info is None:
+                            logger.warning(f"No TEAM_DATA entry for '{cn_name}', skipping")
+                            continue
 
-                    merged_players, source = merge_team_data(cn_name, wiki_players, info)
+                        en_name = TEAM_NAME_MAP.get(cn_name, cn_name)
+                        wiki_players = resolved_scraped.get(en_name)
 
-                    if source == "scraped":
-                        stats["scraped_teams"] += 1
-                    else:
-                        stats["fallback_teams"] += 1
+                        merged_players, source = merge_team_data(cn_name, wiki_players, info)
 
-                    player_count, action = await _upsert_team(
-                        db, cn_name, group_name, info, merged_players
-                    )
-                    stats[action] += 1
-                    stats["players"] += player_count
+                        if source == "scraped":
+                            stats["scraped_teams"] += 1
+                        else:
+                            stats["fallback_teams"] += 1
 
-            await db.flush()
+                        player_count, action = await _upsert_team(
+                            db, cn_name, group_name, info, merged_players
+                        )
+                        stats[action] += 1
+                        stats["players"] += player_count
 
-            summary = (
-                f"Teams: {stats['scraped_teams']} scraped, {stats['fallback_teams']} fallback | "
-                f"Created {stats['created']}, updated {stats['updated']} | "
-                f"Players: {stats['players']}"
-            )
-            await _log_crawler(db, "team", "success", stats["players"], start=start_time)
-            logger.info(f"Team crawler complete: {summary}")
-            return {"status": "success", **stats, "summary": summary}
+                await db.flush()
+
+                summary = (
+                    f"Teams: {stats['scraped_teams']} scraped, {stats['fallback_teams']} fallback | "
+                    f"Created {stats['created']}, updated {stats['updated']} | "
+                    f"Players: {stats['players']}"
+                )
+                await _log_crawler(db, "team", "success", stats["players"], start=start_time)
+                logger.info(f"Team crawler complete: {summary}")
+                return {"status": "success", **stats, "summary": summary}
+
+            if IS_SQLITE:
+                async with write_lock:
+                    return await _persist_teams()
+            return await _persist_teams()
 
         except Exception as e:
             await _safe_crawler_fail(db, "team", e, start_time)
