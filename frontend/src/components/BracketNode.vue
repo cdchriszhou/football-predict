@@ -1,5 +1,5 @@
 <template>
-  <div class="bracket-node">
+  <div class="bracket-node" :class="{ compact }">
     <div class="match-slot" :class="{ winner: isWinner(node.team_a) }">
       <span class="team">{{ node.team_a || t('bracket.tbd') }}</span>
       <span class="score" v-if="node.result_a !== undefined">{{ node.result_a }}</span>
@@ -9,23 +9,30 @@
       <span class="team">{{ node.team_b || t('bracket.tbd') }}</span>
       <span class="score" v-if="node.result_b !== undefined">{{ node.result_b }}</span>
     </div>
+    <div v-if="penaltyLine" class="penalty-line">{{ penaltyLine }}</div>
   </div>
 </template>
 
 <script setup>
+import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { isMatchWinner } from '@/utils/matchScore'
 
 const { t } = useI18n()
 
 const props = defineProps({
-  node: { type: Object, required: true }
+  node: { type: Object, required: true },
+  compact: { type: Boolean, default: false },
+})
+
+const penaltyLine = computed(() => {
+  const n = props.node
+  if (n.penalty_a == null || n.penalty_b == null) return ''
+  return t('match.penaltyShort', { score: `${n.penalty_a} - ${n.penalty_b}` })
 })
 
 function isWinner(team) {
-  if (!team || props.node.result_a === undefined || props.node.result_b === undefined) return false
-  if (props.node.result_a > props.node.result_b) return team === props.node.team_a
-  if (props.node.result_b > props.node.result_a) return team === props.node.team_b
-  return false
+  return isMatchWinner(props.node, team)
 }
 </script>
 
@@ -60,8 +67,32 @@ function isWinner(team) {
   color: #1a237e;
 }
 
+.penalty-line {
+  text-align: center;
+  font-size: 10px;
+  font-weight: 700;
+  color: #5c6bc0;
+  background: #eef0fb;
+  padding: 2px 4px;
+}
+
+.bracket-node.compact {
+  width: 136px;
+}
+.bracket-node.compact .match-slot {
+  padding: 5px 8px;
+  font-size: 12px;
+}
+.bracket-node.compact .team {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 88px;
+}
+
 @media (max-width: 767px) {
   .bracket-node { width: 140px; }
+  .bracket-node.compact { width: 124px; }
   .match-slot { padding: 6px 8px; font-size: 12px; }
   .score { font-size: 12px; }
 }

@@ -58,6 +58,10 @@ export default defineConfig({
       '@': fileURLToPath(new URL('./src', import.meta.url))
     }
   },
+  build: {
+    // Single CSS bundle — avoids lazy route chunks missing styles after PWA/SW cache mismatch.
+    cssCodeSplit: false,
+  },
   server: {
     port: 5173,
     host: '0.0.0.0',

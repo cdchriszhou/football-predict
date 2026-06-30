@@ -84,6 +84,7 @@ export default {
     updateDoneSimple: 'Data update complete',
     updateFailed: 'Update failed',
     loadFailed: 'Failed to load dashboard data. Please try again later.',
+    scoreLoadPartial: 'Today/recent results timed out. Please refresh and try again.',
     refreshProgress: 'Updating: {phase}',
     refreshTimeout: 'Data refresh timed out; check admin panel for progress',
     refreshAlreadyRunning: 'A data refresh is already running',
@@ -171,9 +172,11 @@ export default {
   },
   bracket: {
     title: 'Knockout bracket',
-    subtitle: 'Auto-generated after group stage, updated as results come in',
+    subtitle: 'Symmetric FIFA tree — upper and lower halves meet at the final',
     empty: 'Knockout bracket will be generated after the group stage',
-    tbd: 'TBD'
+    tbd: 'TBD',
+    pyramidHint: 'Scroll horizontally; upper and lower halves converge at the final — tap a match for details',
+    thirdPlace: 'Third place',
   },
   sporttery: {
     notOnSale: 'Sporttery odds not yet available',

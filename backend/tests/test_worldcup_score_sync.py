@@ -49,6 +49,39 @@ def test_assign_external_id_skips_duplicate_row():
     assert duplicate.external_id is None
 
 
+def test_june22_history_includes_uruguay_cape_verde():
+    from data.worldcup_history import HISTORICAL_MATCHES
+
+    row = next(
+        (
+            m for m in HISTORICAL_MATCHES
+            if m.get("year") == 2026
+            and m.get("team_a") == "乌拉圭"
+            and m.get("team_b") == "佛得角"
+        ),
+        None,
+    )
+    assert row is not None
+    assert row["result_a"] == 2 and row["result_b"] == 2
+
+
+def test_june25_history_includes_bosnia_qatar():
+    from data.worldcup_history import HISTORICAL_MATCHES
+
+    row = next(
+        (
+            m for m in HISTORICAL_MATCHES
+            if m.get("year") == 2026
+            and m.get("team_a") == "波黑"
+            and m.get("team_b") == "卡塔尔"
+        ),
+        None,
+    )
+    assert row is not None
+    assert row["result_a"] == 3 and row["result_b"] == 1
+    assert row.get("matchday") == 3
+
+
 def test_build_ext_index_clears_duplicate_owner():
     canonical = _db_row("墨西哥", "南非", datetime(2026, 6, 18, 3, 0), row_id=30, external_id=537342)
     duplicate = _db_row("南非", "墨西哥", datetime(2026, 6, 18, 3, 0), row_id=2065, external_id=537342)

@@ -89,6 +89,9 @@ def build_group_context(
         "qualified_a": False,
         "qualified_b": False,
         "both_need_draw": False,
+        "both_must_win": False,
+        "draw_suits_a": False,
+        "draw_suits_b": False,
         "dead_rubber": False,
         "is_final_group_match": matchday == 3,
         "need_goals_a": False,
@@ -97,6 +100,9 @@ def build_group_context(
         "form_xg_b": 0.0,
         "defense_leak_a": 0.0,
         "defense_leak_b": 0.0,
+        "rank_a": rank_a,
+        "rank_b": rank_b,
+        "rank_gap": abs(rank_a - rank_b),
     }
 
     if stage == "小组赛" and standings and matchday >= 2:
@@ -182,18 +188,25 @@ def analyze_match_context(
 
     # ── Collusion detection (默契球) ──
     if ctx.get("is_final_group_match") or ctx.get("matchday") == 3:
-        collusion = 0.10
-        if ctx.get("both_need_draw"):
+        collusion = 0.15   # was 0.10 — higher baseline for 2026 draw rate
+        if ctx.get("both_must_win"):
+            collusion = 0.04
+        elif ctx.get("both_need_draw"):
             collusion += 0.18
             result.alerts.append("小组赛末轮实力接近：存在默契平局可能")
+        elif ctx.get("draw_suits_a") or ctx.get("draw_suits_b"):
+            collusion += 0.06
+            result.alerts.append("末轮同分：领先方可接受平局，落后方需抢胜")
+        if ctx.get("must_win_a") or ctx.get("must_win_b"):
+            collusion = max(0.04, collusion - 0.14)
         if market.get("draw_protection"):
             collusion += 0.15
             result.alerts.append("盘口平赔保护：庄家防范默契平局")
         imp_draw = fund.get("market_draw_pct", 0)
         if imp_draw > 30:
             collusion += 0.08
-        result.collusion_risk = min(0.50, collusion)
-        result.draw_adjustment += result.collusion_risk * 12
+        result.collusion_risk = min(0.55, collusion)   # was 0.50
+        result.draw_adjustment += result.collusion_risk * 10
 
     if ctx.get("dead_rubber"):
         result.collusion_risk = max(result.collusion_risk, 0.25)
@@ -204,6 +217,27 @@ def analyze_match_context(
     if ctx.get("stage") == "小组赛" and ctx.get("matchday", 0) >= 2:
         name_a = team_a.get("name", "")
         name_b = team_b.get("name", "")
+        sa = ctx.get("standing_a") or {}
+        sb = ctx.get("standing_b") or {}
+        fav_is_a = rank_a < rank_b
+        opp_st = sb if fav_is_a else sa
+        fav_st = sa if fav_is_a else sb
+        def_team = team_b if fav_is_a else team_a
+
+        if opp_st.get("played") and opp_st.get("goals_against") == 0:
+            result.draw_adjustment += 10.0
+            result.upset_risk = min(0.38, result.upset_risk + 0.10)
+            result.alerts.append(f"对手{('B' if fav_is_a else 'A')}队首轮零封：热门破门难度上调")
+
+        if fav_st.get("played") and fav_st.get("goals_for", 0) / max(1, fav_st["played"]) <= 1.0:
+            result.draw_adjustment += 6.0
+            result.alerts.append(f"{'A' if fav_is_a else 'B'}队首轮进球偏少：闷平概率上升")
+
+        if any(t in def_team.get("tactic", "") for t in ("铁桶", "防守", "防反", "硬朗")):
+            if rank_gap >= 8:
+                result.draw_adjustment += 5.0
+                result.upset_risk = min(0.38, result.upset_risk + 0.06)
+
         if ctx.get("must_win_a"):
             result.draw_adjustment = max(0.0, result.draw_adjustment - 4.0)
             result.alerts.append(f"{name_a} 小组赛需抢分，平局权重下调")

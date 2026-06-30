@@ -1,22 +1,29 @@
 {
   "weights": {
-    "rank": 0.093,
-    "ability": 0.139,
-    "tactic": 0.077,
-    "h2h": 0.062,
-    "odds": 0.52,
-    "players": 0.108
+    "rank": 0.120,
+    "ability": 0.180,
+    "tactic": 0.090,
+    "h2h": 0.070,
+    "odds": 0.400,
+    "players": 0.140
   },
-  "avg_goals": 2.55,
+  "avg_goals": 2.75,
   "knockout_goal_reduction": 0.85,
   "dixon_coles_rho": -0.13,
-  "market_blend": 0.4,
-  "draw_base": 30.0,
+  "market_blend": 0.32,
+  "draw_base": 28.0,
   "score_odds_blend": 0.35,
   "upset_weight": 1.2,
   "collusion_weight": 1.8,
   "manipulation_dampen": 0.15,
-  "low_draw_odds": 3.4,
+  "low_draw_odds": 3.6,
+  "KO_ROUND_PARAMS": {
+    "1/8决赛": {"goal_reduction": 0.88, "draw_boost": 7.0, "et_base": 0.18},
+    "1/4决赛": {"goal_reduction": 0.85, "draw_boost": 8.0, "et_base": 0.20},
+    "半决赛":  {"goal_reduction": 0.82, "draw_boost": 9.0, "et_base": 0.22},
+    "决赛":    {"goal_reduction": 0.80, "draw_boost": 8.0, "et_base": 0.25},
+    "季军赛":  {"goal_reduction": 0.95, "draw_boost": 4.0, "et_base": 0.10}
+  },
   "calibrated_at": "2026-06-12T07:05:24.148309",
   "backtest": {
     "total_matches": 44,

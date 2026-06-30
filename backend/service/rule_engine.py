@@ -54,10 +54,15 @@ class RuleEngine:
     # Draw odds threshold — below this, bookmakers are protecting the draw
     LOW_DRAW_ODDS = 3.5
 
+    # Draw base rate for target_draw anchoring (overridable by CalibratedRuleEngine)
+    # Note: 2026 WC group stage observed draw rate ~28%, higher than historical ~25%
+    DRAW_BASE = 28.0
+
     # Dixon-Coles low-score correlation (typical football value ~ -0.10 to -0.15)
     DIXON_COLES_RHO = -0.12
-    # Per-team expected-goals ceiling (World Cup rarely sees 4+ for one side)
-    MAX_XG_PER_TEAM = 3.2
+    # Per-team expected-goals ceiling (raised from 3.2 — World Cup blowouts like
+    # Germany 7:1 or Netherlands 5:1 need headroom above 4.0 xG for the favourite)
+    MAX_XG_PER_TEAM = 5.5
 
     TACTIC_MAP = {
         "高位压迫":   ("pressing", 82),
@@ -234,29 +239,54 @@ class RuleEngine:
 
         # ── Context-aware draw rate ──
         strength_gap = abs(scores["a"] - scores["b"])
-        target_draw = max(8.0, 28.0 - strength_gap * 0.27)
+        # Milder strength-gap deduction: 2026 WC observed ~28% draw rate
+        target_draw = max(12.0, self.DRAW_BASE - strength_gap * 0.18)
         if strength_gap >= 22:
-            target_draw = max(8.0, target_draw - 4.0)
+            target_draw = max(12.0, target_draw - 3.0)
         if group_context and group_context.get("home_side") and strength_gap >= 15:
-            target_draw = max(7.0, target_draw - 2.5)
+            target_draw = max(10.0, target_draw - 2.0)
 
         # Group stage must-win games → lower draw
         if group_context and (group_context.get("must_win_a") or group_context.get("must_win_b")):
-            target_draw = max(5.0, target_draw - 5.0)
+            target_draw = max(8.0, target_draw - 4.0)
 
         # Knockout stage → higher draw probability (teams more cautious)
         stage = group_context.get("stage", "") if group_context else ""
         is_knockout = stage not in ("", "小组赛")
         if is_knockout:
-            target_draw = min(35.0, target_draw + 4.0)
+            from service.score_pick_config import get_config
+            cfg = get_config()
+            ko_params = cfg.get("KO_ROUND_PARAMS", {}).get(stage, {})
+            draw_boost = float(ko_params.get("draw_boost", 4.0))
+            rank_gap = int(group_context.get("rank_gap") or 0)
+            if rank_gap >= 30:
+                draw_boost *= 0.30
+            elif rank_gap >= 20:
+                draw_boost *= 0.45
+            elif rank_gap >= 12:
+                draw_boost *= 0.60
+            target_draw = min(32.0, target_draw + draw_boost)
 
         # 平赔最关键: low draw odds → bookmaker protecting draw → increase draw %
         if imp_draw is not None and draw_o and draw_o < self.LOW_DRAW_ODDS:
             draw_boost = (self.LOW_DRAW_ODDS - float(draw_o)) * 3.0
-            target_draw = min(35.0, target_draw + draw_boost)
+            target_draw = min(38.0, target_draw + draw_boost)
 
-        scores["draw"] = scores["draw"] * 0.4 + target_draw * 0.6
-        scores["draw"] = max(5.0, min(36.0, scores["draw"]))
+        scores["draw"] = scores["draw"] * 0.40 + target_draw * 0.60
+        scores["draw"] = max(10.0, min(38.0, scores["draw"]))
+
+        # Draw nudge: in close matches, draw should be competitive with win/loss.
+        # The Poisson model structurally under-predicts draws because xG separation
+        # makes symmetric outcomes (1:1, 0:0) mathematically less likely than they
+        # are in reality. This nudge gives draws a fair chance when the match is
+        # relatively balanced (max win/loss < 55%).
+        max_wl = max(scores["a"], scores["b"])
+        if scores["draw"] >= max_wl - 8.0 and max_wl < 55.0:
+            scores["draw"] = max(scores["draw"], max_wl)
+        # Also: when draw is close to being the top pick, give it a slight edge
+        # reflecting the real-world tendency toward draws in tournament football
+        elif scores["draw"] >= max_wl - 4.0 and max_wl < 50.0:
+            scores["draw"] = max(scores["draw"], max_wl + 1.0)
 
         remaining = 100.0 - scores["draw"]
         if remaining < 10:
@@ -275,7 +305,7 @@ class RuleEngine:
         expected_a, expected_b = self._expected_goals(
             att_a, def_a, mid_a, spd_a, phy_a, tac_score_a,
             att_b, def_b, mid_b, spd_b, phy_b, tac_score_b,
-            scores, style_a, style_b, is_knockout
+            scores, style_a, style_b, is_knockout, stage
         )
 
         if group_context:
@@ -310,7 +340,10 @@ class RuleEngine:
         over_under_line = float(ou_raw if ou_raw is not None else 2.5)
 
         best_scores = self._top3_scores(
-            expected_a, expected_b, handicap, scores["draw"], over_under_line
+            expected_a, expected_b, handicap, scores["draw"], over_under_line,
+            is_knockout=is_knockout,
+            win_rate=scores["a"],
+            lose_rate=scores["b"],
         )
 
         # ── Handicap prediction ──
@@ -378,15 +411,23 @@ class RuleEngine:
 
     def _expected_goals(self, att_a, def_a, mid_a, spd_a, phy_a, tac_a,
                         att_b, def_b, mid_b, spd_b, phy_b, tac_b,
-                        scores, style_a, style_b, is_knockout=False) -> tuple:
+                        scores, style_a, style_b, is_knockout=False,
+                        stage: str = "") -> tuple:
         """Poisson-rate model with total-goals normalization.
 
         Uses attack/defense ratios (not weakness amplification) so mismatches
         stay realistic, then normalizes to historical World Cup averages.
         """
         half_avg = self.AVG_GOALS / 2.0
+        # Per-round knockout goal reduction (configurable)
+        ko_reduction = self.KNOCKOUT_GOAL_REDUCTION
+        if is_knockout and stage:
+            from service.score_pick_config import get_config
+            cfg = get_config()
+            ko_params = cfg.get("KO_ROUND_PARAMS", {}).get(stage, {})
+            ko_reduction = float(ko_params.get("goal_reduction", self.KNOCKOUT_GOAL_REDUCTION))
         target_total = self.AVG_GOALS * (
-            self.KNOCKOUT_GOAL_REDUCTION if is_knockout else 1.0
+            ko_reduction if is_knockout else 1.0
         )
 
         # Ratio model: stronger attack vs weaker defense → more goals, but bounded
@@ -401,39 +442,44 @@ class RuleEngine:
             edge = min(max(own / max(opp, 1.0) - 1.0, -0.5), 0.5)
             return 1.0 + scale * edge
 
-        ex_a *= _dim_boost(mid_a, mid_b, 0.06)
-        ex_b *= _dim_boost(mid_b, mid_a, 0.06)
-        ex_a *= _dim_boost(spd_a, spd_b, 0.05)
-        ex_b *= _dim_boost(spd_b, spd_a, 0.05)
-        ex_a *= _dim_boost(phy_a, phy_b, 0.04)
-        ex_b *= _dim_boost(phy_b, phy_a, 0.04)
+        ex_a *= _dim_boost(mid_a, mid_b, 0.12)
+        ex_b *= _dim_boost(mid_b, mid_a, 0.12)
+        ex_a *= _dim_boost(spd_a, spd_b, 0.10)
+        ex_b *= _dim_boost(spd_b, spd_a, 0.10)
+        ex_a *= _dim_boost(phy_a, phy_b, 0.08)
+        ex_b *= _dim_boost(phy_b, phy_a, 0.08)
 
         tac_mul_a, tac_mul_b = self._tactical_goal_multipliers(style_a, style_b)
         ex_a *= tac_mul_a
         ex_b *= tac_mul_b
 
-        # Normalize to World Cup average total goals before win-rate tilt
+        # Soft-blend toward World Cup average (preserves attack/defense mismatch signal)
         total = ex_a + ex_b
-        if total > 0:
-            scale = target_total / total
-            ex_a *= scale
-            ex_b *= scale
+        if total > 0 and abs(total - target_total) > 0.05:
+            # Blend 50% raw model + 50% normalized to target — allows natural variation
+            ex_a_normalized = ex_a / total * target_total
+            ex_b_normalized = ex_b / total * target_total
+            ex_a = ex_a * 0.50 + ex_a_normalized * 0.50
+            ex_b = ex_b * 0.50 + ex_b_normalized * 0.50
 
-        # Shift goals toward the favorite based on win probability (not multiplicative)
+        # Shift goals toward the favorite based on win probability
+        # Stronger tilt to create realistic xG separation (0.35 vs old 0.12)
         win_edge = (scores["a"] - scores["b"]) / 100.0
-        tilt = target_total * 0.12 * win_edge
-        ex_a = max(0.2, ex_a + tilt / 2)
-        ex_b = max(0.2, ex_b - tilt / 2)
+        tilt = target_total * 0.35 * win_edge
+        ex_a = max(0.3, ex_a + tilt)
+        ex_b = max(0.3, ex_b - tilt)
 
         if is_knockout:
             avg = (ex_a + ex_b) / 2
             ex_a = avg + (ex_a - avg) * 0.82
             ex_b = avg + (ex_b - avg) * 0.82
+            # Soft-blend toward knockout target
             total = ex_a + ex_b
-            if total > 0:
-                scale = target_total / total
-                ex_a *= scale
-                ex_b *= scale
+            if total > 0 and abs(total - target_total) > 0.05:
+                ex_a_normalized = ex_a / total * target_total
+                ex_b_normalized = ex_b / total * target_total
+                ex_a = ex_a * 0.50 + ex_a_normalized * 0.50
+                ex_b = ex_b * 0.50 + ex_b_normalized * 0.50
 
         ex_a = max(0.2, min(self.MAX_XG_PER_TEAM, ex_a))
         ex_b = max(0.2, min(self.MAX_XG_PER_TEAM, ex_b))
@@ -560,7 +606,7 @@ class RuleEngine:
         over_under_line: float = 2.5,
     ) -> list[tuple[str, float]]:
         """All scorelines with Dixon-Coles Poisson probability (descending)."""
-        max_goals = 5
+        max_goals = 8
 
         def poisson_pmf(lmbda: float) -> dict:
             if lmbda <= 0:
@@ -595,13 +641,13 @@ class RuleEngine:
                         prob *= 1.08
 
                 total = ga + gb
-                if total > 5:
-                    prob *= 0.25
-                elif total > 4:
-                    prob *= 0.55
+                if total > 7:
+                    prob *= 0.65
+                elif total > 5:
+                    prob *= 0.80
 
-                if abs(margin := ga - gb) >= 4:
-                    prob *= 0.2
+                if abs(margin := ga - gb) >= 5:
+                    prob *= 0.65
 
                 if over_under_line <= 2.5 and total >= 4:
                     prob *= 0.7
@@ -647,7 +693,9 @@ class RuleEngine:
 
     @classmethod
     def _top3_scores(cls, ex_a: float, ex_b: float, handicap: float = 0.0,
-                     draw_rate: float = 25.0, over_under_line: float = 2.5) -> list:
+                     draw_rate: float = 25.0, over_under_line: float = 2.5,
+                     *, is_knockout: bool = False,
+                     win_rate: float = 50.0, lose_rate: float = 50.0) -> list:
         """Return 1-3 most likely scorelines via Dixon-Coles Poisson."""
         scores = cls._score_probabilities(
             ex_a, ex_b, handicap, draw_rate, over_under_line
@@ -668,28 +716,54 @@ class RuleEngine:
                 ]
                 scores.sort(key=lambda x: x[1], reverse=True)
 
-        # Favourite clean-sheet bias when expected margin >= 1 goal (skip if draw is tight favourite)
         margin = ex_a - ex_b
-        if margin >= 0.85:
+        margin_threshold = 0.35 if is_knockout else 0.85
+        if margin >= margin_threshold:
             adjusted: list[tuple[str, float]] = []
             for s, p in scores:
                 ga, gb = map(int, s.split(":"))
                 if ga > gb and gb == 0:
                     p *= 1.35
                 elif ga == gb:
-                    p *= 0.72
+                    p *= 0.55 if is_knockout else 0.72
+                elif is_knockout and ga > gb and ga + gb >= 3:
+                    p *= 1.12
                 adjusted.append((s, p))
             scores = sorted(adjusted, key=lambda x: x[1], reverse=True)
-        elif margin <= -0.85:
+        elif margin <= -margin_threshold:
             adjusted = []
             for s, p in scores:
                 ga, gb = map(int, s.split(":"))
                 if gb > ga and ga == 0:
                     p *= 1.35
                 elif ga == gb:
-                    p *= 0.72
+                    p *= 0.55 if is_knockout else 0.72
+                elif is_knockout and gb > ga and ga + gb >= 3:
+                    p *= 1.12
                 adjusted.append((s, p))
             scores = sorted(adjusted, key=lambda x: x[1], reverse=True)
+
+        # Knockout: if favourite clear but draw still tops, promote a win scoreline
+        if is_knockout and scores and win_rate >= lose_rate + 5.0:
+            top = scores[0][0]
+            ga, gb = map(int, top.split(":"))
+            if ga <= gb:
+                for s, p in scores:
+                    sga, sgb = map(int, s.split(":"))
+                    if sga > sgb:
+                        scores = [(s, p * 1.08)] + [(x, y) for x, y in scores if x != s]
+                        scores.sort(key=lambda x: x[1], reverse=True)
+                        break
+        elif is_knockout and scores and lose_rate >= win_rate + 5.0:
+            top = scores[0][0]
+            ga, gb = map(int, top.split(":"))
+            if gb <= ga:
+                for s, p in scores:
+                    sga, sgb = map(int, s.split(":"))
+                    if sgb > sga:
+                        scores = [(s, p * 1.08)] + [(x, y) for x, y in scores if x != s]
+                        scores.sort(key=lambda x: x[1], reverse=True)
+                        break
 
         deduped: list[tuple[str, float]] = []
         seen: set[str] = set()

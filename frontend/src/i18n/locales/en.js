@@ -143,6 +143,7 @@ export default {
   },
   stage: {
     group: 'Group Stage',
+    round32: 'Round of 32',
     round16: 'Round of 16',
     quarter: 'Quarter-finals',
     semi: 'Semi-finals',
@@ -240,6 +241,7 @@ export default {
     lose: 'Away',
     upsetScore: 'Upset',
     likelyScores: 'Likely scores',
+    penaltyShort: 'Pens {score}',
     handicap: 'Hcp {line}',
     noMarketOdds: 'No market odds',
     noSporttery: 'Lottery not on sale',
@@ -448,5 +450,12 @@ export default {
     modelVersion: 'Algorithm version',
     computedAt: 'Computed at',
     loadFailed: 'Failed to load backtest data. Ensure the backend is updated and restarted.',
+    live: 'Live',
+    paused: 'Paused',
+    lastUpdated: 'Updated {time} ago',
+    pauseAuto: 'Pause live',
+    resumeAuto: 'Resume live',
+    justNow: 'just now',
+    minutesAgo: '{n} min ago',
   }
 }

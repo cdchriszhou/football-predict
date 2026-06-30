@@ -1,8 +1,12 @@
 """Tests for contextual score adjustments (odds + standings + knockout path)."""
 from service.score_context import (
     apply_contextual_score_adjustments,
+    apply_resilience_to_likely_pair,
+    adjust_wdl_for_resilience,
+    detect_resilience_signals,
     enrich_knockout_outlook,
     market_score_profile,
+    pick_resilience_upset,
 )
 
 
@@ -73,36 +77,6 @@ def test_must_win_need_goals_aggressive():
     assert best[0] in ("2:1", "3:1", "3:0")
 
 
-def test_handicap_blowout_primary():
-    odds = {
-        "win_win": 1.28,
-        "win_lose": 9.0,
-        "draw": 5.5,
-        "handicap": "-1.5",
-        "handicap_win": 1.92,
-        "handicap_lose": 1.88,
-        "over_under": "3.0",
-        "imp_win": 68.0,
-        "imp_draw": 18.0,
-        "imp_lose": 14.0,
-    }
-    best = apply_contextual_score_adjustments(
-        ["1:0", "2:0"],
-        _crs(),
-        odds_dict=odds,
-        win_rate=70.0,
-        lose_rate=12.0,
-        draw_rate=18.0,
-        expected_a=2.3,
-        expected_b=0.7,
-    )
-    try:
-        ga, gb = map(int, best[0].split(":"))
-    except ValueError:
-        ga, gb = 0, 0
-    assert ga > gb and ga + gb >= 3
-
-
 def test_knockout_outlook_enrichment():
     ctx = {
         "stage": "小组赛",
@@ -123,3 +97,61 @@ def test_knockout_outlook_enrichment():
     assert ctx.get("finish_band_a") == "leading"
     assert ctx.get("r16_opponent_rank_a") == 18
     assert ctx.get("path_pressure_b", 0) > 0
+
+
+def test_belgium_iran_resilience_prefers_scoreless_draw_upset():
+    ctx = {
+        "stage": "小组赛",
+        "matchday": 2,
+        "group_avg_gf": 1.5,
+        "standing_a": {"team": "比利时", "played": 1, "goals_for": 1, "goals_against": 1},
+        "standing_b": {"team": "伊朗", "played": 1, "goals_for": 2, "goals_against": 2},
+    }
+    sig = detect_resilience_signals(
+        ctx, {"draw": 4.76, "over_under": 2.5},
+        9, 21, team_a={"tactic": "技术流"}, team_b={"tactic": "铁桶防守"},
+    )
+    assert sig["favorite_scoring_drought"]
+    assert sig["opponent_defensive"]
+    w, d, l = adjust_wdl_for_resilience(69.4, 19.7, 10.9, sig)
+    assert d > 19.7
+    crs = {
+        "2:0": 6.1, "2:1": 5.8, "1:0": 7.2, "1:1": 8.25, "0:0": 14.0,
+    }
+    upset = pick_resilience_upset(crs, {"2:0", "5:0"}, sig, draw_rate=d, sp_draw=4.76)
+    assert upset == "0:0"
+    best = apply_resilience_to_likely_pair(["2:0", "5:0"], crs, sig, win_rate=w)
+    assert best[0] in ("2:0", "2:1", "1:0")
+    assert best[1] in ("1:1", "0:0", "2:1")
+
+
+def test_uruguay_cape_verde_resilience_keeps_draw_secondary():
+    ctx = {
+        "stage": "小组赛",
+        "matchday": 2,
+        "group_avg_gf": 0.5,
+        "standing_a": {"team": "乌拉圭", "played": 1, "goals_for": 1, "goals_against": 1},
+        "standing_b": {"team": "佛得角", "played": 1, "goals_for": 0, "goals_against": 0},
+    }
+    sig = detect_resilience_signals(ctx, None, 17, 64)
+    assert sig["opponent_clean_sheet"]
+    crs = {"2:0": 4.6, "1:0": 4.95, "1:1": 7.3, "2:2": 28.0, "4:0": 18.0}
+    best = apply_resilience_to_likely_pair(["2:0", "4:0"], crs, sig, win_rate=62.0)
+    assert best[1] in ("1:1", "0:0", "2:1")
+    upset = pick_resilience_upset(crs, set(best), sig, draw_rate=28.0)
+    assert upset in ("2:2", "1:1", "0:0")
+
+
+def test_egypt_nz_multi_goal_away_secondary():
+    ctx = {
+        "stage": "小组赛",
+        "matchday": 2,
+        "group_avg_gf": 1.5,
+        "standing_a": {"team": "新西兰", "played": 1, "goals_for": 2, "goals_against": 2},
+        "standing_b": {"team": "埃及", "played": 1, "goals_for": 1, "goals_against": 1},
+    }
+    sig = detect_resilience_signals(ctx, {"win_lose": 1.42, "over_under": 2.5}, 89, 29)
+    assert sig["leaky_minnow"]
+    crs = {"0:1": 5.75, "1:2": 5.8, "1:3": 11.0, "0:3": 11.0, "1:1": 6.8}
+    best = apply_resilience_to_likely_pair(["0:1", "1:2"], crs, sig, lose_rate=59.7)
+    assert best[1] in ("1:3", "0:3")

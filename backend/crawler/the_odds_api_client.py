@@ -38,6 +38,9 @@ ODDS_API_TEAM_ALIASES = {
     "DR Congo": "DR Congo",
     "Congo DR": "DR Congo",
     "Democratic Republic of the Congo": "DR Congo",
+    "Cabo Verde": "Cape Verde",
+    "Saudi": "Saudi Arabia",
+    "Kingdom of Saudi Arabia": "Saudi Arabia",
 }
 
 

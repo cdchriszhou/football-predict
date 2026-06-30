@@ -294,6 +294,10 @@ async def get_accuracy(
     confidence_sum = 0.0
 
     for pred, match in predictions:
+        # Skip matches without recorded scores (e.g. finished but not yet synced)
+        if match.result_a is None or match.result_b is None:
+            continue
+
         view = await ensure_prediction_consistency(db, pred, match, persist=True)
         wr, dr, lr = view["win_rate"], view["draw_rate"], view["lose_rate"]
 

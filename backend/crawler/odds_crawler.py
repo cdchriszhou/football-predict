@@ -11,7 +11,7 @@ import json
 from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete
-from db.models import Match, Odds
+from db.models import Match, Odds, Prediction
 from data.status_constants import MATCH_LIVE, MATCH_UPCOMING, match_status_in_db_values
 from .base_crawler import _log_crawler, _safe_crawler_fail, crawler_lock
 from .sporttery_client import (
@@ -97,6 +97,22 @@ def _odds_crawler_slugs() -> list[str]:
     return slugs
 
 
+def _has_crs_data(score_odds_raw) -> bool:
+    """Check whether score_odds contains actual CRS market entries (not just _meta)."""
+    if not score_odds_raw:
+        return False
+    if isinstance(score_odds_raw, str):
+        try:
+            score_odds_raw = json.loads(score_odds_raw)
+        except (json.JSONDecodeError, TypeError):
+            return False
+    if not isinstance(score_odds_raw, dict):
+        return False
+    # Count non-meta keys that look like score lines (e.g. "1:0", "2:1")
+    crs_keys = [k for k in score_odds_raw if not k.startswith("_") and ":" in k]
+    return len(crs_keys) >= 3
+
+
 async def run_odds_crawler(
     db: AsyncSession,
     competition_slug: str = "worldcup-2026",
@@ -137,6 +153,7 @@ async def run_odds_crawler(
 
             async def _persist_odds():
                 nonlocal created, updated, skipped, removed, sporttery_matched, odds_api_matched
+                match_ids_to_repredict: list[int] = []
                 for match in matches:
                     team_a, team_b = match.team_a, match.team_b
 
@@ -218,6 +235,13 @@ async def run_odds_crawler(
                         select(Odds).where(Odds.match_id == match.id)
                     )).scalar_one_or_none()
 
+                    # CRS re-prediction trigger: when score_odds goes from empty to available,
+                    # invalidate the stale prediction so it gets regenerated with real CRS data.
+                    crs_was_empty = not existing or not _has_crs_data(existing.score_odds)
+                    crs_now_available = _has_crs_data(score_odds_raw)
+                    if crs_was_empty and crs_now_available:
+                        match_ids_to_repredict.append(match.id)
+
                     payload = dict(
                         win_win=win_win,
                         draw=draw,
@@ -244,6 +268,24 @@ async def run_odds_crawler(
                         created += 1
 
                 await db.flush()
+
+                # Invalidate stale predictions for matches where CRS just became available
+                if match_ids_to_repredict:
+                    try:
+                        from db.redis_client import cache_delete
+                        for mid in match_ids_to_repredict:
+                            await db.execute(
+                                delete(Prediction).where(Prediction.match_id == mid)
+                            )
+                        for mid in match_ids_to_repredict:
+                            await cache_delete(f"prediction:{mid}:auto")
+                        await db.flush()
+                        logger.info(
+                            f"CRS-triggered re-predict: invalidated {len(match_ids_to_repredict)} "
+                            f"stale predictions for matches {match_ids_to_repredict}"
+                        )
+                    except Exception as e:
+                        logger.warning(f"Failed to invalidate predictions for CRS refresh: {e}")
 
                 log_source = f"sporttery({sporttery_matched})+odds-api({odds_api_matched})"
                 await _log_crawler(db, "odds", "success", created + updated, start=start_time)

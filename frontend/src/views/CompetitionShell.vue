@@ -33,6 +33,12 @@ async function syncCompetition(slug) {
     resetStores()
   }
   compStore.setSlug(slug)
+
+  // Ensure list is populated so fallback metadata is available for fetchCurrent
+  if (!compStore.list.length) {
+    await compStore.fetchList().catch(() => {})
+  }
+
   try {
     await compStore.fetchCurrent(slug)
   } catch (err) {

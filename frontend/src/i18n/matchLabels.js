@@ -1,6 +1,7 @@
 /** World Cup / knockout tournament stages only */
 export const STAGE_KEYS = {
   '小组赛': 'group',
+  '1/16决赛': 'round32',
   '1/8决赛': 'round16',
   '1/4决赛': 'quarter',
   '半决赛': 'semi',

@@ -11,6 +11,7 @@ from sqlalchemy import select, delete as sqldelete
 from db.models import Match, Odds, Prediction
 from data.status_constants import MATCH_FINISHED, MATCH_UPCOMING
 from data.worldcup_venues import venue_for_match, canonical_team_order
+from data.worldcup_knockout_schedule import build_knockout_matches
 from .base_crawler import _log_crawler, _safe_crawler_fail, crawler_lock
 from utils.logger import logger
 
@@ -183,6 +184,11 @@ def _build_expected_matches():
     return expected
 
 
+def _build_all_expected_matches():
+    """Group stage (72) + knockout bracket (32)."""
+    return _build_expected_matches() + build_knockout_matches()
+
+
 async def _repair_misaligned_fixtures(db: AsyncSession, expected: list[dict]) -> list[int]:
     """Fix DB rows where group+teams differ from canonical schedule (by pair, not time slot)."""
     by_pair: dict[tuple[str, str, str], dict] = {}
@@ -227,7 +233,7 @@ async def _sync_schedule(db: AsyncSession) -> dict:
     from data.match_status import repair_canonical_team_order
 
     await repair_canonical_team_order(db, "worldcup-2026")
-    expected = _build_expected_matches()
+    expected = _build_all_expected_matches()
     repaired_ids = await _repair_misaligned_fixtures(db, expected)
     repaired = len(repaired_ids)
     expected_keys = {

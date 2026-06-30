@@ -24,7 +24,6 @@ from service.prediction_consistency import (
 )
 from service.score_pick import (
     align_wdl_to_score_picks,
-    reconcile_wdl_with_score_picks,
     dominant_wdl_outcome,
     run_full_score_pipeline,
     _score_outcome,
@@ -45,6 +44,43 @@ def get_configured_models() -> list[str]:
     return models
 
 
+async def _probe_llm_connectivity(timeout: float = 6.0) -> list[str]:
+    """Quickly check which configured LLM APIs are reachable.
+
+    Returns list of model names that responded within *timeout* seconds.
+    If none respond, batch_predict can safely skip LLMs and use rule_engine.
+    """
+    import os
+    import httpx
+
+    probes = []
+    if os.getenv("DEEPSEEK_API_KEY", ""):
+        probes.append(("deepseek", os.getenv("DEEPSEEK_API_URL", "") or "https://api.deepseek.com"))
+    if os.getenv("QWEN_API_KEY", ""):
+        probes.append(("qwen", os.getenv("QWEN_API_URL", "") or "https://dashscope.aliyuncs.com"))
+    if os.getenv("GLM_API_KEY", ""):
+        probes.append(("glm", os.getenv("GLM_API_URL", "") or "https://open.bigmodel.cn"))
+
+    if not probes:
+        return []
+
+    async def _try_connect(name: str, url: str) -> str | None:
+        try:
+            async with httpx.AsyncClient(
+                timeout=httpx.Timeout(connect=timeout, read=2.0, write=2.0, pool=2.0),
+            ) as client:
+                # Just check if the host is reachable (HEAD or quick GET to /)
+                resp = await client.get(url.rstrip("/") + "/", follow_redirects=False)
+                # Any response (including 401, 404) means the host is reachable
+                logger.debug(f"LLM probe {name}: {resp.status_code}")
+                return name
+        except Exception:
+            return None
+
+    results = await asyncio.gather(*[_try_connect(n, u) for n, u in probes])
+    return [r for r in results if r is not None]
+
+
 def _validate_rates(win: float, draw: float, lose: float) -> tuple:
     """Ensure win+draw+lose ≈ 100, redistribute proportionally if not."""
     total = win + draw + lose
@@ -57,6 +93,14 @@ def _validate_rates(win: float, draw: float, lose: float) -> tuple:
     w = round(win * scale, 1)
     d = round(draw * scale, 1)
     l = round(100.0 - w - d, 1)  # ensure exact 100
+    w, d, l = max(0.5, w), max(0.5, d), max(0.5, l)
+    # Re-normalize after clamping to guarantee sum == 100
+    total2 = w + d + l
+    if abs(total2 - 100.0) > 0.05:
+        scale2 = 100.0 / total2
+        w = round(w * scale2, 1)
+        d = round(d * scale2, 1)
+        l = round(100.0 - w - d, 1)
     return (max(0.5, w), max(0.5, d), max(0.5, l))
 
 
@@ -96,7 +140,8 @@ def _fuse_predictions(llm_results: list, rule_result, odds_dict: dict = None,
                       group_context: dict | None = None,
                       team_a: dict | None = None,
                       team_b: dict | None = None,
-                      stage: str | None = None) -> dict:
+                      stage: str | None = None,
+                      context_analysis=None) -> dict:
     """Fuse multiple LLM predictions with rule engine baseline and market odds.
 
     llm_results: list of PredictionOutput from successful LLM calls
@@ -114,9 +159,10 @@ def _fuse_predictions(llm_results: list, rule_result, odds_dict: dict = None,
     draw_rate = sum(r.draw_rate * w for r, w in zip(llm_results, weights))
     lose_rate = sum(r.lose_rate * w for r, w in zip(llm_results, weights))
 
-    # ── Market-implied probability anchor ──
-    # If odds are available, compute the market-implied win/draw/lose percentages
-    # and blend them with LLM predictions (20% weight for market signal)
+    # ── Market-implied probability (for diagnostics / confidence, NOT blended into WDL) ──
+    # The CalibratedRuleEngine already blends market odds at calibrated weight (0.40).
+    # Blending market again here would double-count; we only compute implied probs for
+    # the confidence scorer and rule-engine safety net below.
     market_win = market_draw = market_lose = None
     if odds_dict:
         win_w = odds_dict.get("win_win")
@@ -128,29 +174,17 @@ def _fuse_predictions(llm_results: list, rule_result, odds_dict: dict = None,
             market_draw = (1 / draw_o) / overround * 100
             market_lose = (1 / lose) / overround * 100
 
-            # Blend market-implied into LLM consensus (calibrated weight)
-            MARKET_BLEND = load_calibrated_params().get("market_blend", 0.28)
-            if (
-                abs(win_rate - market_win) > 18
-                and abs(lose_rate - market_lose) > 18
-            ):
-                MARKET_BLEND = min(0.48, MARKET_BLEND + 0.18)
-            win_rate = (1 - MARKET_BLEND) * win_rate + MARKET_BLEND * market_win
-            draw_rate = (1 - MARKET_BLEND) * draw_rate + MARKET_BLEND * market_draw
-            lose_rate = (1 - MARKET_BLEND) * lose_rate + MARKET_BLEND * market_lose
+    if context_analysis is not None:
+        from service.match_context import apply_context_to_rates
+        win_rate, draw_rate, lose_rate = apply_context_to_rates(
+            win_rate, draw_rate, lose_rate, context_analysis,
+        )
 
-            if abs(draw_rate - market_draw) > 15:
-                correction = min(0.5, 0.25 + (abs(draw_rate - market_draw) - 15) / 60)
-                old_draw = draw_rate
-                draw_rate = (1 - correction) * draw_rate + correction * market_draw
-                shift = draw_rate - old_draw
-                win_rate -= shift / 2
-                lose_rate -= shift / 2
-                win_rate, draw_rate, lose_rate = _validate_rates(win_rate, draw_rate, lose_rate)
-
-    # Rule engine safety net: if LLM consensus differs >25% from rule engine,
-    # blend 25% rule engine weight
-    if abs(win_rate - rule_result.win_rate) > 25:
+    # Rule engine safety net: if LLM consensus differs significantly from the
+    # calibrated rule engine (which already blends market odds at 0.40), blend in
+    # 25% rule-engine weight. Lowered threshold from 25pp to 18pp since the direct
+    # market blend was removed — rule engine is now the sole market-informed anchor.
+    if abs(win_rate - rule_result.win_rate) > 18 or abs(lose_rate - rule_result.lose_rate) > 18:
         alpha = 0.75  # LLM weight
         win_rate = alpha * win_rate + 0.25 * rule_result.win_rate
         draw_rate = alpha * draw_rate + 0.25 * rule_result.draw_rate
@@ -198,9 +232,9 @@ def _fuse_predictions(llm_results: list, rule_result, odds_dict: dict = None,
             expected_b=rule_result.expected_b,
             model_scores=model_hint,
             stage=stage,
-            sp_win=odds_dict.get("win_win") if odds_dict else None,
-            sp_lose=odds_dict.get("win_lose") if odds_dict else None,
-            sp_draw=odds_dict.get("draw") if odds_dict else None,
+            sp_win=(odds_dict or {}).get("win_win"),
+            sp_lose=(odds_dict or {}).get("win_lose"),
+            sp_draw=(odds_dict or {}).get("draw"),
             handicap=(odds_dict or {}).get("handicap"),
             rank_a=(team_a or {}).get("rank"),
             rank_b=(team_b or {}).get("rank"),
@@ -209,6 +243,7 @@ def _fuse_predictions(llm_results: list, rule_result, odds_dict: dict = None,
             rule_result=rule_result,
             team_a=team_a,
             team_b=team_b,
+            skip_wdl_resilience=True,
         )
     else:
         best_scores = RuleEngine.pick_likely_scores(score_votes, max_count=2)
@@ -299,9 +334,6 @@ def _fuse_predictions(llm_results: list, rule_result, odds_dict: dict = None,
     model_used = "+".join(short_name(r.model_used) for r in llm_results)
 
     normalized = normalize_score_prediction(best_scores, upset_score)
-    win_rate, draw_rate, lose_rate = reconcile_wdl_with_score_picks(
-        normalized["best_scores"], win_rate, draw_rate, lose_rate,
-    )
     win_rate, draw_rate, lose_rate = align_wdl_to_score_picks(
         normalized["best_scores"], win_rate, draw_rate, lose_rate,
     )
@@ -525,6 +557,7 @@ class PredictionService:
         score_odds = odds_dict.get("score_odds", {})
         half_full_odds = odds_dict.get("half_full_odds", {})
         market_odds = odds_dict if odds_dict.get("has_real_market") else None
+        score_ctx = odds_dict  # handicap / CRS for contextual even without 1X2
 
         players_a = await get_players(db, team_a.id) if team_a else []
         players_b = await get_players(db, team_b.id) if team_b else []
@@ -618,8 +651,18 @@ class PredictionService:
                 client = create_llm_client(m)
                 return await client.predict(llm_input)
 
-            results = await asyncio.gather(*[call_one(m) for m in models_to_call], return_exceptions=True)
-            llm_results = [r for r in results if r is not None and not isinstance(r, Exception)]
+            try:
+                results = await asyncio.wait_for(
+                    asyncio.gather(*[call_one(m) for m in models_to_call], return_exceptions=True),
+                    timeout=45.0,
+                )
+                llm_results = [r for r in results if r is not None and not isinstance(r, Exception)]
+            except asyncio.TimeoutError:
+                logger.warning(
+                    f"LLM calls timed out after 45s for match {match_id} "
+                    f"({match.team_a} vs {match.team_b}), falling back to rule engine"
+                )
+                llm_results = []
 
         # 5. Fuse results with market-implied probability blending
         context_alerts = context_analysis.alerts
@@ -633,6 +676,7 @@ class PredictionService:
                 team_a=team_a_dict,
                 team_b=team_b_dict,
                 stage=match.stage,
+                context_analysis=context_analysis,
             )
         else:
             reason_parts = ["基于历史回测校准模型：欧赔+澳盘融合、六维实力、战术匹配"]
@@ -648,30 +692,73 @@ class PredictionService:
                     expected_b=rule_result.expected_b,
                     model_scores=rule_result.best_scores,
                     stage=match.stage,
-                    sp_win=market_odds.get("win_win") if market_odds else None,
-                    sp_lose=market_odds.get("win_lose") if market_odds else None,
-                    sp_draw=market_odds.get("draw") if market_odds else None,
-                    handicap=(market_odds or {}).get("handicap"),
+                    sp_win=(market_odds or {}).get("win_win"),
+                    sp_lose=(market_odds or {}).get("win_lose"),
+                    sp_draw=(market_odds or {}).get("draw"),
+                    handicap=score_ctx.get("handicap"),
                     rank_a=(team_a_dict or {}).get("rank"),
                     rank_b=(team_b_dict or {}).get("rank"),
                     group_context=group_context,
-                    odds_dict=market_odds,
+                    odds_dict=score_ctx,
                     rule_result=rule_result,
                     team_a=team_a_dict,
                     team_b=team_b_dict,
+                    skip_wdl_resilience=True,
                 )
             else:
-                scores = rule_result.best_scores
-                upset = rule_result.upset_score if rule_result.upset_score != "?" else None
+                from service.score_pick import (
+                    finalize_knockout_score_picks,
+                    poisson_to_synthetic_crs,
+                )
+                ko_scores, ko_upset = finalize_knockout_score_picks(
+                    rule_result.best_scores,
+                    expected_a=rule_result.expected_a,
+                    expected_b=rule_result.expected_b,
+                    win_rate=rule_result.win_rate,
+                    draw_rate=rule_result.draw_rate,
+                    lose_rate=rule_result.lose_rate,
+                    rank_a=(team_a_dict or {}).get("rank"),
+                    rank_b=(team_b_dict or {}).get("rank"),
+                    stage=match.stage,
+                )
+                synthetic_crs = poisson_to_synthetic_crs(
+                    rule_result.expected_a,
+                    rule_result.expected_b,
+                    rule_result.draw_rate,
+                )
+                if synthetic_crs and match.stage not in ("", "小组赛"):
+                    scores, upset, _, pick_warnings = run_full_score_pipeline(
+                        synthetic_crs,
+                        win_rate=rule_result.win_rate,
+                        draw_rate=rule_result.draw_rate,
+                        lose_rate=rule_result.lose_rate,
+                        expected_a=rule_result.expected_a,
+                        expected_b=rule_result.expected_b,
+                        model_scores=ko_scores,
+                        stage=match.stage,
+                        handicap=score_ctx.get("handicap"),
+                        rank_a=(team_a_dict or {}).get("rank"),
+                        rank_b=(team_b_dict or {}).get("rank"),
+                        group_context=group_context,
+                        odds_dict=score_ctx,
+                        rule_result=rule_result,
+                        team_a=team_a_dict,
+                        team_b=team_b_dict,
+                        skip_wdl_resilience=True,
+                    )
+                else:
+                    scores = ko_scores
+                    upset = ko_upset
+                    pick_warnings = []
+                if not upset:
+                    upset = rule_result.upset_score if rule_result.upset_score != "?" else None
             rule_norm = normalize_score_prediction(scores, upset)
-            w, d, l = reconcile_wdl_with_score_picks(
-                rule_norm["best_scores"],
-                rule_result.win_rate,
-                rule_result.draw_rate,
-                rule_result.lose_rate,
-            )
+            w, d, l = rule_result.win_rate, rule_result.draw_rate, rule_result.lose_rate
             w, d, l = align_wdl_to_score_picks(
                 rule_norm["best_scores"], w, d, l,
+                stage=match.stage,
+                rank_a=(team_a_dict or {}).get("rank"),
+                rank_b=(team_b_dict or {}).get("rank"),
             )
             w, d, l = _validate_rates(w, d, l)
             if pick_warnings:
@@ -784,6 +871,27 @@ class PredictionService:
             return []
 
         total = len(matches)
+        # SQLite: serial per match; LLM calls dominate runtime (30-45s each × N matches).
+        # Auto-detect this and default to rule_engine for acceptable batch throughput.
+        if IS_SQLITE and model in (None, "auto"):
+            model = "rule_engine"
+            logger.info(
+                f"Batch predict on SQLite: defaulting to rule_engine for {total} matches "
+                f"(LLMs would take ~{total * 45}s serially; use model='deepseek' to override)"
+            )
+        # Pre-flight: check LLM API reachability. If no LLM responds within 5s,
+        # auto-switch to rule_engine so the batch doesn't stall on unreachable APIs.
+        if model in (None, "auto"):
+            live_llms = await _probe_llm_connectivity(timeout=6.0)
+            if not live_llms:
+                model = "rule_engine"
+                logger.info(
+                    f"Batch predict: no LLM APIs reachable within 6s, "
+                    f"falling back to rule_engine for {total} matches"
+                )
+            else:
+                logger.info(f"Batch predict: {len(live_llms)} LLM(s) reachable: {live_llms}")
+
         # SQLite: serial per match; DB writes use run_db_write — do not hold write_lock
         # across LLM calls (would block on startup/crawler and freeze progress at 0/N).
         if IS_SQLITE:
@@ -796,9 +904,21 @@ class PredictionService:
                     on_progress, idx - 1, len(results), len(failed_ids), match=match,
                 )
                 try:
-                    result = await self.predict_match(match.id, db, model)
+                    # Per-match timeout prevents a single stuck prediction from
+                    # blocking the entire batch indefinitely (60s per match is generous
+                    # for rule_engine, sufficient for LLM with 45s API timeout).
+                    result = await asyncio.wait_for(
+                        self.predict_match(match.id, db, model),
+                        timeout=60.0,
+                    )
                     if result:
                         results.append(result)
+                except asyncio.TimeoutError:
+                    logger.error(
+                        f"Batch predict timed out after 60s for match {match.id} "
+                        f"({match.team_a} vs {match.team_b})"
+                    )
+                    failed_ids.append(match.id)
                 except Exception as e:
                     logger.error(f"Batch predict failed for match {match.id}: {e}")
                     failed_ids.append(match.id)
@@ -823,13 +943,20 @@ class PredictionService:
         done = 0
         success_count = 0
         progress_lock = asyncio.Lock()
+        current_label: str | None = None  # track which match label is being processed
 
         async def _tick_progress() -> None:
             if on_progress:
-                await _maybe_await(on_progress(done, success_count, len(failed_ids)))
+                await _maybe_await(on_progress(
+                    done, success_count, len(failed_ids),
+                    current_match=current_label,
+                ))
 
         async def predict_one(match):
-            nonlocal done, success_count
+            nonlocal done, success_count, current_label
+            label = f"{match.team_a} vs {match.team_b}"
+            async with progress_lock:
+                current_label = label
             async with semaphore:
                 async with session_factory() as session:
                     try:

@@ -143,6 +143,7 @@ export default {
   },
   stage: {
     group: '小组赛',
+    round32: '1/16决赛',
     round16: '1/8决赛',
     quarter: '1/4决赛',
     semi: '半决赛',
@@ -243,6 +244,7 @@ export default {
     lose: '负',
     upsetScore: '冷门',
     likelyScores: '热门比分',
+    penaltyShort: '点球 {score}',
     handicap: '让{line}',
     noMarketOdds: '外围盘口暂无数据',
     noSporttery: '竞彩盘口暂未开售',
@@ -454,5 +456,12 @@ export default {
     modelVersion: '算法版本',
     computedAt: '计算时间',
     loadFailed: '回测数据加载失败，请确认后端已更新并重启',
+    live: '实时更新中',
+    paused: '已暂停',
+    lastUpdated: '{time}前更新',
+    pauseAuto: '暂停实时',
+    resumeAuto: '恢复实时',
+    justNow: '刚刚',
+    minutesAgo: '{n}分钟前',
   }
 }

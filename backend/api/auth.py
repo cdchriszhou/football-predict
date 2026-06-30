@@ -213,23 +213,29 @@ async def register(req: RegisterRequest, db: AsyncSession = Depends(get_db)):
 
 @router.post("/login")
 async def login(req: LoginRequest, db: AsyncSession = Depends(get_db)):
+    import asyncio
+
     user = await get_db_user(db, username=req.username)
 
     if user and not user.is_active:
         logger.warning("Login rejected: user %s is inactive", req.username)
-    elif user and user.is_active and pwd_context.verify(req.password, user.hashed_password):
-        user.last_login_at = datetime.utcnow()
-        await db.commit()
-        token = create_access_token(user.username, user.id, is_admin=user.is_admin)
-        access = user_access_payload(user, is_admin=user.is_admin)
-        return success({
-            "access_token": token,
-            "token_type": "bearer",
-            "expires_in": JWT_EXPIRE_HOURS * 3600,
-            "username": user.username,
-            "is_admin": user.is_admin,
-            **access,
-        }, "登录成功")
+    elif user and user.is_active:
+        password_ok = await asyncio.to_thread(
+            pwd_context.verify, req.password, user.hashed_password,
+        )
+        if password_ok:
+            user.last_login_at = datetime.utcnow()
+            await db.commit()
+            token = create_access_token(user.username, user.id, is_admin=user.is_admin)
+            access = user_access_payload(user, is_admin=user.is_admin)
+            return success({
+                "access_token": token,
+                "token_type": "bearer",
+                "expires_in": JWT_EXPIRE_HOURS * 3600,
+                "username": user.username,
+                "is_admin": user.is_admin,
+                **access,
+            }, "登录成功")
 
     # Fallback: check in-memory admin credentials (backward compat)
     from service.runtime_config import get_auth_credentials

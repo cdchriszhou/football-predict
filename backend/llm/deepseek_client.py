@@ -106,7 +106,9 @@ async def _call_api(api_key: str, base_url: str, model: str, prompt: str,
     }
     if json_mode:
         payload["response_format"] = {"type": "json_object"}
-    async with httpx.AsyncClient(timeout=30.0) as client:
+    async with httpx.AsyncClient(
+        timeout=httpx.Timeout(connect=8.0, read=25.0, write=10.0, pool=5.0),
+    ) as client:
         resp = await client.post(
             base_url,
             headers={

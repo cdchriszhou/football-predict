@@ -46,7 +46,9 @@
               <el-button text type="primary" @click="goMatches">{{ t('dashboard.viewFullSchedule') }}</el-button>
             </div>
           </template>
-          <el-empty v-if="displayTodayMatches.length === 0" :description="t('dashboard.noTodayMatches')" />
+          <el-empty v-if="initialLoading" :description="t('common.loading')" />
+          <el-empty v-else-if="loadError && displayTodayMatches.length === 0" :description="loadError" />
+          <el-empty v-else-if="displayTodayMatches.length === 0" :description="t('dashboard.noTodayMatches')" />
           <div v-else class="today-matches">
             <MatchCard v-for="m in displayTodayMatches" :key="m.id" :match="m" />
           </div>
@@ -262,6 +264,9 @@ const store = useMatchesStore()
 const predStore = usePredictionsStore()
 const compStore = useCompetitionStore()
 
+const initialLoading = ref(true)
+const loadError = ref('')
+
 function goMatches() {
   router.push(`${compStore.basePath}/matches`)
 }
@@ -336,10 +341,9 @@ const isClubLeague = computed(() => compStore.current?.type === 'club')
 
 const scheduleTotal = computed(() => Number(statValues.value.total) || 0)
 
-/** Live or finished fixtures scheduled for today (Beijing); excludes not-yet-kicked-off. */
+/** All fixtures scheduled for today (Beijing), including upcoming matches. */
 const displayTodayMatches = computed(() => {
   return [...store.todayMatches]
-    .filter((m) => effectiveMatchStatus(m) !== 'upcoming')
     .sort(
       (a, b) => new Date(a.match_time || 0) - new Date(b.match_time || 0),
     )
@@ -412,23 +416,55 @@ async function loadStandings() {
 }
 
 async function loadDashboard() {
+  initialLoading.value = true
+  loadError.value = ''
+
+  // Separate data calls (all must succeed for meaningful dashboard) from setup calls
+  const dataCalls = [
+    { key: 'today', p: store.fetchToday() },
+    { key: 'upcoming', p: store.fetchUpcoming(compStore.isWorldCup ? 50 : 12) },
+    { key: 'accuracy', p: predStore.fetchAccuracy(30) },
+  ]
+  if (compStore.isWorldCup) {
+    dataCalls.push(
+      { key: 'recentResults', p: store.fetchRecentResults(72, 12) },
+      { key: 'dailyReport', p: loadDailyReport() },
+    )
+  }
+
   const settled = await Promise.allSettled([
-    store.fetchToday(),
-    store.fetchUpcoming(compStore.isWorldCup ? 50 : 12),
-    compStore.isWorldCup ? store.fetchRecentResults(48, 12) : Promise.resolve(),
-    predStore.fetchAccuracy(30),
-    compStore.isWorldCup ? loadDailyReport() : Promise.resolve(),
+    ...dataCalls.map((d) => d.p),
     compStore.fetchCurrent().catch(() => null),
   ])
-  const failed = settled.filter((r) => r.status === 'rejected')
-  if (failed.length === settled.length) {
-    console.warn('[dashboard] load failed:', failed[0]?.reason?.message || failed[0]?.reason)
+
+  // Check data-call failures (exclude the always-resolved fetchCurrent)
+  const dataFailed = []
+  for (let i = 0; i < dataCalls.length; i++) {
+    const r = settled[i]
+    if (r.status === 'rejected') {
+      const err = r.reason
+      const status = err?.response?.status || 'network'
+      console.warn(`[dashboard] ${dataCalls[i].key} failed (HTTP ${status}):`, err?.message || err)
+      dataFailed.push(dataCalls[i].key)
+    }
+  }
+
+  if (dataFailed.length === dataCalls.length) {
+    // All data APIs failed — likely a connectivity or auth issue
+    console.error('[dashboard] All data APIs failed:', dataFailed)
+    loadError.value = t('dashboard.loadFailed')
     ElMessage.warning(t('dashboard.loadFailed'))
+    initialLoading.value = false
     return
   }
-  if (failed.length) {
-    console.warn('[dashboard] partial load:', failed.map((r) => r.reason?.message || r.reason))
+  if (dataFailed.length) {
+    console.warn('[dashboard] partial load failures:', dataFailed)
+    const scoreKeys = ['today', 'recentResults']
+    if (dataFailed.some((k) => scoreKeys.includes(k))) {
+      ElMessage.warning(t('dashboard.scoreLoadPartial'))
+    }
   }
+
   await loadStandings()
   if (compStore.current?.stats) {
     statValues.value.total = compStore.current.stats.matches || 0
@@ -439,6 +475,7 @@ async function loadDashboard() {
   statValues.value.predicted = Object.keys(predStore.cache).length || '—'
   statValues.value.updateTime = new Date().toLocaleString(locale.value)
   syncScorePolling()
+  initialLoading.value = false
 }
 
 function sleep(ms) {
@@ -541,7 +578,7 @@ async function refreshMatchScores() {
     await Promise.all([
       store.fetchToday(),
       store.fetchUpcoming(compStore.isWorldCup ? 50 : 12),
-      compStore.isWorldCup ? store.fetchRecentResults(48, 12) : Promise.resolve(),
+      compStore.isWorldCup ? store.fetchRecentResults(72, 12) : Promise.resolve(),
       compStore.isWorldCup ? loadDailyReport() : Promise.resolve(),
     ])
   } catch {

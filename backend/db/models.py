@@ -97,6 +97,8 @@ class Match(Base):
     stadium = Column(String(100))
     result_a = Column(Integer, nullable=True, default=None)
     result_b = Column(Integer, nullable=True, default=None)
+    penalty_a = Column(Integer, nullable=True, default=None, comment="点球大战 team_a 得分")
+    penalty_b = Column(Integer, nullable=True, default=None, comment="点球大战 team_b 得分")
     status = Column(String(20), default="upcoming", comment="upcoming/live/finished")
     season = Column(String(20), comment="赛季 如 2025/26")
     matchday = Column(Integer, comment="联赛轮次")

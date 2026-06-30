@@ -1,6 +1,7 @@
 """Reconcile stale match statuses and remove duplicate seed fixtures."""
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime, timedelta
 
 from sqlalchemy import delete, func, select, update
@@ -8,6 +9,7 @@ from sqlalchemy.exc import OperationalError, IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from utils.logger import logger
+from db.sqlite_write import flush_session
 
 from data.competitions import get_competition
 from data.competition_status import _parse_iso
@@ -64,7 +66,7 @@ async def migrate_legacy_statuses(db: AsyncSession) -> dict:
             )
             player_updated += int(result.rowcount or 0)
         if match_updated or player_updated:
-            await db.flush()
+            await flush_session(db)
     except OperationalError as exc:
         if "locked" in str(exc).lower():
             logger.warning(f"Legacy status migration skipped (SQLite locked): {exc}")
@@ -92,7 +94,7 @@ async def backfill_match_seasons(db: AsyncSession, slug: str) -> int:
     )
     updated = int(result.rowcount or 0)
     if updated:
-        await db.flush()
+        await flush_session(db)
     return updated
 
 
@@ -113,7 +115,7 @@ async def backfill_team_seasons(db: AsyncSession, slug: str) -> int:
     )
     updated = int(result.rowcount or 0)
     if updated:
-        await db.flush()
+        await flush_session(db)
     return updated
 
 
@@ -160,7 +162,7 @@ async def dedupe_duplicate_fixtures(db: AsyncSession, slug: str) -> int:
             await db.delete(dup)
             removed += 1
     if removed:
-        await db.flush()
+        await flush_session(db)
         logger.info("Deduped %d duplicate fixtures for %s", removed, slug)
     return removed
 
@@ -197,7 +199,7 @@ async def cleanup_orphan_seed_matches(db: AsyncSession, slug: str) -> int:
     await db.execute(delete(Prediction).where(Prediction.match_id.in_(orphan_ids)))
     await db.execute(delete(Odds).where(Odds.match_id.in_(orphan_ids)))
     result = await db.execute(delete(Match).where(Match.id.in_(orphan_ids)))
-    await db.flush()
+    await flush_session(db)
     return int(result.rowcount or 0)
 
 
@@ -241,7 +243,7 @@ async def reconcile_stale_matches(db: AsyncSession, slug: str) -> int:
         updated += int(result.rowcount or 0)
 
     if updated:
-        await db.flush()
+        await flush_session(db)
     return updated
 
 
@@ -260,7 +262,7 @@ async def clear_placeholder_scores(db: AsyncSession, slug: str) -> int:
     )
     updated = int(result.rowcount or 0)
     if updated:
-        await db.flush()
+        await flush_session(db)
     return updated
 
 
@@ -286,7 +288,7 @@ async def reopen_prematurely_finished_matches(db: AsyncSession, slug: str) -> in
         m.status = MATCH_UPCOMING
         updated += 1
     if updated:
-        await db.flush()
+        await flush_session(db)
     return updated
 
 
@@ -326,10 +328,17 @@ async def apply_confirmed_results(db: AsyncSession, slug: str) -> int:
         if not match:
             continue
         ra, rb = int(item["result_a"]), int(item["result_b"])
+        pa = item.get("penalty_a")
+        pb = item.get("penalty_b")
         if reversed_match:
             ra, rb = rb, ra
+            if pa is not None and pb is not None:
+                pa, pb = pb, pa
         match.result_a = ra
         match.result_b = rb
+        if pa is not None and pb is not None:
+            match.penalty_a = int(pa)
+            match.penalty_b = int(pb)
         match.status = MATCH_FINISHED
         from data.worldcup_venues import venue_for_match, canonical_team_order
         ca, cb = canonical_team_order(item["team_a"], item["team_b"])
@@ -342,7 +351,7 @@ async def apply_confirmed_results(db: AsyncSession, slug: str) -> int:
             match.stadium = item["stadium"]
         updated += 1
     if updated:
-        await db.flush()
+        await flush_session(db)
     return updated
 
 
@@ -411,7 +420,7 @@ async def backfill_historical_odds(db: AsyncSession, slug: str) -> int:
             ))
             updated += 1
     if updated:
-        await db.flush()
+        await flush_session(db)
     return updated
 
 
@@ -430,7 +439,7 @@ async def refresh_predictions_for_matches(db: AsyncSession, match_ids: list[int]
         except Exception as exc:
             logger.warning(f"Re-predict failed match {mid}: {exc}")
     if refreshed:
-        await db.flush()
+        await flush_session(db)
     return refreshed
 
 
@@ -484,13 +493,20 @@ async def refresh_missed_finished_predictions(db: AsyncSession, slug: str) -> in
         except Exception as exc:
             logger.warning(f"Refresh prediction failed match {match.id}: {exc}")
     if refreshed:
-        await db.flush()
+        await flush_session(db)
     return refreshed
 
 
 _last_result_sync_at: dict[str, float] = {}
 _RESULT_SYNC_INTERVAL_SEC = 60
 _LIVE_CACHE_TTL_SEC = 45
+_result_sync_locks: dict[str, asyncio.Lock] = {}
+
+
+def _result_sync_lock(slug: str) -> asyncio.Lock:
+    if slug not in _result_sync_locks:
+        _result_sync_locks[slug] = asyncio.Lock()
+    return _result_sync_locks[slug]
 
 
 def _mirror_score_token(score: str) -> str:
@@ -678,7 +694,7 @@ async def repair_canonical_team_order(db: AsyncSession, slug: str) -> int:
         for mid in swapped_ids:
             await invalidate_prediction_cache(mid)
     if fixed:
-        await db.flush()
+        await flush_session(db)
         logger.info("Canonical team order repair [%s]: %d fixture(s)", slug, fixed)
     return fixed
 
@@ -712,7 +728,7 @@ async def repair_canonical_kickoffs(db: AsyncSession, slug: str) -> int:
             m.status = MATCH_UPCOMING
             reopened += 1
     if fixed or reopened:
-        await db.flush()
+        await flush_session(db)
         logger.info(
             f"Canonical kickoff repair [{slug}]: {fixed} time(s), {reopened} reopened"
         )
@@ -737,13 +753,25 @@ def effective_kickoff_naive(match) -> datetime | None:
 
 
 def include_in_today_dashboard(match) -> bool:
-    """Today section: canonical Beijing kickoff day + live or finished only."""
+    """Today section: canonical Beijing kickoff day (including upcoming matches).
+
+    Falls back to raw DB match_time when effective_kickoff_naive is unavailable
+    or returns a non-today result — ensures matches with stale/broken schedule
+    lookups still appear in the dashboard.
+    """
     from utils.datetime_helpers import china_today
 
+    today = china_today()
     kt = effective_kickoff_naive(match)
-    if kt is not None and kt.date() != china_today():
-        return False
-    return resolve_public_match_status(match) != MATCH_UPCOMING
+    if kt is not None and kt.date() == today:
+        return True
+
+    # Fallback: use raw DB match_time when schedule lookup fails
+    db_kt = getattr(match, "match_time", None)
+    if db_kt is not None and db_kt.date() == today:
+        return True
+
+    return False
 
 
 async def sync_live_scores(db: AsyncSession, slug: str, *, network: bool = False) -> dict:
@@ -751,7 +779,6 @@ async def sync_live_scores(db: AsyncSession, slug: str, *, network: bool = False
     if slug != "worldcup-2026":
         return {"status": "skipped"}
     try:
-        await repair_canonical_team_order(db, slug)
         from crawler.worldcup_score_sync import sync_worldcup_scores_from_football_data
         return await sync_worldcup_scores_from_football_data(db, network=network)
     except IntegrityError as exc:
@@ -768,8 +795,10 @@ async def sync_match_results_throttled(db: AsyncSession, slug: str) -> int:
     """Apply history + cached live scores before serving match lists (fast, non-blocking)."""
     import time
 
-    kickoffs = await repair_canonical_team_order(db, slug)
-    kickoffs += await repair_canonical_kickoffs(db, slug)
+    now = time.monotonic()
+    elapsed = now - _last_result_sync_at.get(slug, 0)
+    ttl = _LIVE_CACHE_TTL_SEC if slug == "worldcup-2026" else _RESULT_SYNC_INTERVAL_SEC
+
     applied = await apply_confirmed_results(db, slug)
 
     live_sync = {"updated": 0}
@@ -781,31 +810,59 @@ async def sync_match_results_throttled(db: AsyncSession, slug: str) -> int:
             heavy = False
         if not heavy:
             live_sync = await sync_live_scores(db, slug, network=False)
-            kickoffs += await repair_canonical_kickoffs(db, slug)
+            if int(live_sync.get("updated") or 0):
+                applied += await apply_confirmed_results(db, slug)
+                try:
+                    from data.knockout_advance import advance_knockout_teams
+                    await advance_knockout_teams(db, slug)
+                except Exception:
+                    pass
 
-    now = time.monotonic()
-    elapsed = now - _last_result_sync_at.get(slug, 0)
-    if elapsed < _LIVE_CACHE_TTL_SEC if slug == "worldcup-2026" else _RESULT_SYNC_INTERVAL_SEC:
-        return kickoffs + int(applied) + int(live_sync.get("updated") or 0)
-    _last_result_sync_at[slug] = now
-
-    try:
-        reconciled = await reconcile_stale_matches(db, slug)
-    except OperationalError as exc:
-        if "locked" in str(exc).lower():
-            logger.warning(f"Result sync reconcile skipped for {slug} (SQLite locked)")
-            await db.rollback()
-            reconciled = 0
-        else:
-            raise
-    total = applied + reconciled
     fd_updated = int(live_sync.get("updated") or 0)
-    if total or fd_updated:
-        logger.info(
-            f"Match result sync [{slug}]: football_data={fd_updated}, "
-            f"history={applied}, reconciled={reconciled}"
-        )
-    return kickoffs + total + fd_updated
+    if elapsed < ttl:
+        return int(applied) + fd_updated
+
+    lock = _result_sync_lock(slug)
+    if lock.locked():
+        return int(applied) + fd_updated
+
+    async with lock:
+        now = time.monotonic()
+        if now - _last_result_sync_at.get(slug, 0) < ttl:
+            return int(applied) + fd_updated
+        _last_result_sync_at[slug] = now
+
+        kickoffs = await repair_canonical_team_order(db, slug)
+        kickoffs += await repair_canonical_kickoffs(db, slug)
+        applied += await apply_confirmed_results(db, slug)
+
+        try:
+            from data.knockout_advance import advance_knockout_teams
+            advanced = await advance_knockout_teams(db, slug)
+        except Exception as exc:
+            logger.warning("Knockout advance skipped for %s: %s", slug, exc)
+            advanced = 0
+        if advanced:
+            logger.info("Knockout teams advanced [%s]: %d fixtures", slug, advanced)
+
+        try:
+            reconciled = await reconcile_stale_matches(db, slug)
+        except OperationalError as exc:
+            if "locked" in str(exc).lower():
+                logger.warning(f"Result sync reconcile skipped for {slug} (SQLite locked)")
+                await db.rollback()
+                reconciled = 0
+            else:
+                raise
+        if reconciled:
+            applied += await apply_confirmed_results(db, slug)
+        total = applied + reconciled
+        if total or fd_updated or kickoffs:
+            logger.info(
+                f"Match result sync [{slug}]: football_data={fd_updated}, "
+                f"history={applied}, reconciled={reconciled}, kickoffs={kickoffs}"
+            )
+        return kickoffs + total + fd_updated
 
 
 async def maintain_competition_matches(db: AsyncSession, slug: str) -> dict:
@@ -841,6 +898,8 @@ async def maintain_competition_matches(db: AsyncSession, slug: str) -> dict:
             updated = 0
         else:
             raise
+    if updated:
+        confirmed += await apply_confirmed_results(db, slug)
     try:
         standings = await ensure_league_standings_stats(db, slug)
     except OperationalError as exc:

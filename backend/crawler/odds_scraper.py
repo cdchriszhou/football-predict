@@ -243,48 +243,87 @@ def build_multi_source_odds(team_a: str, team_b: str, derived: dict = None) -> d
 # ============================================================
 
 def derive_score_odds(win_a: float, draw: float, win_b: float) -> dict:
-    """Generate deterministic correct-score odds consistent with 1X2 match odds."""
+    """Generate deterministic correct-score odds consistent with 1X2 match odds.
+
+    INVARIANT: every derived score odd must be strictly above its parent 1X2 odd
+    (a specific scoreline is a subset of "any win/draw/lose", so it must always
+    be less probable / longer odds than the parent outcome).
+
+    Multipliers are calibrated so the most-likely score in each bucket sits at
+    ~2-5× the parent WDL odds, reflecting typical CRS market relationships.
+    A post-clamp ensures no score odd falls below parent × 1.5 (absolute floor).
+    """
     avg_odds = (win_a + win_b) / 2
     fav_is_a = win_a <= win_b
 
+    # For each scoreline: odds = parent_wdl * multiplier
+    # Multipliers reflect relative likelihood within each WDL bucket:
+    #   win:  1:0 ≈ 3.5×, 2:0 ≈ 4.5×, ..., 5:0 ≈ 30×
+    #   draw: 1:1 ≈ 2.0×, 0:0 ≈ 2.5×, ..., 3:3 ≈ 22×
+    #   lose: 0:1 ≈ 3.0×, 0:2 ≈ 4.5×, ..., 0:5 ≈ 30×
     scores = {
-        "1:0": round(win_a * 1.0, 2),
-        "2:0": round(win_a * 1.25, 2),
-        "2:1": round(win_a * 1.2, 2),
-        "3:0": round(win_a * 2.4, 2),
-        "3:1": round(win_a * 2.4, 2),
-        "3:2": round(win_a * 5.5, 2),
-        "4:0": round(win_a * 5.5, 2),
-        "4:1": round(win_a * 5.5, 2),
-        "4:2": round(win_a * 9.5, 2),
-        "5:0": round(win_a * 11.5, 2),
-        "5:1": round(win_a * 11.5, 2),
-        "0:0": round(draw * 1.05, 2),
-        "1:1": round(draw * 0.82, 2),
-        "2:2": round(draw * 2.1, 2),
-        "3:3": round(draw * 7.5, 2),
-        "0:1": round(win_b * 1.05, 2),
-        "0:2": round(win_b * 1.35, 2),
-        "1:2": round(win_b * 1.5, 2),
-        "0:3": round(win_b * 2.75, 2),
-        "1:3": round(win_b * 2.75, 2),
-        "2:3": round(win_b * 5.5, 2),
-        "0:4": round(win_b * 5.5, 2),
-        "1:4": round(win_b * 5.5, 2),
-        "2:4": round(win_b * 11.5, 2),
-        "0:5": round(win_b * 11.5, 2),
-        "1:5": round(win_b * 11.5, 2),
-        "3:4": round(avg_odds * 15.0, 2),
-        "4:3": round(avg_odds * 15.0, 2),
-        "4:4": round(avg_odds * 35.0, 2),
+        "1:0": round(win_a * 3.5, 2),
+        "2:0": round(win_a * 4.5, 2),
+        "2:1": round(win_a * 4.2, 2),
+        "3:0": round(win_a * 7.5, 2),
+        "3:1": round(win_a * 7.5, 2),
+        "3:2": round(win_a * 16.0, 2),
+        "4:0": round(win_a * 16.0, 2),
+        "4:1": round(win_a * 16.0, 2),
+        "4:2": round(win_a * 28.0, 2),
+        "5:0": round(win_a * 32.0, 2),
+        "5:1": round(win_a * 32.0, 2),
+        "0:0": round(draw * 2.5, 2),
+        "1:1": round(draw * 2.0, 2),
+        "2:2": round(draw * 6.5, 2),
+        "3:3": round(draw * 24.0, 2),
+        "0:1": round(win_b * 3.0, 2),
+        "0:2": round(win_b * 4.5, 2),
+        "1:2": round(win_b * 5.0, 2),
+        "0:3": round(win_b * 8.0, 2),
+        "1:3": round(win_b * 8.0, 2),
+        "2:3": round(win_b * 16.0, 2),
+        "0:4": round(win_b * 16.0, 2),
+        "1:4": round(win_b * 16.0, 2),
+        "2:4": round(win_b * 32.0, 2),
+        "0:5": round(win_b * 32.0, 2),
+        "1:5": round(win_b * 32.0, 2),
+        "3:4": round(avg_odds * 45.0, 2),
+        "4:3": round(avg_odds * 45.0, 2),
+        "4:4": round(avg_odds * 100.0, 2),
     }
-    # Boost most likely scoreline for the favourite
+
+    # Tighten the favourite's most-likely scorelines slightly (they are still
+    # well above the parent odd after this adjustment).
     if fav_is_a:
-        scores["1:0"] = round(scores["1:0"] * 0.92, 2)
-        scores["2:1"] = round(scores["2:1"] * 0.95, 2)
+        scores["1:0"] = round(scores["1:0"] * 0.88, 2)
+        scores["2:1"] = round(scores["2:1"] * 0.92, 2)
     else:
-        scores["0:1"] = round(scores["0:1"] * 0.92, 2)
-        scores["1:2"] = round(scores["1:2"] * 0.95, 2)
+        scores["0:1"] = round(scores["0:1"] * 0.88, 2)
+        scores["1:2"] = round(scores["1:2"] * 0.92, 2)
+
+    # Safety clamp: no score odd may fall below its parent WDL odd × 1.5.
+    # This guarantees the fundamental subset relationship holds.
+    def _clamp(odd: float, parent: float) -> float:
+        floor = round(parent * 1.5, 2)
+        return round(max(odd, floor), 2)
+
+    def _outcome(s: str) -> str:
+        try:
+            ga, gb = map(int, s.split(":"))
+        except (ValueError, AttributeError):
+            return "?"
+        return "win" if ga > gb else "lose" if gb > ga else "draw"
+
+    for key in scores:
+        oc = _outcome(key)
+        if oc == "win":
+            scores[key] = _clamp(scores[key], win_a)
+        elif oc == "draw":
+            scores[key] = _clamp(scores[key], draw)
+        elif oc == "lose":
+            scores[key] = _clamp(scores[key], win_b)
+
     return scores
 
 

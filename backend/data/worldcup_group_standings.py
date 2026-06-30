@@ -222,8 +222,27 @@ def enrich_group_context(
     ctx["defense_leak_b"] = _defense_leak_delta(sb, avg_gf)
 
     if matchday == 3 and sa and sb and sa.played >= 2 and sb.played >= 2:
-        gap = abs(sa.points - sb.points)
-        if gap <= 1 and sa.points >= 3 and sb.points >= 3:
+        if mw_a and mw_b:
+            ctx["both_must_win"] = True
+            ctx["both_need_draw"] = False
+        elif sa.points == sb.points and sa.points >= 3:
+            if sa.goal_diff > sb.goal_diff:
+                ctx["draw_suits_a"] = True
+                ctx["must_win_b"] = True
+            elif sb.goal_diff > sa.goal_diff:
+                ctx["draw_suits_b"] = True
+                ctx["must_win_a"] = True
+            else:
+                ctx["both_need_draw"] = True
+        elif (
+            abs(sa.points - sb.points) <= 1
+            and sa.points >= 3
+            and sb.points >= 3
+            and qual_a
+            and qual_b
+            and not mw_a
+            and not mw_b
+        ):
             ctx["both_need_draw"] = True
 
     return ctx

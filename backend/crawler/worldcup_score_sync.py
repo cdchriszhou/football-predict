@@ -87,13 +87,22 @@ async def refresh_fd_cache() -> list[dict]:
             _fd_refresh_running = False
 
 
-def _perspective_scores(row: dict, team_a_is_home: bool) -> tuple[int | None, int | None]:
+def _perspective_scores(row: dict, team_a_is_home: bool) -> tuple[int | None, int | None, int | None, int | None]:
     ra, rb = row.get("result_a"), row.get("result_b")
+    pa, pb = row.get("penalty_a"), row.get("penalty_b")
     if ra is None or rb is None:
-        return None, None
-    if team_a_is_home:
-        return int(ra), int(rb)
-    return int(rb), int(ra)
+        reg = (None, None)
+    elif team_a_is_home:
+        reg = (int(ra), int(rb))
+    else:
+        reg = (int(rb), int(ra))
+    if pa is None or pb is None:
+        pen = (None, None)
+    elif team_a_is_home:
+        pen = (int(pa), int(pb))
+    else:
+        pen = (int(pb), int(pa))
+    return reg[0], reg[1], pen[0], pen[1]
 
 
 def _kickoff_delta(db_time: datetime | None, api_time: datetime | None) -> timedelta | None:
@@ -211,7 +220,7 @@ async def _apply_fd_rows(db: AsyncSession, fd_rows: list[dict]) -> dict:
             continue
 
         status = map_match_status(fd.get("status_raw"))
-        ra, rb = _perspective_scores(fd, a_is_home)
+        ra, rb, pa, pb = _perspective_scores(fd, a_is_home)
 
         kickoff = effective_kickoff_naive(match) or match.match_time
         if (
@@ -230,6 +239,11 @@ async def _apply_fd_rows(db: AsyncSession, fd_rows: list[dict]) -> dict:
             if match.result_a != ra or match.result_b != rb:
                 match.result_a = ra
                 match.result_b = rb
+                changed = True
+        if pa is not None and pb is not None:
+            if getattr(match, "penalty_a", None) != pa or getattr(match, "penalty_b", None) != pb:
+                match.penalty_a = pa
+                match.penalty_b = pb
                 changed = True
         ext_id = _normalize_ext_id(fd.get("external_id"))
         if ext_id is not None and _assign_external_id(match, ext_id, ext_index):

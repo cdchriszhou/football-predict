@@ -4,8 +4,8 @@ from typing import Optional
 class BracketService:
     """Generate knockout bracket matchups based on group results"""
 
-    KNOCKOUT_STAGES = ["1/8决赛", "1/4决赛", "半决赛", "季军赛", "决赛"]
-    MATCHES_PER_STAGE = {"1/8决赛": 8, "1/4决赛": 4, "半决赛": 2, "季军赛": 1, "决赛": 1}
+    KNOCKOUT_STAGES = ["1/16决赛", "1/8决赛", "1/4决赛", "半决赛", "季军赛", "决赛"]
+    MATCHES_PER_STAGE = {"1/16决赛": 16, "1/8决赛": 8, "1/4决赛": 4, "半决赛": 2, "季军赛": 1, "决赛": 1}
 
     # Group winner/runner-up mapping to R16 slots
     GROUP_PAIRINGS = [

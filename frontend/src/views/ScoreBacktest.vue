@@ -6,7 +6,22 @@
           <h2>{{ t('scoreBacktest.title') }}</h2>
           <p>{{ t('scoreBacktest.subtitle') }}</p>
         </div>
-        <el-button type="primary" :loading="loading" @click="loadData">{{ t('common.refresh') }}</el-button>
+        <div class="header-actions">
+          <span v-if="lastUpdated" class="live-badge" :class="{ paused: !autoRefresh }">
+            {{ autoRefresh ? t('scoreBacktest.live') : t('scoreBacktest.paused') }}
+          </span>
+          <span v-if="lastUpdated" class="last-updated">
+            {{ t('scoreBacktest.lastUpdated', { time: formatTimeAgo(lastUpdated) }) }}
+          </span>
+          <el-button
+            :type="autoRefresh ? 'default' : 'primary'"
+            size="small"
+            @click="autoRefresh = !autoRefresh"
+          >
+            {{ autoRefresh ? t('scoreBacktest.pauseAuto') : t('scoreBacktest.resumeAuto') }}
+          </el-button>
+          <el-button type="primary" :loading="loading" @click="loadData">{{ t('common.refresh') }}</el-button>
+        </div>
       </div>
     </div>
 
@@ -101,7 +116,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import { DataAnalysis } from '@element-plus/icons-vue'
@@ -114,6 +129,60 @@ const loading = ref(false)
 const data = ref(null)
 const disclaimer = ref('')
 const expandedGroups = ref('')
+const autoRefresh = ref(true)
+const lastUpdated = ref(null)
+
+const POLL_INTERVAL_MS = 15_000
+let pollTimer = null
+let visibilityHandler = null
+
+function startPolling() {
+  stopPolling()
+  pollTimer = setInterval(() => {
+    if (!autoRefresh.value || loading.value) return
+    loadData()
+  }, POLL_INTERVAL_MS)
+
+  visibilityHandler = () => {
+    if (document.hidden) {
+      // Tab hidden: pause polling
+      clearInterval(pollTimer)
+      pollTimer = null
+    } else {
+      // Tab visible again: resume and fetch immediately
+      if (autoRefresh.value && !pollTimer) {
+        loadData()
+        pollTimer = setInterval(() => {
+          if (!autoRefresh.value || loading.value) return
+          loadData()
+        }, POLL_INTERVAL_MS)
+      }
+    }
+  }
+  document.addEventListener('visibilitychange', visibilityHandler)
+}
+
+function stopPolling() {
+  if (pollTimer) {
+    clearInterval(pollTimer)
+    pollTimer = null
+  }
+  if (visibilityHandler) {
+    document.removeEventListener('visibilitychange', visibilityHandler)
+    visibilityHandler = null
+  }
+}
+
+function formatTimeAgo(date) {
+  if (!date) return '—'
+  const now = Date.now()
+  const diff = now - date.getTime()
+  const seconds = Math.floor(diff / 1000)
+  if (seconds < 60) return t('scoreBacktest.justNow')
+  const minutes = Math.floor(seconds / 60)
+  if (minutes < 60) return t('scoreBacktest.minutesAgo', { n: minutes })
+  return formatTime(date)
+}
 
 const metrics = computed(() => {
   if (!data.value) return []
@@ -175,6 +244,7 @@ async function loadData() {
       return
     }
     data.value = res.data
+    lastUpdated.value = new Date()
     disclaimer.value = data.value?.disclaimer || t('scoreBacktest.disclaimer')
     if (groups.value.length) {
       expandedGroups.value = groups.value[0].group_key
@@ -187,13 +257,60 @@ async function loadData() {
   }
 }
 
-onMounted(loadData)
+onMounted(() => {
+  loadData()
+  startPolling()
+})
+
+onUnmounted(() => {
+  stopPolling()
+})
 </script>
 
 <style scoped>
 .header-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
 .header-row h2 { margin: 0; }
 .header-row p { margin: 4px 0 0; color: #606266; }
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+.live-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+  background: #52c41a;
+  padding: 2px 10px;
+  border-radius: 10px;
+  white-space: nowrap;
+}
+.live-badge::before {
+  content: '';
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: #fff;
+  animation: live-pulse 1.2s ease-in-out infinite;
+}
+.live-badge.paused {
+  background: #909399;
+}
+.live-badge.paused::before {
+  animation: none;
+}
+@keyframes live-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+.last-updated {
+  font-size: 12px;
+  color: #909399;
+  white-space: nowrap;
+}
 .disclaimer-alert { margin-bottom: 16px; }
 .stat-card { display: flex; align-items: center; gap: 16px; margin-bottom: 16px; }
 .stat-icon {
@@ -207,4 +324,10 @@ onMounted(loadData)
 .group-title { font-weight: 600; color: #303133; }
 .notes-list { margin: 0; padding-left: 20px; line-height: 1.8; color: #606266; }
 .meta-line { margin-top: 16px; font-size: 13px; color: #909399; }
+
+@media (max-width: 767px) {
+  .header-row { flex-direction: column; gap: 12px; }
+  .header-actions { flex-wrap: wrap; gap: 8px; width: 100%; }
+  .header-actions .el-button { flex: 1; min-width: 0; }
+}
 </style>

@@ -9,17 +9,17 @@
       <div class="prob-section">
         <div class="prob-row">
           <span class="prob-label">{{ t('match.win') }}</span>
-          <el-progress :percentage="prediction.win_rate" :color="'#4caf50'" :stroke-width="10" />
+          <el-progress :percentage="prediction.win_rate" :color="'#4caf50'" :stroke-width="10" :show-text="false" />
           <span class="prob-value text-win">{{ prediction.win_rate }}%</span>
         </div>
         <div class="prob-row">
           <span class="prob-label">{{ t('match.draw') }}</span>
-          <el-progress :percentage="prediction.draw_rate" :color="'#ff9800'" :stroke-width="10" />
+          <el-progress :percentage="prediction.draw_rate" :color="'#ff9800'" :stroke-width="10" :show-text="false" />
           <span class="prob-value text-draw">{{ prediction.draw_rate }}%</span>
         </div>
         <div class="prob-row">
           <span class="prob-label">{{ t('match.lose') }}</span>
-          <el-progress :percentage="prediction.lose_rate" :color="'#f44336'" :stroke-width="10" />
+          <el-progress :percentage="prediction.lose_rate" :color="'#f44336'" :stroke-width="10" :show-text="false" />
           <span class="prob-value text-lose">{{ prediction.lose_rate }}%</span>
         </div>
       </div>
@@ -115,9 +115,15 @@ const modelTagType = computed(() => {
 .ai-prediction { padding: 8px 0; }
 .prob-section { margin-bottom: 8px; }
 .prob-row { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
-.prob-label { width: 20px; font-weight: 600; text-align: center; }
-.prob-value { width: 48px; text-align: right; font-size: 14px; }
-.key-results { display: flex; justify-content: space-around; align-items: flex-start; }
+.prob-row :deep(.el-progress) { flex: 1; min-width: 0; }
+.prob-label { width: 20px; flex-shrink: 0; font-weight: 600; text-align: center; }
+.prob-value { width: 48px; flex-shrink: 0; text-align: right; font-size: 14px; }
+.key-results {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  align-items: start;
+}
 .result-item { text-align: center; }
 .result-label { font-size: 12px; color: #999; display: block; margin-bottom: 4px; }
 .result-value { font-size: 20px; font-weight: 700; color: #1a237e; }
@@ -136,10 +142,11 @@ const modelTagType = computed(() => {
 .loading-state { padding: 20px; }
 
 @media (max-width: 767px) {
-  .key-results { gap: 8px; }
+  .key-results { grid-template-columns: repeat(2, 1fr); gap: 12px; }
   .result-value { font-size: 16px; }
   .reason-text { font-size: 12px; }
   .prob-row { gap: 6px; }
   .prob-label { width: 16px; font-size: 12px; }
+  .prob-value { width: 42px; font-size: 12px; }
 }
 </style>

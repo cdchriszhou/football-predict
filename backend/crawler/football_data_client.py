@@ -89,16 +89,34 @@ def utc_to_beijing_naive(dt: datetime | None) -> datetime | None:
 
 
 def extract_match_score(score: dict | None) -> tuple[int | None, int | None]:
-    """Current or final goals from football-data score object (live + finished)."""
+    """Regulation/extra-time goals (excludes penalty shootout)."""
+    parsed = extract_match_scores(score)
+    return parsed["reg_a"], parsed["reg_b"]
+
+
+def extract_match_scores(score: dict | None) -> dict:
+    """Parse football-data score object into regulation + penalty shootout."""
+    empty = {"reg_a": None, "reg_b": None, "pen_a": None, "pen_b": None}
     if not score:
-        return None, None
-    for block in (score.get("fullTime"), score.get("regularTime"), score.get("halfTime")):
+        return empty
+
+    def _block(block: dict | None) -> tuple[int | None, int | None]:
         if not block:
-            continue
+            return None, None
         home, away = block.get("home"), block.get("away")
         if home is not None and away is not None:
             return int(home), int(away)
-    return None, None
+        return None, None
+
+    reg_a, reg_b = _block(score.get("fullTime"))
+    if reg_a is None:
+        reg_a, reg_b = _block(score.get("regularTime"))
+    if reg_a is None:
+        reg_a, reg_b = _block(score.get("halfTime"))
+
+    pen_a, pen_b = _block(score.get("penalties"))
+
+    return {"reg_a": reg_a, "reg_b": reg_b, "pen_a": pen_a, "pen_b": pen_b}
 
 
 async def fetch_competition_matches(
@@ -125,7 +143,9 @@ async def fetch_competition_matches(
         home = m.get("homeTeam") or {}
         away = m.get("awayTeam") or {}
         score = m.get("score") or {}
-        ra, rb = extract_match_score(score)
+        scores = extract_match_scores(score)
+        ra, rb = scores["reg_a"], scores["reg_b"]
+        pen_a, pen_b = scores["pen_a"], scores["pen_b"]
         kickoff_utc = _parse_dt(m.get("utcDate"))
         out.append({
             "external_id": m.get("id"),
@@ -140,6 +160,8 @@ async def fetch_competition_matches(
             "away_name_en": away.get("name") or away.get("shortName"),
             "result_a": ra,
             "result_b": rb,
+            "penalty_a": pen_a,
+            "penalty_b": pen_b,
             "venue": (m.get("venue") or home.get("venue") or ""),
         })
     logger.info(f"football-data.org: {len(out)} matches for {code} season {season}")

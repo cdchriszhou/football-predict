@@ -83,6 +83,7 @@ export default {
     updateDoneSimple: '数据更新完成',
     updateFailed: '更新失败',
     loadFailed: '仪表盘数据加载失败，请稍后重试',
+    scoreLoadPartial: '今日/最近赛果加载超时，请刷新页面重试',
     refreshProgress: '正在更新：{phase}',
     refreshTimeout: '数据更新超时，请稍后在管理后台查看进度',
     refreshAlreadyRunning: '数据更新已在进行中',
@@ -170,9 +171,11 @@ export default {
   },
   bracket: {
     title: '淘汰赛对阵图',
-    subtitle: '小组赛后自动生成，随赛果动态更新',
+    subtitle: '左右对称 FIFA 晋级树：上半区 / 下半区于决赛汇合',
     empty: '小组赛结束后自动生成淘汰赛对阵',
-    tbd: '待定'
+    tbd: '待定',
+    pyramidHint: '左右滑动查看完整对阵；上半区与下半区于决赛汇合，点击场次查看详情',
+    thirdPlace: '季军赛',
   },
   sporttery: {
     notOnSale: '竞彩盘口暂未开售',

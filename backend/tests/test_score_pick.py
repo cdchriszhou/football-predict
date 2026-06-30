@@ -8,6 +8,7 @@ from service.score_pick import (
     reconcile_likely_upset_cluster,
     repair_stored_score_picks,
     score_matches_pick,
+    _score_outcome,
 )
 
 
@@ -655,4 +656,346 @@ def test_june21_germany_two_one_pipeline():
         stage="小组赛",
     )
     assert any(score_matches_pick("2:1", p, crs) for p in picks)
+
+
+def _june22_ctx(standing_a, standing_b, group_avg_gf=1.5):
+    return {
+        "stage": "小组赛",
+        "matchday": 2,
+        "group_avg_gf": group_avg_gf,
+        "standing_a": standing_a,
+        "standing_b": standing_b,
+    }
+
+
+def test_june22_spain_saudi_rout_pipeline():
+    """2026-06-22: Spain 4:0 — deep fav keeps rout in likely pair."""
+    from service.score_pick import run_full_score_pipeline
+
+    crs = {
+        "2:0": 5.20, "3:0": 6.50, "4:0": 8.50, "2:1": 7.00, "3:1": 9.00,
+        "1:0": 9.50, "1:1": 12.0, "0:0": 18.0,
+    }
+    _, _, picks, _ = run_full_score_pipeline(
+        crs,
+        win_rate=78.0,
+        draw_rate=14.0,
+        lose_rate=8.0,
+        sp_win=1.18,
+        sp_draw=6.50,
+        sp_lose=12.0,
+        handicap="-2",
+        rank_a=8,
+        rank_b=58,
+        expected_a=2.8,
+        stage="小组赛",
+        group_context=_june22_ctx(
+            {"played": 1, "goals_for": 3, "goals_against": 0},
+            {"played": 1, "goals_for": 0, "goals_against": 2},
+        ),
+    )
+    assert any(score_matches_pick("4:0", p, crs) for p in picks)
+
+
+def test_june22_belgium_iran_scoreless_draw():
+    """2026-06-22: Belgium 0:0 — R1 drought + iron defense keeps 0:0 in triple."""
+    from service.score_pick import run_full_score_pipeline
+
+    crs = {
+        "2:0": 6.1, "2:1": 5.8, "1:0": 7.2, "1:1": 8.25, "0:0": 14.0,
+        "3:0": 12.0, "4:0": 22.0,
+    }
+    ctx = _june22_ctx(
+        {"played": 1, "goals_for": 1, "goals_against": 1},
+        {"played": 1, "goals_for": 2, "goals_against": 2},
+    )
+    _, upset, picks, _ = run_full_score_pipeline(
+        crs,
+        win_rate=58.0,
+        draw_rate=32.0,
+        lose_rate=10.0,
+        sp_win=1.55,
+        sp_draw=4.76,
+        sp_lose=5.50,
+        handicap="-1",
+        rank_a=9,
+        rank_b=21,
+        stage="小组赛",
+        group_context=ctx,
+        team_a={"tactic": "技术流"},
+        team_b={"tactic": "铁桶防守"},
+        odds_dict={"win_win": 1.55, "draw": 4.76, "win_lose": 5.50, "over_under": 2.5},
+    )
+    assert any(score_matches_pick("0:0", p, crs) for p in picks)
+
+
+def test_june22_uruguay_cape_verde_draw_secondary():
+    """2026-06-22: Uruguay 2:2 — opponent clean sheet keeps draw line in picks."""
+    from service.score_pick import run_full_score_pipeline
+
+    crs = {
+        "2:0": 4.6, "1:0": 4.95, "1:1": 7.3, "2:2": 28.0, "4:0": 18.0,
+        "0:0": 12.0, "2:1": 8.0,
+    }
+    ctx = _june22_ctx(
+        {"played": 1, "goals_for": 1, "goals_against": 1},
+        {"played": 1, "goals_for": 0, "goals_against": 0},
+        group_avg_gf=0.5,
+    )
+    _, upset, picks, _ = run_full_score_pipeline(
+        crs,
+        win_rate=55.0,
+        draw_rate=30.0,
+        lose_rate=15.0,
+        sp_win=1.50,
+        sp_draw=4.20,
+        sp_lose=6.50,
+        rank_a=17,
+        rank_b=64,
+        stage="小组赛",
+        group_context=ctx,
+    )
+    assert any(
+        score_matches_pick("2:2", p, crs) or score_matches_pick("1:1", p, crs)
+        for p in picks
+    )
+
+
+def test_june22_nz_egypt_multi_goal_away():
+    """2026-06-22: NZ 1:3 — away fav keeps 1:3 in likely pair."""
+    from service.score_pick import run_full_score_pipeline
+
+    crs = {
+        "0:1": 5.75, "1:2": 5.8, "1:3": 11.0, "0:3": 11.0, "1:1": 6.8,
+        "0:2": 8.5, "2:1": 14.0,
+    }
+    ctx = _june22_ctx(
+        {"played": 1, "goals_for": 2, "goals_against": 2},
+        {"played": 1, "goals_for": 1, "goals_against": 1},
+    )
+    _, _, picks, _ = run_full_score_pipeline(
+        crs,
+        win_rate=18.0,
+        draw_rate=22.0,
+        lose_rate=60.0,
+        sp_win=5.50,
+        sp_draw=4.00,
+        sp_lose=1.42,
+        handicap="+1",
+        rank_a=89,
+        rank_b=29,
+        stage="小组赛",
+        group_context=ctx,
+        odds_dict={"win_win": 5.50, "draw": 4.00, "win_lose": 1.42, "over_under": 2.5},
+        skip_wdl_resilience=True,
+    )
+    assert any(score_matches_pick("1:3", p, crs) for p in picks)
+
+
+def test_align_preserves_draw_when_resilience_active():
+    from service.score_context import detect_resilience_signals
+    from service.score_pick import align_score_picks_to_wdl, _score_outcome
+
+    ctx = {
+        "matchday": 2,
+        "group_avg_gf": 0.5,
+        "standing_a": {"played": 1, "goals_for": 1, "goals_against": 1},
+        "standing_b": {"played": 1, "goals_for": 0, "goals_against": 0},
+    }
+    sig = detect_resilience_signals(ctx, None, 17, 64)
+    crs = {"2:0": 4.6, "1:0": 4.95, "1:1": 7.3, "4:0": 18.0}
+    out = align_score_picks_to_wdl(
+        ["2:0", "1:1"], crs,
+        win_rate=62.0, draw_rate=28.0, lose_rate=10.0,
+        resilience=sig,
+    )
+    assert _score_outcome(out[1]) == "draw"
+
+
+def test_june26_tunisia_netherlands_away_rout_not_home_upset():
+    """2026-06-26: Tunisia vs Netherlands — MD3 rout must not flip to 1:0/2:1."""
+    from service.score_pick import run_full_score_pipeline, score_matches_pick
+
+    crs = {
+        "0:3": 5.0, "0:2": 5.5, "0:4": 6.5, "0:1": 9.2, "0:5": 9.5, "1:3": 9.5,
+        "1:0": 80.0, "2:1": 80.0, "1:1": 25.0, "0:0": 29.0, "2:2": 50.0,
+    }
+    ctx = {
+        "stage": "小组赛",
+        "matchday": 3,
+        "must_win_a": True,
+        "must_win_b": False,
+        "qualified_a": False,
+        "qualified_b": True,
+        "standing_a": {"played": 2, "points": 0, "goals_for": 1, "goals_against": 9},
+        "standing_b": {"played": 2, "points": 4, "goals_for": 7, "goals_against": 3},
+    }
+    # Rule engine can over-boost home must-win without 1X2 market — align must not undo rout
+    _, _, picks, _ = run_full_score_pipeline(
+        crs,
+        win_rate=48.6,
+        draw_rate=12.5,
+        lose_rate=38.9,
+        handicap="+2",
+        rank_a=44,
+        rank_b=7,
+        stage="小组赛",
+        group_context=ctx,
+        odds_dict={"handicap": "+2", "over_under": 2.5},
+        skip_wdl_resilience=True,
+    )
+    assert not any(p in ("1:0", "2:1") for p in picks[:2])
+    assert any(score_matches_pick("0:3", p, crs) or score_matches_pick("0:2", p, crs) for p in picks[:2])
+
+
+def test_june26_curacao_ivory_coast_away_rout_not_home_upset():
+    """2026-06-26: Curacao vs Côte d'Ivoire — +2 handicap, no 1X2, away rout."""
+    from service.score_pick import run_full_score_pipeline, score_matches_pick
+
+    crs = {
+        "0:2": 6.0, "0:3": 6.5, "0:1": 7.0, "1:3": 8.0, "0:4": 9.0,
+        "1:0": 80.0, "2:1": 85.0, "1:1": 25.0, "0:0": 30.0, "2:2": 45.0,
+    }
+    ctx = {
+        "stage": "小组赛",
+        "matchday": 3,
+        "must_win_a": True,
+        "must_win_b": False,
+        "qualified_a": False,
+        "qualified_b": False,
+        "rank_a": 82,
+        "rank_b": 34,
+        "rank_gap": 48,
+        "standing_a": {"played": 2, "points": 0, "goals_for": 1, "goals_against": 6},
+        "standing_b": {"played": 2, "points": 3, "goals_for": 3, "goals_against": 2},
+    }
+    _, _, picks, _ = run_full_score_pipeline(
+        crs,
+        win_rate=39.3,
+        draw_rate=38.0,
+        lose_rate=22.7,
+        handicap="+2",
+        rank_a=82,
+        rank_b=34,
+        stage="小组赛",
+        group_context=ctx,
+        odds_dict={"handicap": "+2", "over_under": 2.5},
+        skip_wdl_resilience=True,
+    )
+    assert not any(p in ("1:0", "2:1", "2:0") for p in picks[:2])
+    assert any(score_matches_pick("0:2", p, crs) or score_matches_pick("0:3", p, crs) for p in picks[:2])
+
+
+def test_june27_cape_verde_saudi_likely_pair_not_opposite():
+    """2026-06-27: Cape Verde vs Saudi — hot pair must not be 1:2 + 2:1."""
+    from service.score_pick import run_full_score_pipeline, _score_outcome, repair_stored_score_picks
+
+    crs = {
+        "1:1": 5.5, "2:1": 7.5, "1:0": 7.6, "1:2": 8.0, "0:1": 8.5,
+        "0:0": 10.0, "2:2": 12.0, "0:2": 14.0,
+    }
+    ctx = {
+        "stage": "小组赛",
+        "matchday": 3,
+        "must_win_a": False,
+        "must_win_b": True,
+        "qualified_a": False,
+        "qualified_b": False,
+        "rank_a": 64,
+        "rank_b": 53,
+        "rank_gap": 11,
+        "standing_a": {"played": 2, "points": 2, "goals_for": 2, "goals_against": 2},
+        "standing_b": {"played": 2, "points": 1, "goals_for": 1, "goals_against": 5},
+    }
+    _, _, picks, _ = run_full_score_pipeline(
+        crs,
+        win_rate=30.5,
+        draw_rate=28.8,
+        lose_rate=40.7,
+        sp_win=2.46,
+        sp_draw=3.05,
+        sp_lose=2.53,
+        handicap="-1",
+        rank_a=64,
+        rank_b=53,
+        stage="小组赛",
+        group_context=ctx,
+        odds_dict={"win_win": 2.46, "draw": 3.05, "win_lose": 2.53, "handicap": "-1"},
+        skip_wdl_resilience=True,
+    )
+    assert _score_outcome(picks[0]) != "win" or _score_outcome(picks[1]) != "lose"
+    assert not ({_score_outcome(picks[0]), _score_outcome(picks[1])} == {"win", "lose"})
+    assert any(_score_outcome(p) == "lose" for p in picks[:2])
+    fixed, upset = repair_stored_score_picks(
+        ["1:2", "2:1"], "2:2", crs,
+        win_rate=30.5, draw_rate=28.8, lose_rate=40.7,
+        sp_win=2.46, sp_lose=2.53, sp_draw=3.05, handicap="-1", rank_a=64, rank_b=53,
+    )
+    assert not ({_score_outcome(fixed[0]), _score_outcome(fixed[1])} == {"win", "lose"})
+
+
+def test_knockout_brazil_japan_prefers_win_not_draw_primary():
+    from service.score_pick import finalize_knockout_score_picks, align_wdl_to_score_picks
+    from service.rule_engine import RuleEngine
+    from service.match_context import build_group_context
+
+    ctx = build_group_context("1/16决赛", "", 0, "巴西", "日本", 6, 18)
+    re = RuleEngine()
+    r = re.evaluate(
+        {"name": "巴西", "rank": 6, "attack": 88, "defend": 85, "midfield": 86, "speed": 86, "physical": 85, "tactic": "控球"},
+        {"name": "日本", "rank": 18, "attack": 78, "defend": 80, "midfield": 80, "speed": 82, "physical": 78, "tactic": "防守反击"},
+        odds=None, group_context=ctx,
+    )
+    scores, _ = finalize_knockout_score_picks(
+        r.best_scores,
+        expected_a=r.expected_a, expected_b=r.expected_b,
+        win_rate=r.win_rate, draw_rate=r.draw_rate, lose_rate=r.lose_rate,
+        rank_a=6, rank_b=18, stage="1/16决赛",
+    )
+    assert _score_outcome(scores[0]) == "win"
+    w, d, l = align_wdl_to_score_picks(
+        scores, r.win_rate, r.draw_rate, r.lose_rate,
+        stage="1/16决赛", rank_a=6, rank_b=18,
+    )
+    assert w >= l
+
+
+def test_knockout_germany_paraguay_includes_draw_secondary():
+    from service.score_pick import finalize_knockout_score_picks
+
+    scores, _ = finalize_knockout_score_picks(
+        ["1:1", "0:0", "1:0"],
+        expected_a=1.45, expected_b=0.95,
+        win_rate=53.0, draw_rate=18.0, lose_rate=29.0,
+        rank_a=10, rank_b=40, stage="1/16决赛",
+    )
+    assert _score_outcome(scores[0]) == "win"
+    assert "1:1" in scores or _score_outcome(scores[1]) == "draw"
+
+
+def test_knockout_r32_replay_hits():
+    from data.worldcup_history import HISTORICAL_MATCHES
+    from service.score_backtest import run_score_prediction, score_matches_pick
+
+    targets = {("巴西", "日本"), ("德国", "巴拉圭"), ("荷兰", "摩洛哥")}
+    for h in HISTORICAL_MATCHES:
+        if h.get("year") != 2026 or h.get("stage") != "1/16决赛":
+            continue
+        if (h["team_a"], h["team_b"]) not in targets:
+            continue
+        crs = {str(k): float(v) for k, v in (h.get("score_odds") or {}).items()}
+        eu = h.get("european") or {}
+        w, d, l = eu["win_win"], eu["draw"], eu["win_lose"]
+        o = 1 / w + 1 / d + 1 / l
+        wdl = ((1 / w) / o * 100, (1 / d) / o * 100, (1 / l) / o * 100)
+        p1, _, _, all_p = run_score_prediction(
+            h["team_a"], h["team_b"], crs, wdl,
+            {"win_win": w, "draw": d, "win_lose": l, "handicap": (h.get("macau") or {}).get("handicap")},
+            stage="1/16决赛",
+        )
+        actual = f"{h['result_a']}:{h['result_b']}"
+        hit = score_matches_pick(actual, p1, crs) or any(
+            score_matches_pick(actual, p, crs) for p in all_p if p
+        )
+        assert hit, f"{h['team_a']} vs {h['team_b']} actual={actual} picks={all_p}"
 

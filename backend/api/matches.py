@@ -79,6 +79,8 @@ def match_to_dict(m: Match) -> dict:
         "match_time": format_beijing_iso(m.match_time),
         "location": m.location, "stadium": m.stadium,
         "result_a": ra, "result_b": rb,
+        "penalty_a": m.penalty_a if match_has_recorded_score(m) else None,
+        "penalty_b": m.penalty_b if match_has_recorded_score(m) else None,
         "status": status,
         "season": m.season, "matchday": m.matchday,
     }
@@ -180,7 +182,7 @@ async def get_match_stages(
 
     # Club leagues use matchday rounds; never expose World Cup knockout labels.
     if comp and comp.get("type") == "club":
-        knockout = {"小组赛", "1/8决赛", "1/4决赛", "半决赛", "季军赛", "决赛"}
+        knockout = {"小组赛", "1/16决赛", "1/8决赛", "1/4决赛", "半决赛", "季军赛", "决赛"}
         stages = [s for s in stages if s not in knockout]
 
     return success(stages)
@@ -223,10 +225,14 @@ async def get_today_matches(
     comp_slug = resolve_competition(competition)
     await _ensure_results_synced(db, comp_slug)
     today_start, today_end = beijing_day_bounds_naive()
+    # Wider DB window so canonical kickoff (may differ from stale match_time) still matches today.
+    query_start = today_start - timedelta(days=1)
+    query_end = today_end + timedelta(days=1)
     today_filters = [
         Match.competition_slug == comp_slug,
-        Match.match_time >= today_start,
-        Match.match_time < today_end,
+        Match.match_time.isnot(None),
+        Match.match_time >= query_start,
+        Match.match_time < query_end,
     ]
     season_filter = _club_season_filter(comp_slug)
     if season_filter is not None:

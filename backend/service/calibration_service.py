@@ -35,12 +35,12 @@ DEFAULT_PARAMS = {
     "knockout_goal_reduction": 0.84,
     "dixon_coles_rho": -0.13,
     "market_blend": 0.28,
-    "draw_base": 26.0,
+    "draw_base": 30.0,
     "score_odds_blend": 0.32,
     "upset_weight": 1.0,
-    "collusion_weight": 1.0,
+    "collusion_weight": 1.2,
     "manipulation_dampen": 0.15,
-    "low_draw_odds": 3.4,
+    "low_draw_odds": 3.6,
     "calibrated_at": None,
     "backtest": {},
 }
@@ -108,9 +108,11 @@ class CalibratedRuleEngine(RuleEngine):
         self._market_blend = p.get("market_blend", 0.28)
         self._score_odds_blend = p.get("score_odds_blend", 0.32)
         self._draw_base = p.get("draw_base", 26.0)
+        self.DRAW_BASE = self._draw_base  # wire to parent RuleEngine
         self._upset_weight = p.get("upset_weight", 1.0)
         self._collusion_weight = p.get("collusion_weight", 1.0)
         self._manipulation_dampen = p.get("manipulation_dampen", 0.15)
+        self._ko_params = p.get("KO_ROUND_PARAMS", {})
 
     def evaluate(self, team_a, team_b, h2h=None, odds=None, players_a=None,
                  players_b=None, group_context=None, context_analysis=None,
@@ -158,115 +160,45 @@ class CalibratedRuleEngine(RuleEngine):
                 result.lose_rate = round(100 - result.win_rate - result.draw_rate, 1)
 
         if score_odds:
-            result.best_scores = self._blend_score_odds(
-                result.best_scores, score_odds, result.draw_rate, result.win_rate,
-            )
-            from service.score_pick import (
-                pick_crs_anchored_scores,
-                boost_heavy_favorite_scores,
-                apply_favourite_blowout_scores,
-                promote_strong_home_multi_goal,
-            )
-            result.best_scores = pick_crs_anchored_scores(
+            # Use the new weighted-ensemble pipeline for score selection
+            from service.score_pick import run_full_score_pipeline
+            best, upset, _, _ = run_full_score_pipeline(
                 score_odds,
                 win_rate=result.win_rate,
-                lose_rate=result.lose_rate,
                 draw_rate=result.draw_rate,
+                lose_rate=result.lose_rate,
                 expected_a=result.expected_a,
                 expected_b=result.expected_b,
                 model_scores=result.best_scores,
+                stage=(group_context or {}).get("stage"),
                 sp_win=(odds or {}).get("win_win"),
                 sp_lose=(odds or {}).get("win_lose"),
                 sp_draw=(odds or {}).get("draw"),
-            )
-            result.best_scores = self._apply_host_blowout_scores(
-                result.best_scores,
-                score_odds,
-                group_context,
-                odds,
-                result,
-                team_a,
-                team_b,
-            )
-            result.best_scores = boost_heavy_favorite_scores(
-                result.best_scores,
-                score_odds,
-                win_rate=result.win_rate,
                 handicap=(odds or {}).get("handicap"),
                 rank_a=(team_a or {}).get("rank"),
                 rank_b=(team_b or {}).get("rank"),
-            )
-            result.best_scores = apply_favourite_blowout_scores(
-                result.best_scores,
-                score_odds,
-                sp_win=(odds or {}).get("win_win"),
-                handicap=(odds or {}).get("handicap"),
-                win_rate=result.win_rate,
-                lose_rate=result.lose_rate,
-                expected_a=result.expected_a,
-            )
-            result.best_scores = promote_strong_home_multi_goal(
-                result.best_scores,
-                score_odds,
-                sp_win=(odds or {}).get("win_win"),
-            )
-            from service.score_pick import refine_favorite_score_cluster
-            result.best_scores = refine_favorite_score_cluster(
-                result.best_scores,
-                score_odds,
-                win_rate=result.win_rate,
-                lose_rate=result.lose_rate,
-                sp_win=(odds or {}).get("win_win"),
-                sp_lose=(odds or {}).get("win_lose"),
-            )
-            from service.score_context import apply_contextual_score_adjustments
-            result.best_scores = apply_contextual_score_adjustments(
-                result.best_scores,
-                score_odds,
                 group_context=group_context,
                 odds_dict=odds,
-                win_rate=result.win_rate,
-                lose_rate=result.lose_rate,
-                draw_rate=result.draw_rate,
-                expected_a=result.expected_a,
-                expected_b=result.expected_b,
-                rank_a=(team_a or {}).get("rank"),
-                rank_b=(team_b or {}).get("rank"),
-                team_a=(team_a or {}).get("name", ""),
-                team_b=(team_b or {}).get("name", ""),
+                rule_result=result,
+                team_a=team_a,
+                team_b=team_b,
             )
+            result.best_scores = best
 
         is_knockout = (group_context or {}).get("stage", "") not in ("", "小组赛")
         over_under = float((odds or {}).get("over_under", 2.5) or 2.5)
-        result.upset_score = self._predict_upset_score(
-            result.expected_a,
-            result.expected_b,
-            result.win_rate,
-            result.draw_rate,
-            result.lose_rate,
-            result.best_scores,
-            over_under,
-            is_knockout,
-            context_analysis,
-        )
-
-        from service.score_pick import align_score_picks_to_wdl, reconcile_wdl_with_score_picks
-        if score_odds:
-            result.best_scores = align_score_picks_to_wdl(
+        if not getattr(result, 'upset_score', None) or result.upset_score == "?":
+            result.upset_score = self._predict_upset_score(
+                result.expected_a,
+                result.expected_b,
+                result.win_rate,
+                result.draw_rate,
+                result.lose_rate,
                 result.best_scores,
-                score_odds,
-                win_rate=result.win_rate,
-                draw_rate=result.draw_rate,
-                lose_rate=result.lose_rate,
-                model_scores=result.best_scores,
+                over_under,
+                is_knockout,
+                context_analysis,
             )
-        wr, dr, lr = reconcile_wdl_with_score_picks(
-            result.best_scores,
-            result.win_rate,
-            result.draw_rate,
-            result.lose_rate,
-        )
-        result.win_rate, result.draw_rate, result.lose_rate = wr, dr, lr
 
         return result
 

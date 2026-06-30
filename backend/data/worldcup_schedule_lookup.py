@@ -14,11 +14,14 @@ KICKOFF_OVERRIDES_BEIJING: dict[tuple[str, str], datetime] = {
 @lru_cache(maxsize=1)
 def _schedule_by_teams() -> dict[tuple[str, str], datetime]:
     from crawler.schedule_crawler import _build_expected_matches
+    from data.worldcup_knockout_schedule import knockout_kickoff_by_teams
 
-    return {
+    mapping = {
         (m["team_a"], m["team_b"]): m["match_time"]
         for m in _build_expected_matches()
     }
+    mapping.update(knockout_kickoff_by_teams())
+    return mapping
 
 
 def canonical_kickoff_beijing(team_a: str, team_b: str) -> datetime | None:

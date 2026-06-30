@@ -55,7 +55,7 @@ function getBaseURL() {
 
 const api = axios.create({
   baseURL: getBaseURL(),
-  timeout: 30000,
+  timeout: 60000,
 })
 
 api.interceptors.request.use(
@@ -83,15 +83,21 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response.data,
   (error) => {
-    if (error.response?.status === 401) {
+    const status = error.response?.status
+    if (status === 401) {
       localStorage.removeItem(TOKEN_KEY)
       localStorage.removeItem('worldcup_auth_user')
       if (window.location.pathname !== '/login') {
         window.location.href = '/login'
       }
     }
-    const msg = error.response?.data?.message || error.message || i18n.global.t('messages.requestFailed')
-    console.error('[API Error]', msg)
+    // FastAPI returns { detail: "..." } for HTTPException, or
+    // { code: N, message: "..." } from the custom exception handler.
+    const body = error.response?.data
+    const msg = (typeof body === 'object' && (body?.message || body?.detail))
+      || error.message
+      || i18n.global.t('messages.requestFailed')
+    console.error(`[API Error] HTTP ${status || 'network'}:`, msg)
     return Promise.reject(error)
   }
 )

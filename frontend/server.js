@@ -7,6 +7,7 @@ const __dirname = fileURLToPath(new URL('.', import.meta.url))
 const DIST = join(__dirname, 'dist')
 const API_TARGET = process.env.BACKEND_URL || process.env.API_TARGET || 'http://127.0.0.1:8888'
 const PORT = parseInt(process.env.PORT || '4173', 10)
+const PROXY_TIMEOUT_MS = parseInt(process.env.API_PROXY_TIMEOUT_MS || '120000', 10)
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -45,14 +46,22 @@ createServer(async (req, res) => {
     log(`${req.method} ${req.url} -> ${API_TARGET}${proxyPath}`)
 
     const proxy = request(opts, (proxyRes) => {
+      clearTimeout(timer)
       log(`  <- ${proxyRes.statusCode} (${req.url})`)
       res.writeHead(proxyRes.statusCode, proxyRes.headers)
       proxyRes.pipe(res)
     })
+    const timer = setTimeout(() => {
+      proxy.destroy(new Error(`Backend timeout after ${PROXY_TIMEOUT_MS}ms`))
+    }, PROXY_TIMEOUT_MS)
+    proxy.on('close', () => clearTimeout(timer))
     proxy.on('error', (err) => {
+      clearTimeout(timer)
       log(`  !! PROXY ERROR: ${err.message}`)
-      res.writeHead(502, { 'Content-Type': 'application/json' })
-      res.end(JSON.stringify({ message: 'Backend API unavailable', error: err.message }))
+      if (!res.headersSent) {
+        res.writeHead(502, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({ message: 'Backend API unavailable', error: err.message }))
+      }
     })
     req.pipe(proxy)
     return

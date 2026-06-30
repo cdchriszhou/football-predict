@@ -43,8 +43,12 @@ class _ReentrantAsyncLock:
 write_lock = _ReentrantAsyncLock()
 
 
-async def commit_session(db: AsyncSession, *, retries: int = 8) -> None:
-    """Commit with optional global lock and exponential backoff (SQLite only)."""
+async def commit_session(db: AsyncSession, *, retries: int = 3) -> None:
+    """Commit with optional global lock and backoff (SQLite only).
+
+    Retries reduced from 8→3: SQLite's busy_timeout=60000 already handles
+    write contention at the C level; Python-level retries just compound the wait.
+    """
     if not IS_SQLITE:
         await db.commit()
         return
@@ -53,7 +57,7 @@ async def commit_session(db: AsyncSession, *, retries: int = 8) -> None:
         await _commit_with_retry(db, retries=retries)
 
 
-async def _commit_with_retry(db: AsyncSession, *, retries: int = 8) -> None:
+async def _commit_with_retry(db: AsyncSession, *, retries: int = 3) -> None:
     for attempt in range(retries):
         try:
             await db.commit()
@@ -69,7 +73,7 @@ async def _commit_with_retry(db: AsyncSession, *, retries: int = 8) -> None:
             await asyncio.sleep(wait)
 
 
-async def flush_session(db: AsyncSession, *, retries: int = 8) -> None:
+async def flush_session(db: AsyncSession, *, retries: int = 3) -> None:
     """Flush pending changes with retry when SQLite is briefly locked."""
     if not IS_SQLITE:
         await db.flush()
@@ -90,7 +94,7 @@ async def flush_session(db: AsyncSession, *, retries: int = 8) -> None:
                 await asyncio.sleep(wait)
 
 
-async def run_db_write(db: AsyncSession, write_fn, *, retries: int = 8) -> None:
+async def run_db_write(db: AsyncSession, write_fn, *, retries: int = 3) -> None:
     """Run a write callback under the global SQLite lock (no-op lock on other DBs)."""
     if not IS_SQLITE:
         await write_fn()

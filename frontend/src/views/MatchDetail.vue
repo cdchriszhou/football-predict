@@ -18,12 +18,13 @@
           </div>
           <div class="hero-center">
             <template v-if="isEffectiveMatchStatus(match, 'finished')">
-              <span v-if="hasMatchScore(match)" class="hero-score">{{ match.result_a }} - {{ match.result_b }}</span>
-              <span v-else class="hero-vs">VS</span>
+              <span v-if="hasMatchScore(match)" class="hero-score">{{ scoreLines.regulation }}</span>
+              <span v-if="scoreLines.penalty" class="hero-penalty">{{ t('match.penaltyShort', { score: scoreLines.penalty }) }}</span>
+              <span v-else-if="!hasMatchScore(match)" class="hero-vs">VS</span>
               <el-tag type="info" size="small" effect="dark" class="hero-status-tag">{{ t('status.finished') }}</el-tag>
             </template>
             <template v-else-if="isEffectiveMatchStatus(match, 'live')">
-              <span class="hero-score live">{{ match.result_a }} - {{ match.result_b }}</span>
+              <span class="hero-score live">{{ scoreLines.regulation || '0 - 0' }}</span>
               <el-tag type="danger" size="small">LIVE</el-tag>
             </template>
             <template v-else>
@@ -105,6 +106,7 @@ import TeamBadge from '@/components/TeamBadge.vue'
 import { useModelOptions, formatGroup } from '@/i18n/helpers'
 import { stageLabel } from '@/i18n/matchLabels'
 import { hasMatchScore, isEffectiveMatchStatus, effectiveMatchStatus } from '@/utils/matchStatus'
+import { formatMatchScoreLines } from '@/utils/matchScore'
 
 const { t, locale } = useI18n()
 const modelOptions = useModelOptions()
@@ -121,6 +123,8 @@ const loading = ref(false)
 const predLoading = ref(false)
 const activeTab = ref('prediction')
 const predictModel = ref('auto')
+
+const scoreLines = computed(() => formatMatchScoreLines(match.value || {}))
 
 async function load() {
   loading.value = true
@@ -199,6 +203,13 @@ onUnmounted(() => {
 .hero-team h3 { font-size: 20px; font-weight: 700; margin: 0; text-align: left; line-height: 1.3; }
 .hero-center { text-align: center; }
 .hero-score { font-size: 42px; font-weight: 900; }
+.hero-penalty {
+  display: block;
+  margin-top: 4px;
+  font-size: 16px;
+  font-weight: 700;
+  color: #5c6bc0;
+}
 .hero-score.live { color: #f44336; animation: pulse 1s infinite; }
 .hero-vs { font-size: 36px; font-weight: 800; color: #1a237e; }
 .hero-status-tag { margin-top: 8px; }
@@ -209,13 +220,17 @@ onUnmounted(() => {
 
 @media (max-width: 767px) {
   .detail-title { font-size: 16px; }
-  .hero-content { flex-direction: column; gap: 16px; padding: 12px 0; }
-  .hero-team h3 { font-size: 16px; }
   .hero-score { font-size: 32px; }
   .hero-vs { font-size: 28px; }
-  .hero-meta { flex-direction: column; gap: 4px; font-size: 12px; }
+  .hero-meta { flex-wrap: wrap; gap: 4px 8px; font-size: 12px; }
   .predict-header { flex-direction: column; align-items: flex-start; gap: 8px; }
   .predict-header :deep(.el-select) { width: 100% !important; }
+}
+
+@media (max-width: 599px) {
+  .hero-content { flex-direction: column; gap: 16px; padding: 12px 0; }
+  .hero-team h3 { font-size: 16px; }
+  .hero-meta { flex-direction: column; gap: 4px; }
 }
 
 @keyframes pulse {

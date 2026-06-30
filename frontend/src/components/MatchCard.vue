@@ -33,7 +33,10 @@
       <div class="score-area">
         <template v-if="hasMatchScore(match) && (isEffectiveMatchStatus(match, 'finished') || isEffectiveMatchStatus(match, 'live'))">
           <span class="score" :class="{ live: isEffectiveMatchStatus(match, 'live') }">
-            {{ match.result_a }} - {{ match.result_b }}
+            {{ scoreLines.regulation }}
+          </span>
+          <span v-if="scoreLines.penalty" class="penalty-score">
+            {{ t('match.penaltyShort', { score: scoreLines.penalty }) }}
           </span>
           <el-tag
             v-if="isEffectiveMatchStatus(match, 'live')"
@@ -45,6 +48,10 @@
         <template v-else-if="isEffectiveMatchStatus(match, 'live')">
           <span class="score live">{{ formatLiveScore(match) }}</span>
           <el-tag type="danger" size="small" class="live-tag">LIVE</el-tag>
+        </template>
+        <template v-else-if="isEffectiveMatchStatus(match, 'finished')">
+          <span class="score pending">— : —</span>
+          <span class="match-time">{{ formatTime(match.match_time) }}</span>
         </template>
         <template v-else>
           <span class="vs">VS</span>
@@ -137,6 +144,7 @@ import { useAuthStore } from '@/stores/auth'
 import { hasSportteryOdds, resolveSportteryView } from '@/utils/sporttery'
 import { stageLabel, statusLabel } from '@/i18n/matchLabels'
 import { effectiveMatchStatus, hasMatchScore, isEffectiveMatchStatus } from '@/utils/matchStatus'
+import { formatMatchScoreLines } from '@/utils/matchScore'
 import { parseLikelyScores, parseUpsetScore } from '@/utils/scorePrediction'
 
 const { t } = useI18n()
@@ -194,6 +202,7 @@ function fmt(v) {
 }
 
 const effectiveStatus = computed(() => effectiveMatchStatus(props.match))
+const scoreLines = computed(() => formatMatchScoreLines(props.match))
 
 const displayScores = computed(() => parseLikelyScores(prediction.value))
 const upsetScore = computed(() => parseUpsetScore(prediction.value))
@@ -223,7 +232,8 @@ function formatTime(tVal) {
 }
 
 function formatLiveScore(m) {
-  if (hasMatchScore(m)) return `${m.result_a} - ${m.result_b}`
+  const lines = formatMatchScoreLines(m)
+  if (lines.regulation) return lines.regulation
   return '0 - 0'
 }
 </script>
@@ -244,6 +254,15 @@ function formatLiveScore(m) {
 .score-area { flex-shrink: 0; text-align: center; padding: 0 8px; }
 .score { font-size: 24px; font-weight: 800; }
 .score.live { color: #f44336; animation: pulse 1s infinite; }
+.score.pending { color: #909399; font-size: 20px; }
+.penalty-score {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #5c6bc0;
+  line-height: 1.3;
+}
 .vs { font-size: 18px; font-weight: 700; color: #999; }
 .match-time { font-size: 12px; color: #999; display: block; }
 .predicted-scores { margin-top: 4px; }

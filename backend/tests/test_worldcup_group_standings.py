@@ -107,3 +107,34 @@ def test_load_standings_from_history_j_group():
     st = load_standings_from_history(hist, "J", before_time=cutoff)
     assert st["阿根廷"].points == 3
     assert st["阿尔及利亚"].points == 0
+
+
+def test_md3_tied_on_points_different_gd_not_both_need_draw():
+    """Switzerland vs Canada: same pts, Canada leads GD → trailer must win, not collusion."""
+    rows = [
+        _finished("加拿大", "波黑", 1, 1, group="B", t="2026-06-12T03:00:00"),
+        _finished("卡塔尔", "瑞士", 1, 1, group="B", t="2026-06-13T09:00:00"),
+        _finished("瑞士", "波黑", 4, 1, group="B", t="2026-06-19T04:00:00"),
+        _finished("加拿大", "卡塔尔", 6, 0, group="B", t="2026-06-19T07:00:00"),
+    ]
+    st = compute_standings_from_rows(rows, "B")
+    ctx = build_group_context(
+        "小组赛", "B", 3, "瑞士", "加拿大", 19, 30, standings=st,
+    )
+    assert ctx["both_need_draw"] is False
+    assert ctx["draw_suits_b"] is True
+    assert ctx["must_win_a"] is True
+
+
+def test_md3_both_must_win_when_both_on_one_point():
+    rows = [
+        _finished("波黑", "卡塔尔", 0, 0, group="B", t="2026-06-12T03:00:00"),
+    ]
+    st = compute_standings_from_rows(rows, "B")
+    st["波黑"] = GroupTeamStanding("波黑", played=2, won=0, draw=1, lost=1, goals_for=2, goals_against=3)
+    st["卡塔尔"] = GroupTeamStanding("卡塔尔", played=2, won=0, draw=1, lost=1, goals_for=1, goals_against=6)
+    ctx = build_group_context(
+        "小组赛", "B", 3, "波黑", "卡塔尔", 54, 56, standings=st,
+    )
+    assert ctx["both_must_win"] is True
+    assert ctx["both_need_draw"] is False

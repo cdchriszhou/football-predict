@@ -272,7 +272,20 @@ def fuse_multi_market_odds(
 
 
 def score_distribution_from_odds(score_odds: dict) -> dict[str, float]:
-    """Convert score odds dict to normalized probability distribution."""
+    """Convert score odds dict to normalized probability distribution.
+
+    Handles "胜其它"/"win_other", "平其它"/"draw_other", "负其它"/"lose_other"
+    by distributing their probability mass proportionally across existing scores
+    of the same outcome (win / draw / lose), rather than merging into a single
+    arbitrary key like "4:1" which caused double-counting.
+    """
+    def _outcome(s: str) -> str:
+        try:
+            ga, gb = map(int, s.split(":"))
+        except (ValueError, AttributeError):
+            return "?"
+        return "win" if ga > gb else "lose" if gb > ga else "draw"
+
     if not score_odds:
         return {}
     clean = {
@@ -282,10 +295,36 @@ def score_distribution_from_odds(score_odds: dict) -> dict[str, float]:
     if not clean:
         return {}
     inv = {s: 1.0 / float(o) for s, o in clean.items()}
-    for key, label in (("胜其它", "4:1"), ("win_other", "4:1")):
-        o = score_odds.get(key)
-        if o and float(o) > 1:
-            inv[label] = inv.get(label, 0) + (1.0 / float(o)) * 0.65
+
+    # Distribute "X其它" probability proportionally across scores of the same outcome.
+    # Using 0.65 discount factor because the "other" bucket covers many specific
+    # scorelines not individually listed — we don't want to over-inflate any single line.
+    _DISTRIBUTE = [
+        ("胜其它", "win",  0.65),
+        ("win_other", "win",  0.65),
+        ("平其它", "draw", 0.65),
+        ("draw_other", "draw", 0.65),
+        ("负其它", "lose", 0.65),
+        ("lose_other", "lose", 0.65),
+    ]
+    for other_key, outcome, discount in _DISTRIBUTE:
+        other_odd = score_odds.get(other_key)
+        if not other_odd or float(other_odd) <= 1:
+            continue
+        extra = (1.0 / float(other_odd)) * discount
+        # Find existing scores of this outcome
+        same_outcome = [s for s in inv if _outcome(s) == outcome]
+        if same_outcome:
+            # Distribute proportionally to existing weight of each score
+            same_total = sum(inv[s] for s in same_outcome)
+            if same_total > 0:
+                for s in same_outcome:
+                    inv[s] += extra * (inv[s] / same_total)
+        else:
+            # No existing score of this outcome — create a fallback entry
+            fallback = {"win": "2:1", "draw": "1:1", "lose": "1:2"}.get(outcome, "1:1")
+            inv[fallback] = inv.get(fallback, 0) + extra
+
     total = sum(inv.values())
     return {s: p / total for s, p in inv.items()}
 
