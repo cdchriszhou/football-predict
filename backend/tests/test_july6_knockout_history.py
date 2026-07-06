@@ -21,7 +21,7 @@ def test_july6_r16_brazil_norway():
 def test_july6_r16_mexico_england():
     row = _wc2026_key("墨西哥", "英格兰", "1/8决赛")
     assert row is not None
-    assert row["result_a"] == 1 and row["result_b"] == 2
+    assert row["result_a"] == 2 and row["result_b"] == 3
     assert row.get("match_time")
 
 

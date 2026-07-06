@@ -452,14 +452,15 @@ async def apply_confirmed_results(
         if match.team_a != new_ta or match.team_b != new_tb:
             match.team_a, match.team_b = new_ta, new_tb
             changed = True
-        if match.result_a != ra or match.result_b != rb:
-            match.result_a, match.result_b = ra, rb
-            changed = True
-        if pa is not None and pb is not None:
-            ipa, ipb = int(pa), int(pb)
-            if match.penalty_a != ipa or match.penalty_b != ipb:
-                match.penalty_a, match.penalty_b = ipa, ipb
+        if not match_has_recorded_score(match):
+            if match.result_a != ra or match.result_b != rb:
+                match.result_a, match.result_b = ra, rb
                 changed = True
+            if pa is not None and pb is not None:
+                ipa, ipb = int(pa), int(pb)
+                if match.penalty_a != ipa or match.penalty_b != ipb:
+                    match.penalty_a, match.penalty_b = ipa, ipb
+                    changed = True
         if match.status != MATCH_FINISHED:
             match.status = MATCH_FINISHED
             changed = True

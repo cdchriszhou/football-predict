@@ -722,7 +722,7 @@ HISTORICAL_MATCHES: list[dict] = [
      "rank_a": 6, "rank_b": 20, "stage": "1/8决赛", "group_name": "", "matchday": 0,
      "location": "休斯顿", "stadium": "NRG体育场",
      "match_time": "2026-07-06T04:00:00"},
-    {"year": 2026, "team_a": "墨西哥", "team_b": "英格兰", "result_a": 1, "result_b": 2,
+    {"year": 2026, "team_a": "墨西哥", "team_b": "英格兰", "result_a": 2, "result_b": 3,
      "rank_a": 15, "rank_b": 5, "stage": "1/8决赛", "group_name": "", "matchday": 0,
      "location": "墨西哥城", "stadium": "阿兹特克体育场",
      "match_time": "2026-07-06T08:00:00"},
