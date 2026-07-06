@@ -11,6 +11,7 @@ from api.deps import require_competition_entitlement
 from data.competitions import get_competition
 from data.competition_status import _parse_iso
 from data.match_status import (
+    confirmed_scores_from_history,
     include_in_today_dashboard,
     match_has_recorded_score,
     season_label_for,
@@ -75,8 +76,15 @@ def match_to_dict(m: Match, *, knockout_by_no: dict | None = None) -> dict:
     status = resolve_public_match_status(m)
     ra, rb = m.result_a, m.result_b
     pa, pb = m.penalty_a, m.penalty_b
-    # Expose recorded scores for live and finished; hide only when not yet stored.
     if not match_has_recorded_score(m):
+        hist = confirmed_scores_from_history(m)
+        if hist:
+            ra, rb = hist["result_a"], hist["result_b"]
+            pa, pb = hist.get("penalty_a"), hist.get("penalty_b")
+            if status != MATCH_LIVE:
+                status = MATCH_FINISHED
+    # Expose recorded scores for live and finished; hide only when not yet stored.
+    if ra is None or rb is None:
         ra, rb = None, None
         pa, pb = None, None
 
@@ -102,8 +110,8 @@ def match_to_dict(m: Match, *, knockout_by_no: dict | None = None) -> dict:
 async def _knockout_by_no(db: AsyncSession, comp_slug: str) -> dict | None:
     if comp_slug != "worldcup-2026":
         return None
-    from data.knockout_advance import load_knockout_slot_index
-    return await load_knockout_slot_index(db, comp_slug)
+    from data.knockout_advance import load_knockout_slot_index_cached
+    return await load_knockout_slot_index_cached(db, comp_slug)
 
 
 @router.get("/list")

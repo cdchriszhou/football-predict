@@ -341,9 +341,31 @@ const isClubLeague = computed(() => compStore.current?.type === 'club')
 
 const scheduleTotal = computed(() => Number(statValues.value.total) || 0)
 
+function beijingDateKey(iso) {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ''
+  return d.toLocaleDateString('sv-SE', { timeZone: 'Asia/Shanghai' })
+}
+
+const beijingTodayKey = computed(() =>
+  new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Shanghai' }),
+)
+
 /** Today's results: prefer finished/live matches; fall back to full schedule. */
 const displayTodayMatches = computed(() => {
-  const rows = [...store.todayMatches].sort(
+  const todayKey = beijingTodayKey.value
+  const byId = new Map()
+  for (const m of store.todayMatches) {
+    if (beijingDateKey(m.match_time) === todayKey) byId.set(m.id, m)
+  }
+  // If /today timed out or returned empty, reuse recent-results for the same Beijing day.
+  if (!byId.size && compStore.isWorldCup) {
+    for (const m of store.recentResults) {
+      if (beijingDateKey(m.match_time) === todayKey) byId.set(m.id, m)
+    }
+  }
+  const rows = [...byId.values()].sort(
     (a, b) => new Date(a.match_time || 0) - new Date(b.match_time || 0),
   )
   const withScore = rows.filter(

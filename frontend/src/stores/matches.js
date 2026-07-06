@@ -44,6 +44,8 @@ export const useMatchesStore = defineStore('matches', {
       const res = await getTodayMatches()
       if (Array.isArray(res.data)) {
         this.todayMatches = res.data
+      } else if (res?.code !== 200) {
+        throw new Error(res?.message || 'Failed to load today matches')
       }
     },
 

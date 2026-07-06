@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import re
+import time
 from datetime import datetime
 from typing import Any
 
@@ -242,6 +243,25 @@ async def load_knockout_slot_index(db: AsyncSession, slug: str = "worldcup-2026"
     return build_slot_index(stage_rows)
 
 
+_ko_index_cache: dict[str, tuple[float, dict[int, Any]]] = {}
+_KO_INDEX_TTL_SEC = 30
+
+
+async def load_knockout_slot_index_cached(db: AsyncSession, slug: str = "worldcup-2026") -> dict[int, Any]:
+    """Cached wrapper — dashboard hits this on every /today + /recent-results."""
+    now = time.monotonic()
+    cached = _ko_index_cache.get(slug)
+    if cached and now - cached[0] < _KO_INDEX_TTL_SEC:
+        return cached[1]
+    index = await load_knockout_slot_index(db, slug)
+    _ko_index_cache[slug] = (now, index)
+    return index
+
+
+def invalidate_knockout_slot_index_cache(slug: str = "worldcup-2026") -> None:
+    _ko_index_cache.pop(slug, None)
+
+
 def _clean_team_label(name: str | None) -> str:
     if not name or str(name).startswith("第"):
         return ""
@@ -250,8 +270,13 @@ def _clean_team_label(name: str | None) -> str:
 
 def display_teams_for_match(m: Match, by_no: dict[int, Any]) -> tuple[str, str]:
     """Resolve feeder placeholders to real team names for API display."""
+    db_a = _clean_team_label(m.team_a)
+    db_b = _clean_team_label(m.team_b)
+    if db_a and db_b:
+        return db_a, db_b
+
     if not by_no:
-        return _clean_team_label(m.team_a), _clean_team_label(m.team_b)
+        return db_a, db_b
 
     match_no = None
     for no, row in by_no.items():
@@ -314,4 +339,5 @@ async def advance_knockout_teams(db: AsyncSession, slug: str = "worldcup-2026") 
     if updated:
         from db.sqlite_write import flush_session
         await flush_session(db)
+        invalidate_knockout_slot_index_cache(slug)
     return updated

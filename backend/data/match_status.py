@@ -481,13 +481,6 @@ async def apply_confirmed_results(
             updated += 1
     if updated and flush:
         await flush_session(db)
-    elif updated:
-        try:
-            await asyncio.wait_for(db.flush(), timeout=2.0)
-        except (asyncio.TimeoutError, OperationalError) as exc:
-            logger.warning("apply_confirmed_results flush skipped (contention): %s", exc)
-            await db.rollback()
-            return 0
     return updated
 
 
@@ -944,11 +937,6 @@ async def sync_match_results_for_read(db: AsyncSession, slug: str) -> int:
     fd_updated = int(live_sync.get("updated") or 0)
     if fd_updated:
         applied += await apply_confirmed_results(db, slug, recent_days=14, flush=False)
-        try:
-            from data.knockout_advance import advance_knockout_teams
-            await advance_knockout_teams(db, slug)
-        except Exception as exc:
-            logger.warning("Knockout advance skipped on read sync [%s]: %s", slug, exc)
 
     return applied + fd_updated
 
@@ -1102,6 +1090,62 @@ def match_has_recorded_score(match) -> bool:
     ra = getattr(match, "result_a", None)
     rb = getattr(match, "result_b", None)
     return ra is not None and rb is not None
+
+
+def confirmed_scores_from_history(match) -> dict | None:
+    """Fallback scores from worldcup_history when DB row is finished but empty."""
+    if getattr(match, "competition_slug", None) != "worldcup-2026":
+        return None
+    if match_has_recorded_score(match):
+        return None
+    from data.worldcup_history import HISTORICAL_MATCHES
+
+    stage = getattr(match, "stage", "") or "小组赛"
+    mt = effective_kickoff_naive(match) or getattr(match, "match_time", None)
+    if mt is None:
+        return None
+    window = timedelta(minutes=45)
+    ma, mb = getattr(match, "team_a", "") or "", getattr(match, "team_b", "") or ""
+
+    best: dict | None = None
+    best_delta = window.total_seconds() + 1
+    for item in HISTORICAL_MATCHES:
+        if item.get("year") != 2026:
+            continue
+        if item.get("result_a") is None or item.get("result_b") is None:
+            continue
+        if item.get("stage", "小组赛") != stage:
+            continue
+        item_mt = _parse_history_match_time(item)
+        if item_mt is None:
+            continue
+        delta = abs((mt - item_mt).total_seconds())
+        if delta > window.total_seconds():
+            continue
+        ta, tb = item["team_a"], item["team_b"]
+        reversed_match = False
+        if not (ma.startswith("第") or mb.startswith("第")):
+            if ma == ta and mb == tb:
+                reversed_match = False
+            elif ma == tb and mb == ta:
+                reversed_match = True
+            elif delta > 60:
+                continue
+        if delta <= best_delta:
+            best_delta = delta
+            ra, rb = int(item["result_a"]), int(item["result_b"])
+            pa, pb = item.get("penalty_a"), item.get("penalty_b")
+            if reversed_match:
+                ra, rb = rb, ra
+                if pa is not None and pb is not None:
+                    pa, pb = pb, pa
+            best = {
+                "result_a": ra,
+                "result_b": rb,
+                "penalty_a": int(pa) if pa is not None else None,
+                "penalty_b": int(pb) if pb is not None else None,
+            }
+    return best
 
 
 def _now_beijing_naive() -> datetime:
