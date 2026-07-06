@@ -108,13 +108,17 @@ def extract_match_scores(score: dict | None) -> dict:
             return int(home), int(away)
         return None, None
 
-    reg_a, reg_b = _block(score.get("fullTime"))
-    if reg_a is None:
-        reg_a, reg_b = _block(score.get("regularTime"))
-    if reg_a is None:
-        reg_a, reg_b = _block(score.get("halfTime"))
-
     pen_a, pen_b = _block(score.get("penalties"))
+    rt_a, rt_b = _block(score.get("regularTime"))
+    et_a, et_b = _block(score.get("extraTime"))
+    if rt_a is not None:
+        reg_a, reg_b = rt_a, rt_b
+        if et_a is not None:
+            reg_a, reg_b = rt_a + et_a, rt_b + et_b
+    else:
+        reg_a, reg_b = _block(score.get("fullTime"))
+        if reg_a is None:
+            reg_a, reg_b = _block(score.get("halfTime"))
 
     return {"reg_a": reg_a, "reg_b": reg_b, "pen_a": pen_a, "pen_b": pen_b}
 

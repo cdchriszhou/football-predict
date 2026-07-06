@@ -18,3 +18,16 @@ def test_extract_live_half_time():
     assert parsed["reg_a"] == 0
     assert parsed["reg_b"] == 1
     assert parsed["pen_a"] is None
+
+
+def test_extract_pen_shootout_ignores_fulltime_aggregate():
+    """fullTime may include shootout goals; use regularTime (+ extraTime) instead."""
+    score = {
+        "duration": "PENALTY_SHOOTOUT",
+        "fullTime": {"home": 4, "away": 5},
+        "regularTime": {"home": 1, "away": 1},
+        "extraTime": {"home": 0, "away": 0},
+        "penalties": {"home": 3, "away": 4},
+    }
+    parsed = extract_match_scores(score)
+    assert parsed == {"reg_a": 1, "reg_b": 1, "pen_a": 3, "pen_b": 4}

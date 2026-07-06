@@ -2,12 +2,12 @@
   <div class="bracket-node" :class="{ compact }">
     <div class="match-slot" :class="{ winner: isWinner(node.team_a) }">
       <span class="team">{{ node.team_a || t('bracket.tbd') }}</span>
-      <span class="score" v-if="node.result_a !== undefined">{{ node.result_a }}</span>
+      <span class="score" v-if="hasMatchScore(node)">{{ node.result_a }}</span>
     </div>
     <div class="vs-divider">VS</div>
     <div class="match-slot" :class="{ winner: isWinner(node.team_b) }">
       <span class="team">{{ node.team_b || t('bracket.tbd') }}</span>
-      <span class="score" v-if="node.result_b !== undefined">{{ node.result_b }}</span>
+      <span class="score" v-if="hasMatchScore(node)">{{ node.result_b }}</span>
     </div>
     <div v-if="penaltyLine" class="penalty-line">{{ penaltyLine }}</div>
   </div>
@@ -17,6 +17,7 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { isMatchWinner } from '@/utils/matchScore'
+import { hasMatchScore } from '@/utils/matchStatus'
 
 const { t } = useI18n()
 

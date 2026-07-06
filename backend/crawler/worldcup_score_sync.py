@@ -30,6 +30,8 @@ WC_FD_CODE = "WC"
 WC_SEASON = 2026
 _KICKOFF_TOLERANCE = timedelta(hours=4)
 _FD_CACHE_TTL_SEC = 45
+# Knockout runs ~3 weeks; 3-day lookback missed early R32 fixtures on read path.
+_WC_FD_LOOKBACK_DAYS = 21
 
 _fd_cache: list[dict] = []
 _fd_cache_at: float = 0.0
@@ -73,7 +75,7 @@ async def refresh_fd_cache() -> list[dict]:
             rows = await fetch_competition_matches(
                 WC_FD_CODE,
                 WC_SEASON,
-                date_from=today - timedelta(days=2),
+                date_from=today - timedelta(days=_WC_FD_LOOKBACK_DAYS),
                 date_to=today + timedelta(days=1),
             )
             _fd_cache = rows
@@ -203,7 +205,7 @@ async def _apply_fd_rows(db: AsyncSession, fd_rows: list[dict]) -> dict:
         return {"status": "skipped", "reason": "empty_cache", "updated": 0}
 
     now = china_now().replace(tzinfo=None)
-    lookback = now - timedelta(days=3)
+    lookback = now - timedelta(days=_WC_FD_LOOKBACK_DAYS)
     db_rows = list((await db.execute(
         select(Match).where(
             Match.competition_slug == "worldcup-2026",
