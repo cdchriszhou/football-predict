@@ -163,6 +163,46 @@ async def get_matches(
     return success(paginate(data, total, page, size))
 
 
+@router.get("/knockout-bracket")
+async def get_knockout_bracket(
+    competition: str = Query("worldcup-2026"),
+    db: AsyncSession = Depends(get_db),
+    current_user: str = Depends(get_current_user),
+):
+    """All knockout stages in one response for the bracket view."""
+    comp_slug = resolve_competition(competition)
+    await _ensure_results_synced(db, comp_slug)
+    if comp_slug == "worldcup-2026":
+        from data.knockout_advance import ensure_knockout_fixtures, advance_knockout_teams
+
+        created = await ensure_knockout_fixtures(db, comp_slug)
+        if created:
+            try:
+                await advance_knockout_teams(db, comp_slug)
+            except Exception:
+                pass
+        else:
+            try:
+                from service.write_guard import is_heavy_job_running
+                if not is_heavy_job_running():
+                    await advance_knockout_teams(db, comp_slug)
+            except Exception:
+                pass
+
+    ko_index = await _knockout_by_no(db, comp_slug)
+    stages = ["1/16决赛", "1/8决赛", "1/4决赛", "半决赛", "季军赛", "决赛"]
+    payload: dict[str, list] = {}
+    for stage in stages:
+        rows = list((await db.execute(
+            select(Match).where(
+                Match.competition_slug == comp_slug,
+                Match.stage == stage,
+            ).order_by(Match.match_time.asc())
+        )).scalars().all())
+        payload[stage] = [match_to_dict(m, knockout_by_no=ko_index) for m in rows]
+    return success(payload)
+
+
 @router.get("/dates")
 async def get_match_dates(
     competition: str = Query("worldcup-2026"),

@@ -4,6 +4,10 @@ export function getMatches(params = {}) {
   return api.get('/matches/list', { params })
 }
 
+export function getKnockoutBracket() {
+  return api.get('/matches/knockout-bracket', { timeout: 45000 })
+}
+
 export function getTodayMatches() {
   return api.get('/matches/today', { timeout: 20000 })
 }

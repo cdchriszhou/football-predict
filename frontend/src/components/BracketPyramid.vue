@@ -66,7 +66,7 @@ import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import BracketNode from '@/components/BracketNode.vue'
 import BracketRoundCol from '@/components/BracketRoundCol.vue'
-import { getMatches } from '@/api/matches'
+import { getKnockoutBracket } from '@/api/matches'
 import { KNOCKOUT_STAGES, stageLabel } from '@/i18n/matchLabels'
 import { useCompetitionStore } from '@/stores/competition'
 import {
@@ -106,7 +106,8 @@ const thirdMatch = computed(() =>
 )
 
 const hasAnyMatch = computed(() =>
-  KNOCKOUT_STAGES.some((s) => (byStage.value[s] || []).length > 0),
+  compStore.isWorldCup
+  || KNOCKOUT_STAGES.some((s) => (byStage.value[s] || []).length > 0),
 )
 
 function resolve(matchNo) {
@@ -116,14 +117,17 @@ function resolve(matchNo) {
 async function loadAll() {
   loading.value = true
   try {
-    const entries = await Promise.all(
-      KNOCKOUT_STAGES.map(async (stage) => {
-        const res = await getMatches({ stage, page: 1, size: 32, status: '' })
-        return [stage, res.data?.items || []]
-      }),
-    )
-    byStage.value = Object.fromEntries(entries)
+    const res = await getKnockoutBracket()
+    if (res?.data && typeof res.data === 'object') {
+      byStage.value = res.data
+    } else {
+      byStage.value = {}
+    }
     matchIndex.value = buildMatchIndex(byStage.value)
+  } catch (err) {
+    console.warn('[bracket] load failed:', err?.message || err)
+    byStage.value = {}
+    matchIndex.value = buildMatchIndex({})
   } finally {
     loading.value = false
   }

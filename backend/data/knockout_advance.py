@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import re
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 
 from sqlalchemy import select
@@ -88,6 +88,62 @@ for fx in KNOCKOUT_FIXTURES:
     CANONICAL_BY_STAGE.setdefault(fx["stage"], []).append(fx["match_no"])
 for stage in CANONICAL_BY_STAGE:
     CANONICAL_BY_STAGE[stage].sort()
+
+KNOCKOUT_STAGES = sorted(CANONICAL_BY_STAGE.keys(), key=lambda s: CANONICAL_BY_STAGE[s][0])
+
+
+async def ensure_knockout_fixtures(db: AsyncSession, slug: str = "worldcup-2026") -> int:
+    """Insert missing knockout placeholder rows so bracket API never returns empty."""
+    if slug != "worldcup-2026":
+        return 0
+    from data.worldcup_knockout_schedule import build_knockout_matches
+    from data.status_constants import MATCH_UPCOMING
+
+    expected = build_knockout_matches()
+    existing = list((await db.execute(
+        select(Match).where(
+            Match.competition_slug == slug,
+            Match.stage.in_(KNOCKOUT_STAGES),
+        )
+    )).scalars().all())
+
+    if len(existing) >= len(expected):
+        return 0
+
+    window = timedelta(minutes=45)
+    created = 0
+    for item in expected:
+        mt = item["match_time"]
+        matched = any(
+            m.stage == item["stage"]
+            and m.match_time is not None
+            and abs((m.match_time - mt).total_seconds()) <= window.total_seconds()
+            for m in existing
+        )
+        if matched:
+            continue
+        row = Match(
+            competition_slug=slug,
+            stage=item["stage"],
+            group_name=item.get("group_name", ""),
+            team_a=item["team_a"],
+            team_b=item["team_b"],
+            match_time=item["match_time"],
+            location=item.get("location", ""),
+            stadium=item.get("stadium", ""),
+            result_a=None,
+            result_b=None,
+            status=MATCH_UPCOMING,
+        )
+        db.add(row)
+        existing.append(row)
+        created += 1
+
+    if created:
+        from db.sqlite_write import flush_session
+        await flush_session(db)
+        invalidate_knockout_slot_index_cache(slug)
+    return created
 
 
 def _team_key(a: str, b: str) -> str:
