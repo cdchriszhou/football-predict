@@ -706,35 +706,29 @@ class PredictionService:
                     skip_wdl_resilience=True,
                 )
             else:
-                from service.score_pick import (
-                    finalize_knockout_score_picks,
-                    poisson_to_synthetic_crs,
-                )
-                ko_scores, ko_upset = finalize_knockout_score_picks(
-                    rule_result.best_scores,
+                from service.score_pick import prepare_pipeline_crs_and_hints
+
+                score_odds, ko_hints, ko_upset = prepare_pipeline_crs_and_hints(
+                    None,
                     expected_a=rule_result.expected_a,
                     expected_b=rule_result.expected_b,
                     win_rate=rule_result.win_rate,
                     draw_rate=rule_result.draw_rate,
                     lose_rate=rule_result.lose_rate,
+                    model_scores=rule_result.best_scores,
+                    stage=match.stage,
                     rank_a=(team_a_dict or {}).get("rank"),
                     rank_b=(team_b_dict or {}).get("rank"),
-                    stage=match.stage,
                 )
-                synthetic_crs = poisson_to_synthetic_crs(
-                    rule_result.expected_a,
-                    rule_result.expected_b,
-                    rule_result.draw_rate,
-                )
-                if synthetic_crs and match.stage not in ("", "小组赛"):
+                if score_odds and match.stage not in ("", "小组赛"):
                     scores, upset, _, pick_warnings = run_full_score_pipeline(
-                        synthetic_crs,
+                        score_odds,
                         win_rate=rule_result.win_rate,
                         draw_rate=rule_result.draw_rate,
                         lose_rate=rule_result.lose_rate,
                         expected_a=rule_result.expected_a,
                         expected_b=rule_result.expected_b,
-                        model_scores=ko_scores,
+                        model_scores=ko_hints,
                         stage=match.stage,
                         handicap=score_ctx.get("handicap"),
                         rank_a=(team_a_dict or {}).get("rank"),
@@ -747,7 +741,7 @@ class PredictionService:
                         skip_wdl_resilience=True,
                     )
                 else:
-                    scores = ko_scores
+                    scores = ko_hints
                     upset = ko_upset
                     pick_warnings = []
                 if not upset:

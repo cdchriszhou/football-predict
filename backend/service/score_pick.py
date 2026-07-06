@@ -125,11 +125,15 @@ def finalize_knockout_score_picks(
 
     rank_gap = abs(int(rank_a or 50) - int(rank_b or 50))
     margin = expected_a - expected_b
+    wdl_margin = abs(win_rate - lose_rate)
     fav_side = "win" if win_rate >= lose_rate + 3.0 else (
         "lose" if lose_rate >= win_rate + 3.0 else "draw"
     )
 
-    if fav_side in ("win", "lose") and rank_gap >= 6:
+    fav_clear = fav_side in ("win", "lose") and (
+        rank_gap >= 6 or wdl_margin >= 14.0
+    )
+    if fav_clear:
         primary = _knockout_favorite_primary(ranked, margin, fav_side)
         if not primary:
             primary = _first_score_with_outcome(ranked, fav_side) or ranked[0][0]
@@ -173,6 +177,104 @@ def poisson_to_synthetic_crs(
         odd = max(4.0, min(35.0, 1.0 / max(prob / max_p, 0.02) * 3.5))
         out[score] = round(odd, 2)
     return out
+
+
+def prepare_pipeline_crs_and_hints(
+    crs: dict[str, float] | None,
+    *,
+    expected_a: float,
+    expected_b: float,
+    win_rate: float,
+    draw_rate: float,
+    lose_rate: float,
+    model_scores: list[str] | None,
+    stage: str | None,
+    rank_a: int | None = None,
+    rank_b: int | None = None,
+) -> tuple[dict[str, float], list[str], str | None]:
+    """
+    Normalize CRS input for run_full_score_pipeline.
+
+    Knockout fixtures without bookmaker CRS get Poisson-synthetic odds after
+    finalize_knockout_score_picks (same path as prediction_service).
+    """
+    hints = [s for s in (model_scores or []) if s and s != "?"]
+    if crs:
+        return crs, hints, None
+
+    if not is_knockout_stage(stage):
+        return {}, hints, None
+
+    ko_scores, ko_upset = finalize_knockout_score_picks(
+        hints,
+        expected_a=expected_a,
+        expected_b=expected_b,
+        win_rate=win_rate,
+        draw_rate=draw_rate,
+        lose_rate=lose_rate,
+        rank_a=rank_a,
+        rank_b=rank_b,
+        stage=stage,
+    )
+    hints = ko_scores or hints
+    synthetic = poisson_to_synthetic_crs(expected_a, expected_b, draw_rate)
+    if synthetic:
+        return synthetic, hints, ko_upset
+    return {}, hints, ko_upset
+
+
+def ensure_knockout_underdog_upset(
+    best_scores: list[str],
+    upset: str | None,
+    *,
+    win_rate: float,
+    lose_rate: float,
+    rank_a: int | None,
+    rank_b: int | None,
+    crs: dict[str, float],
+    stage: str | None,
+    sp_draw: float | None = None,
+) -> str | None:
+    """When favourite is clear, cold pick should be underdog win — not another draw."""
+    if not is_knockout_stage(stage) or not best_scores:
+        return upset
+    rank_gap = abs(int(rank_a or 50) - int(rank_b or 50))
+    wdl_margin = abs(win_rate - lose_rate)
+    if rank_gap < 8 and wdl_margin < 12.0:
+        return upset
+    fav_home = win_rate >= lose_rate + 5.0
+    fav_away = lose_rate >= win_rate + 5.0
+    if not fav_home and not fav_away:
+        return upset
+    underdog_out = "lose" if fav_home else "win"
+    pri_out = _score_outcome(best_scores[0])
+    if pri_out == underdog_out:
+        return upset
+    if upset and _score_outcome(upset) == "draw":
+        # Market prices knockout ET/draw (e.g. Germany–Paraguay draw @ 4.50)
+        if sp_draw is not None and sp_draw >= 3.8:
+            return upset
+        if any(_score_outcome(s) == "draw" for s in best_scores):
+            return upset
+        heavy_fav = rank_gap >= 12 and max(win_rate, lose_rate) >= 62.0
+        if not heavy_fav:
+            return upset
+    elif upset and _score_outcome(upset) != pri_out:
+        return upset
+    prefs = (
+        ["1:2", "0:1", "0:2", "1:3", "2:3"]
+        if underdog_out == "lose"
+        else ["2:1", "1:0", "3:2", "2:0"]
+    )
+    listed = _listed_crs_scores(crs)
+    for s in prefs:
+        if s in listed and s not in best_scores:
+            return s
+    return _first_score_with_outcome(
+        _rank_crs(crs, set(best_scores)),
+        underdog_out,
+        exclude=set(best_scores),
+    ) or upset
 
 
 def _listed_crs_scores(score_odds: dict | None) -> set[str]:
@@ -1502,9 +1604,22 @@ def run_full_score_pipeline(
     double-counting resilience signals on win/draw/lose rates.
     """
     hints = [s for s in (model_scores or []) if s and s != "?"]
+    pre_upset: str | None = None
+    crs, hints, pre_upset = prepare_pipeline_crs_and_hints(
+        crs or None,
+        expected_a=expected_a,
+        expected_b=expected_b,
+        win_rate=win_rate,
+        draw_rate=draw_rate,
+        lose_rate=lose_rate,
+        model_scores=hints or None,
+        stage=stage,
+        rank_a=rank_a,
+        rank_b=rank_b,
+    )
     if not crs:
         fallback = hints[:2] if hints else ["?"]
-        return fallback, None, fallback, []
+        return fallback, pre_upset, fallback + ([pre_upset] if pre_upset else []), []
 
     # ── New weighted-ensemble pipeline (feature-flagged) ──
     from service.score_pick_config import get_config

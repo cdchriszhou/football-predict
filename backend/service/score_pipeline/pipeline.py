@@ -209,6 +209,22 @@ class ScorePredictionPipeline:
         # ── Upset pick ──
         upset = self.upset_picker.pick(aggregated, best, crs, inp)
 
+        from service.score_pick import (
+            ensure_knockout_underdog_upset,
+            is_knockout_stage,
+        )
+        if is_knockout_stage(stage):
+            upset = ensure_knockout_underdog_upset(
+                best, upset,
+                win_rate=adjusted_wr,
+                lose_rate=adjusted_lr,
+                rank_a=rank_a,
+                rank_b=rank_b,
+                crs=crs,
+                stage=stage,
+                sp_draw=sp_draw,
+            )
+
         # ── Validate ──
         best, upset, warnings = self.validator.validate(
             best, upset, crs,
