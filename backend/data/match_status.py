@@ -332,11 +332,93 @@ async def _find_history_match_by_kickoff(
     return rows[0], False
 
 
-async def apply_confirmed_results(db: AsyncSession, slug: str) -> int:
+def _parse_history_match_time(item: dict) -> datetime | None:
+    mt_raw = item.get("match_time")
+    if not mt_raw:
+        return None
+    if isinstance(mt_raw, str):
+        return datetime.fromisoformat(mt_raw.replace("Z", ""))
+    return mt_raw
+
+
+def _history_item_in_window(item: dict, recent_days: int | None) -> bool:
+    if recent_days is None:
+        return True
+    mt = _parse_history_match_time(item)
+    if mt is None:
+        return True
+    from utils.datetime_helpers import china_today
+
+    start = china_today() - timedelta(days=recent_days)
+    end = china_today() + timedelta(days=1)
+    d = mt.date()
+    return start <= d <= end
+
+
+def _find_history_match_by_kickoff_cached(
+    rows: list[Match],
+    item: dict,
+) -> tuple[Match | None, bool]:
+    """Match knockout placeholders by official kickoff window (in-memory)."""
+    mt = _parse_history_match_time(item)
+    if not mt:
+        return None, False
+    stage = item.get("stage", "小组赛")
+    window = timedelta(minutes=45)
+    candidates = [
+        m for m in rows
+        if m.stage == stage
+        and m.match_time is not None
+        and mt - window <= m.match_time <= mt + window
+    ]
+    if not candidates:
+        return None, False
+    if len(candidates) == 1:
+        m = candidates[0]
+        reversed_match = m.team_a == item["team_b"] and m.team_b == item["team_a"]
+        return m, reversed_match
+    ta, tb = item["team_a"], item["team_b"]
+    for m in candidates:
+        if m.team_a == ta and m.team_b == tb:
+            return m, False
+        if m.team_a == tb and m.team_b == ta:
+            return m, True
+    candidates.sort(key=lambda m: abs((m.match_time - mt).total_seconds()))
+    return candidates[0], False
+
+
+async def apply_confirmed_results(
+    db: AsyncSession,
+    slug: str,
+    *,
+    recent_days: int | None = None,
+    flush: bool = True,
+) -> int:
     """Apply known final scores from worldcup_history into live fixtures."""
     if slug != "worldcup-2026":
         return 0
     from data.worldcup_history import HISTORICAL_MATCHES
+
+    fixture_query = select(Match).where(Match.competition_slug == slug)
+    if recent_days is not None:
+        from utils.datetime_helpers import china_today
+
+        window_start = datetime.combine(
+            china_today() - timedelta(days=recent_days),
+            datetime.min.time(),
+        )
+        window_end = datetime.combine(
+            china_today() + timedelta(days=2),
+            datetime.min.time(),
+        )
+        fixture_query = fixture_query.where(
+            Match.match_time.isnot(None),
+            Match.match_time >= window_start,
+            Match.match_time < window_end,
+        )
+    fixture_rows = list((await db.execute(fixture_query)).scalars().all())
+    by_exact = {(m.team_a, m.team_b, m.stage): m for m in fixture_rows}
+    by_reversed = {(m.team_b, m.team_a, m.stage): m for m in fixture_rows}
 
     updated = 0
     for item in HISTORICAL_MATCHES:
@@ -344,28 +426,17 @@ async def apply_confirmed_results(db: AsyncSession, slug: str) -> int:
             continue
         if item.get("result_a") is None or item.get("result_b") is None:
             continue
+        if not _history_item_in_window(item, recent_days):
+            continue
         stage = item.get("stage", "小组赛")
-        match = (await db.execute(
-            select(Match).where(
-                Match.competition_slug == slug,
-                Match.team_a == item["team_a"],
-                Match.team_b == item["team_b"],
-                Match.stage == stage,
-            )
-        )).scalar_one_or_none()
+        ta, tb = item["team_a"], item["team_b"]
+        match = by_exact.get((ta, tb, stage))
         reversed_match = False
         if not match:
-            match = (await db.execute(
-                select(Match).where(
-                    Match.competition_slug == slug,
-                    Match.team_a == item["team_b"],
-                    Match.team_b == item["team_a"],
-                    Match.stage == stage,
-                )
-            )).scalar_one_or_none()
+            match = by_reversed.get((ta, tb, stage))
             reversed_match = match is not None
         if not match:
-            match, reversed_match = await _find_history_match_by_kickoff(db, slug, item)
+            match, reversed_match = _find_history_match_by_kickoff_cached(fixture_rows, item)
         if not match:
             continue
         ra, rb = int(item["result_a"]), int(item["result_b"])
@@ -375,31 +446,48 @@ async def apply_confirmed_results(db: AsyncSession, slug: str) -> int:
             ra, rb = rb, ra
             if pa is not None and pb is not None:
                 pa, pb = pb, pa
-        # Normalize team names when matched via kickoff (placeholder rows).
-        if not reversed_match:
-            match.team_a = item["team_a"]
-            match.team_b = item["team_b"]
-        else:
-            match.team_a = item["team_b"]
-            match.team_b = item["team_a"]
-        match.result_a = ra
-        match.result_b = rb
+        new_ta = item["team_b"] if reversed_match else item["team_a"]
+        new_tb = item["team_a"] if reversed_match else item["team_b"]
+        changed = False
+        if match.team_a != new_ta or match.team_b != new_tb:
+            match.team_a, match.team_b = new_ta, new_tb
+            changed = True
+        if match.result_a != ra or match.result_b != rb:
+            match.result_a, match.result_b = ra, rb
+            changed = True
         if pa is not None and pb is not None:
-            match.penalty_a = int(pa)
-            match.penalty_b = int(pb)
-        match.status = MATCH_FINISHED
+            ipa, ipb = int(pa), int(pb)
+            if match.penalty_a != ipa or match.penalty_b != ipb:
+                match.penalty_a, match.penalty_b = ipa, ipb
+                changed = True
+        if match.status != MATCH_FINISHED:
+            match.status = MATCH_FINISHED
+            changed = True
         from data.worldcup_venues import venue_for_match, canonical_team_order
         ca, cb = canonical_team_order(item["team_a"], item["team_b"])
         vn = venue_for_match(ca, cb)
         if vn:
-            match.location, match.stadium = vn
-        elif item.get("location"):
+            loc, stadium = vn
+            if match.location != loc or match.stadium != stadium:
+                match.location, match.stadium = loc, stadium
+                changed = True
+        elif item.get("location") and match.location != item["location"]:
             match.location = item["location"]
-        if not vn and item.get("stadium"):
+            changed = True
+        if not vn and item.get("stadium") and match.stadium != item["stadium"]:
             match.stadium = item["stadium"]
-        updated += 1
-    if updated:
+            changed = True
+        if changed:
+            updated += 1
+    if updated and flush:
         await flush_session(db)
+    elif updated:
+        try:
+            await asyncio.wait_for(db.flush(), timeout=2.0)
+        except (asyncio.TimeoutError, OperationalError) as exc:
+            logger.warning("apply_confirmed_results flush skipped (contention): %s", exc)
+            await db.rollback()
+            return 0
     return updated
 
 
@@ -837,6 +925,32 @@ async def sync_live_scores(db: AsyncSession, slug: str, *, network: bool = False
         logger.warning(f"Live score sync failed [{slug}]: {exc}")
         await db.rollback()
         return {"status": "failed", "error": str(exc)}
+
+
+async def sync_match_results_for_read(db: AsyncSession, slug: str) -> int:
+    """Fast sync for HTTP read endpoints — no repair/reconcile/network blocking."""
+    applied = await apply_confirmed_results(db, slug, recent_days=14, flush=False)
+    if slug != "worldcup-2026":
+        return applied
+
+    try:
+        from service.write_guard import is_heavy_job_running
+        if is_heavy_job_running():
+            return applied
+    except ImportError:
+        pass
+
+    live_sync = await sync_live_scores(db, slug, network=False)
+    fd_updated = int(live_sync.get("updated") or 0)
+    if fd_updated:
+        applied += await apply_confirmed_results(db, slug, recent_days=14, flush=False)
+        try:
+            from data.knockout_advance import advance_knockout_teams
+            await advance_knockout_teams(db, slug)
+        except Exception as exc:
+            logger.warning("Knockout advance skipped on read sync [%s]: %s", slug, exc)
+
+    return applied + fd_updated
 
 
 async def sync_match_results_throttled(db: AsyncSession, slug: str) -> int:

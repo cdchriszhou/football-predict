@@ -259,11 +259,16 @@ async def _apply_fd_rows(db: AsyncSession, fd_rows: list[dict]) -> dict:
 
     if updated:
         try:
-            await db.flush()
+            from db.sqlite_write import flush_session
+            await flush_session(db)
         except IntegrityError as exc:
             await db.rollback()
             logger.warning("World Cup score sync flush failed (duplicate external_id): %s", exc)
             return {"status": "failed", "error": "integrity_error", "updated": 0}
+        except Exception as exc:
+            await db.rollback()
+            logger.warning("World Cup score sync flush failed: %s", exc)
+            return {"status": "failed", "error": str(exc), "updated": 0}
         logger.info(
             "World Cup score sync: updated=%d live=%d finished=%d (cache_age=%.0fs)",
             updated, live, finished, fd_cache_age_sec(),
@@ -301,6 +306,7 @@ async def sync_worldcup_scores_from_football_data(
     else:
         schedule_fd_cache_refresh()
         if not _fd_cache:
-            await refresh_fd_cache()
+            # Read path must not block on football-data.org; background task fills cache.
+            return {"status": "skipped", "reason": "cache_empty", "updated": 0}
 
     return await _apply_fd_rows(db, _fd_cache)

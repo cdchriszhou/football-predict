@@ -15,7 +15,7 @@ from data.match_status import (
     match_has_recorded_score,
     season_label_for,
     resolve_public_match_status,
-    sync_match_results_throttled,
+    sync_match_results_for_read,
 )
 from data.status_constants import (
     MATCH_FINISHED,
@@ -33,11 +33,16 @@ router = APIRouter(dependencies=[Depends(require_competition_entitlement)])
 
 
 async def _ensure_results_synced(db: AsyncSession, comp_slug: str) -> None:
+    """Best-effort score sync; never block the response on maintenance work."""
     try:
-        await sync_match_results_throttled(db, comp_slug)
+        await sync_match_results_for_read(db, comp_slug)
     except SQLAlchemyError:
         await db.rollback()
-        raise
+    except Exception:
+        try:
+            await db.rollback()
+        except Exception:
+            pass
 
 
 def _sort_stages(stages: list[str]) -> list[str]:

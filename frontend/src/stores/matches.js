@@ -42,7 +42,9 @@ export const useMatchesStore = defineStore('matches', {
 
     async fetchToday() {
       const res = await getTodayMatches()
-      this.todayMatches = res.data
+      if (Array.isArray(res.data)) {
+        this.todayMatches = res.data
+      }
     },
 
     async fetchUpcoming(limit = 10) {

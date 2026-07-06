@@ -86,11 +86,13 @@ async def flush_session(db: AsyncSession, *, retries: int = 3) -> None:
                 return
             except OperationalError as exc:
                 if "locked" not in str(exc).lower() or attempt >= retries - 1:
+                    await db.rollback()
                     raise
                 wait = 0.25 * (attempt + 1)
                 logger.warning(
                     f"SQLite locked on flush, retry {attempt + 1}/{retries} in {wait:.1f}s"
                 )
+                await db.rollback()
                 await asyncio.sleep(wait)
 
 

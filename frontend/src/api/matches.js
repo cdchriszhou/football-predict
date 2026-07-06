@@ -5,7 +5,7 @@ export function getMatches(params = {}) {
 }
 
 export function getTodayMatches() {
-  return api.get('/matches/today')
+  return api.get('/matches/today', { timeout: 20000 })
 }
 
 export function getRecentResults(hours = 48, limit = 12) {
