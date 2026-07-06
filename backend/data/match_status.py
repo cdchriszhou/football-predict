@@ -292,6 +292,46 @@ async def reopen_prematurely_finished_matches(db: AsyncSession, slug: str) -> in
     return updated
 
 
+async def _find_history_match_by_kickoff(
+    db: AsyncSession,
+    slug: str,
+    item: dict,
+) -> tuple[Match | None, bool]:
+    """Match knockout placeholders by official kickoff window."""
+    mt_raw = item.get("match_time")
+    if not mt_raw:
+        return None, False
+    if isinstance(mt_raw, str):
+        mt = datetime.fromisoformat(mt_raw.replace("Z", ""))
+    else:
+        mt = mt_raw
+    stage = item.get("stage", "小组赛")
+    window = timedelta(minutes=45)
+    rows = list((await db.execute(
+        select(Match).where(
+            Match.competition_slug == slug,
+            Match.stage == stage,
+            Match.match_time.isnot(None),
+            Match.match_time >= mt - window,
+            Match.match_time <= mt + window,
+        )
+    )).scalars().all())
+    if not rows:
+        return None, False
+    if len(rows) == 1:
+        m = rows[0]
+        reversed_match = m.team_a == item["team_b"] and m.team_b == item["team_a"]
+        return m, reversed_match
+    ta, tb = item["team_a"], item["team_b"]
+    for m in rows:
+        if m.team_a == ta and m.team_b == tb:
+            return m, False
+        if m.team_a == tb and m.team_b == ta:
+            return m, True
+    rows.sort(key=lambda m: abs((m.match_time - mt).total_seconds()))
+    return rows[0], False
+
+
 async def apply_confirmed_results(db: AsyncSession, slug: str) -> int:
     """Apply known final scores from worldcup_history into live fixtures."""
     if slug != "worldcup-2026":
@@ -304,27 +344,28 @@ async def apply_confirmed_results(db: AsyncSession, slug: str) -> int:
             continue
         if item.get("result_a") is None or item.get("result_b") is None:
             continue
-        row = await db.execute(
+        stage = item.get("stage", "小组赛")
+        match = (await db.execute(
             select(Match).where(
                 Match.competition_slug == slug,
                 Match.team_a == item["team_a"],
                 Match.team_b == item["team_b"],
-                Match.stage == item.get("stage", "小组赛"),
+                Match.stage == stage,
             )
-        )
-        match = row.scalar_one_or_none()
+        )).scalar_one_or_none()
         reversed_match = False
         if not match:
-            row = await db.execute(
+            match = (await db.execute(
                 select(Match).where(
                     Match.competition_slug == slug,
                     Match.team_a == item["team_b"],
                     Match.team_b == item["team_a"],
-                    Match.stage == item.get("stage", "小组赛"),
+                    Match.stage == stage,
                 )
-            )
-            match = row.scalar_one_or_none()
+            )).scalar_one_or_none()
             reversed_match = match is not None
+        if not match:
+            match, reversed_match = await _find_history_match_by_kickoff(db, slug, item)
         if not match:
             continue
         ra, rb = int(item["result_a"]), int(item["result_b"])
@@ -334,6 +375,13 @@ async def apply_confirmed_results(db: AsyncSession, slug: str) -> int:
             ra, rb = rb, ra
             if pa is not None and pb is not None:
                 pa, pb = pb, pa
+        # Normalize team names when matched via kickoff (placeholder rows).
+        if not reversed_match:
+            match.team_a = item["team_a"]
+            match.team_b = item["team_b"]
+        else:
+            match.team_a = item["team_b"]
+            match.team_b = item["team_a"]
         match.result_a = ra
         match.result_b = rb
         if pa is not None and pb is not None:

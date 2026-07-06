@@ -225,6 +225,52 @@ def resolve_fixture_teams(match_no: int, by_no: dict[int, Any]) -> tuple[str | N
     return ta, tb
 
 
+async def load_knockout_slot_index(db: AsyncSession, slug: str = "worldcup-2026") -> dict[int, Any]:
+    """Load all knockout rows and map FIFA match_no → DB row."""
+    if slug != "worldcup-2026":
+        return {}
+    stages = sorted({fx["stage"] for fx in KNOCKOUT_FIXTURES}, key=lambda s: CANONICAL_BY_STAGE[s][0])
+    stage_rows: dict[str, list[Match]] = {}
+    for stage in stages:
+        rows = list((await db.execute(
+            select(Match).where(
+                Match.competition_slug == slug,
+                Match.stage == stage,
+            ).order_by(Match.match_time.asc())
+        )).scalars().all())
+        stage_rows[stage] = rows
+    return build_slot_index(stage_rows)
+
+
+def _clean_team_label(name: str | None) -> str:
+    if not name or str(name).startswith("第"):
+        return ""
+    return str(name)
+
+
+def display_teams_for_match(m: Match, by_no: dict[int, Any]) -> tuple[str, str]:
+    """Resolve feeder placeholders to real team names for API display."""
+    if not by_no:
+        return _clean_team_label(m.team_a), _clean_team_label(m.team_b)
+
+    match_no = None
+    for no, row in by_no.items():
+        if _field(row, "id") == m.id:
+            match_no = no
+            break
+    if match_no is None:
+        return _clean_team_label(m.team_a), _clean_team_label(m.team_b)
+
+    fx = FIXTURE_BY_NO.get(match_no)
+    if not fx:
+        return _clean_team_label(m.team_a), _clean_team_label(m.team_b)
+
+    resolved_a, resolved_b = resolve_fixture_teams(match_no, by_no)
+    ta = fx["team_a"] if not fx["team_a"].startswith("第") else (resolved_a or "")
+    tb = fx["team_b"] if not fx["team_b"].startswith("第") else (resolved_b or "")
+    return ta, tb
+
+
 async def advance_knockout_teams(db: AsyncSession, slug: str = "worldcup-2026") -> int:
     """Fill placeholder team names on later knockout rounds from finished feeders."""
     if slug != "worldcup-2026":

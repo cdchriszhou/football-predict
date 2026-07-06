@@ -26,7 +26,7 @@
       <div class="team-col team-a">
         <div class="team-row">
           <TeamBadge :name="match.team_a" :size="32" />
-          <span class="team-name">{{ match.team_a }}</span>
+          <span class="team-name">{{ displayTeamName(match.team_a) }}</span>
         </div>
       </div>
 
@@ -78,7 +78,7 @@
       <div class="team-col team-b">
         <div class="team-row">
           <TeamBadge :name="match.team_b" :size="32" />
-          <span class="team-name">{{ match.team_b }}</span>
+          <span class="team-name">{{ displayTeamName(match.team_b) }}</span>
         </div>
       </div>
     </div>
@@ -194,6 +194,11 @@ const canShowSportteryOdds = computed(() => authStore.canAccessSporttery && hasS
 const canShowSportteryEmpty = computed(
   () => authStore.canAccessSporttery && !hasSportteryOdds(lotteryOdds.value) && !hasMarketOdds.value
 )
+
+function displayTeamName(name) {
+  if (!name || String(name).startsWith('第')) return t('bracket.tbd')
+  return name
+}
 
 function fmt(v) {
   if (v == null || v === '') return '-'

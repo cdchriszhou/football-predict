@@ -66,24 +66,39 @@ def _season_ended(comp_slug: str) -> bool:
     return bool(closing and datetime.utcnow() > closing)
 
 
-def match_to_dict(m: Match) -> dict:
+def match_to_dict(m: Match, *, knockout_by_no: dict | None = None) -> dict:
     status = resolve_public_match_status(m)
     ra, rb = m.result_a, m.result_b
+    pa, pb = m.penalty_a, m.penalty_b
     # Expose recorded scores for live and finished; hide only when not yet stored.
     if not match_has_recorded_score(m):
         ra, rb = None, None
+        pa, pb = None, None
+
+    team_a, team_b = m.team_a, m.team_b
+    if knockout_by_no is not None and m.competition_slug == "worldcup-2026":
+        from data.knockout_advance import display_teams_for_match
+        team_a, team_b = display_teams_for_match(m, knockout_by_no)
+
     return {
         "id": m.id, "competition_slug": m.competition_slug,
         "stage": m.stage, "group_name": m.group_name,
-        "team_a": m.team_a, "team_b": m.team_b,
+        "team_a": team_a, "team_b": team_b,
         "match_time": format_beijing_iso(m.match_time),
         "location": m.location, "stadium": m.stadium,
         "result_a": ra, "result_b": rb,
-        "penalty_a": m.penalty_a if match_has_recorded_score(m) else None,
-        "penalty_b": m.penalty_b if match_has_recorded_score(m) else None,
+        "penalty_a": pa,
+        "penalty_b": pb,
         "status": status,
         "season": m.season, "matchday": m.matchday,
     }
+
+
+async def _knockout_by_no(db: AsyncSession, comp_slug: str) -> dict | None:
+    if comp_slug != "worldcup-2026":
+        return None
+    from data.knockout_advance import load_knockout_slot_index
+    return await load_knockout_slot_index(db, comp_slug)
 
 
 @router.get("/list")
@@ -130,7 +145,8 @@ async def get_matches(
         query.order_by(Match.match_time.asc()).offset((page - 1) * size).limit(size)
     )).scalars().all()
 
-    data = [match_to_dict(m) for m in matches]
+    ko_index = await _knockout_by_no(db, comp_slug)
+    data = [match_to_dict(m, knockout_by_no=ko_index) for m in matches]
     return success(paginate(data, total, page, size))
 
 
@@ -213,7 +229,8 @@ async def get_recent_results(
     matches = (await db.execute(
         select(Match).where(*filters).order_by(Match.match_time.desc()).limit(limit)
     )).scalars().all()
-    return success([match_to_dict(m) for m in matches])
+    ko_index = await _knockout_by_no(db, comp_slug)
+    return success([match_to_dict(m, knockout_by_no=ko_index) for m in matches])
 
 
 @router.get("/today")
@@ -241,7 +258,12 @@ async def get_today_matches(
         select(Match).where(*today_filters).order_by(Match.match_time.asc())
     )).scalars().all()
 
-    data = [match_to_dict(m) for m in matches if include_in_today_dashboard(m)]
+    ko_index = await _knockout_by_no(db, comp_slug)
+    data = [
+        match_to_dict(m, knockout_by_no=ko_index)
+        for m in matches
+        if include_in_today_dashboard(m)
+    ]
     return success(data)
 
 
@@ -269,7 +291,8 @@ async def get_upcoming_matches(
         select(Match).where(*upcoming_filters).order_by(Match.match_time.asc()).limit(limit)
     )).scalars().all()
 
-    data = [match_to_dict(m) for m in matches]
+    ko_index = await _knockout_by_no(db, comp_slug)
+    data = [match_to_dict(m, knockout_by_no=ko_index) for m in matches]
     return success(data)
 
 
@@ -283,16 +306,30 @@ async def get_match_detail(match_id: int, db: AsyncSession = Depends(get_db), cu
     match = (await db.execute(select(Match).where(Match.id == match_id))).scalar_one()
 
     from db.models import Team, Odds
-    team_a = (await db.execute(
-        select(Team).where(Team.name == match.team_a, Team.competition_slug == match.competition_slug)
-    )).scalar_one_or_none()
-    team_b = (await db.execute(
-        select(Team).where(Team.name == match.team_b, Team.competition_slug == match.competition_slug)
-    )).scalar_one_or_none()
+    ko_index = await _knockout_by_no(db, match.competition_slug)
+    payload = match_to_dict(match, knockout_by_no=ko_index)
+    names_a = [n for n in {payload.get("team_a"), match.team_a} if n]
+    names_b = [n for n in {payload.get("team_b"), match.team_b} if n]
+    team_a = None
+    team_b = None
+    if names_a:
+        team_a = (await db.execute(
+            select(Team).where(
+                Team.competition_slug == match.competition_slug,
+                Team.name.in_(names_a),
+            )
+        )).scalar_one_or_none()
+    if names_b:
+        team_b = (await db.execute(
+            select(Team).where(
+                Team.competition_slug == match.competition_slug,
+                Team.name.in_(names_b),
+            )
+        )).scalar_one_or_none()
     odds = (await db.execute(select(Odds).where(Odds.match_id == match_id))).scalar_one_or_none()
 
     return success({
-        **match_to_dict(match),
+        **payload,
         "team_a_detail": team_to_dict(team_a) if team_a else None,
         "team_b_detail": team_to_dict(team_b) if team_b else None,
         "odds": {

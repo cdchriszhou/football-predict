@@ -662,6 +662,28 @@ HISTORICAL_MATCHES: list[dict] = [
          "1:1": 6.0, "1:0": 7.5, "0:1": 7.0, "2:1": 10.0, "1:2": 10.5, "0:0": 9.0,
          "2:2": 14.0,
      }},
+    # ═══ 2026-07-01 1/16 — Round of 32 (feeds Jul 6 R16) ═══
+    {"year": 2026, "team_a": "科特迪瓦", "team_b": "挪威", "result_a": 0, "result_b": 1,
+     "rank_a": 30, "rank_b": 20, "stage": "1/16决赛", "group_name": "", "matchday": 0,
+     "location": "达拉斯", "stadium": "AT&T体育场",
+     "match_time": "2026-07-01T01:00:00"},
+    {"year": 2026, "team_a": "墨西哥", "team_b": "厄瓜多尔", "result_a": 2, "result_b": 1,
+     "rank_a": 15, "rank_b": 28, "stage": "1/16决赛", "group_name": "", "matchday": 0,
+     "location": "墨西哥城", "stadium": "阿兹特克体育场",
+     "match_time": "2026-07-01T10:00:00"},
+    {"year": 2026, "team_a": "英格兰", "team_b": "刚果(金)", "result_a": 2, "result_b": 0,
+     "rank_a": 5, "rank_b": 55, "stage": "1/16决赛", "group_name": "", "matchday": 0,
+     "location": "亚特兰大", "stadium": "梅赛德斯-奔驰体育场",
+     "match_time": "2026-07-02T00:00:00"},
+    # ═══ 2026-07-06 1/8 — Round of 16 ═══
+    {"year": 2026, "team_a": "巴西", "team_b": "挪威", "result_a": 1, "result_b": 2,
+     "rank_a": 6, "rank_b": 20, "stage": "1/8决赛", "group_name": "", "matchday": 0,
+     "location": "休斯顿", "stadium": "NRG体育场",
+     "match_time": "2026-07-06T04:00:00"},
+    {"year": 2026, "team_a": "墨西哥", "team_b": "英格兰", "result_a": 1, "result_b": 2,
+     "rank_a": 15, "rank_b": 5, "stage": "1/8决赛", "group_name": "", "matchday": 0,
+     "location": "墨西哥城", "stadium": "阿兹特克体育场",
+     "match_time": "2026-07-06T08:00:00"},
 ]
 # fmt: on
 

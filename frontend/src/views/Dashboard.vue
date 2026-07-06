@@ -256,7 +256,7 @@ import { refreshAllData, getDataRefreshStatus } from '@/api/admin'
 import { refreshLeagueData } from '@/api/competitions'
 import { getDailyScoreBacktest } from '@/api/predictions'
 import { useRouter } from 'vue-router'
-import { effectiveMatchStatus, hasMatchScore } from '@/utils/matchStatus'
+import { effectiveMatchStatus, hasMatchScore, isEffectiveMatchStatus } from '@/utils/matchStatus'
 
 const { t, tm, locale } = useI18n()
 const router = useRouter()
@@ -341,12 +341,15 @@ const isClubLeague = computed(() => compStore.current?.type === 'club')
 
 const scheduleTotal = computed(() => Number(statValues.value.total) || 0)
 
-/** All fixtures scheduled for today (Beijing), including upcoming matches. */
+/** Today's results: prefer finished/live matches; fall back to full schedule. */
 const displayTodayMatches = computed(() => {
-  return [...store.todayMatches]
-    .sort(
-      (a, b) => new Date(a.match_time || 0) - new Date(b.match_time || 0),
-    )
+  const rows = [...store.todayMatches].sort(
+    (a, b) => new Date(a.match_time || 0) - new Date(b.match_time || 0),
+  )
+  const withScore = rows.filter(
+    (m) => isEffectiveMatchStatus(m, 'finished') || isEffectiveMatchStatus(m, 'live'),
+  )
+  return withScore.length ? withScore : rows
 })
 
 const upcomingPreviewLimit = computed(() => (compStore.isWorldCup ? 12 : 6))
