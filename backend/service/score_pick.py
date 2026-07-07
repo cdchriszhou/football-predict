@@ -143,8 +143,27 @@ def finalize_knockout_score_picks(
             win_rate=win_rate,
             lose_rate=lose_rate,
         )
+        # Moderate knockout favourite: keep 1:1 ET path in likely pair
+        if rank_gap < 22 and wdl_margin < 22:
+            draw_alt = _first_score_with_outcome(ranked, "draw", exclude={primary})
+            if draw_alt and draw_alt != primary:
+                secondary = draw_alt
         underdog = "lose" if fav_side == "win" else "win"
-        upset = _first_score_with_outcome(ranked, underdog) or ("0:1" if fav_side == "win" else "1:0")
+        underdog_prefs = (
+            ["1:2", "2:1", "0:1", "2:2", "1:0"]
+            if fav_side == "win"
+            else ["2:1", "1:2", "1:0", "2:2", "0:1"]
+        )
+        by_score = {s for s, _ in ranked}
+        upset = None
+        for s in underdog_prefs:
+            if s in by_score and _score_outcome(s) == underdog:
+                upset = s
+                break
+        if not upset:
+            upset = _first_score_with_outcome(ranked, underdog) or (
+                "0:1" if fav_side == "win" else "1:0"
+            )
         return [primary, secondary], upset
 
     primary = _first_score_with_outcome(ranked, "draw") or ranked[0][0]
@@ -1295,6 +1314,11 @@ def align_score_picks_to_wdl(
     if margin < margin_threshold and not force_align:
         return picks
     ranked = _rank_crs(crs, set())
+    if ranked and not force_align and margin < 8.0:
+        crs_dom = _score_outcome(ranked[0][0])
+        pri_dom = _score_outcome(picks[0]) if picks else None
+        if crs_dom != dom and pri_dom == crs_dom:
+            return picks
 
     if _score_outcome(picks[0]) != dom:
         primary = _best_crs_for_outcome(ranked, crs, dom, set(), model_scores)
@@ -2566,6 +2590,67 @@ def _pick_outcomes(scores: list[str], upset: str | None) -> set[str]:
     elif upset == "平其它":
         outcomes.add("draw")
     return outcomes
+
+
+def ensure_extreme_mismatch_triple_coverage(
+    best_scores: list[str],
+    upset: str | None,
+    crs: dict[str, float],
+    *,
+    sp_win: float | None = None,
+    sp_lose: float | None = None,
+    rank_a: int | None = None,
+    rank_b: int | None = None,
+    expected_a: float = 1.2,
+    expected_b: float = 1.0,
+) -> tuple[list[str], str | None]:
+    """Cover stalemate and rout tails that triple picks often miss on extreme mismatches."""
+    picks = [s for s in (best_scores or []) if s and s != "?"][:2]
+    upset_val = upset if upset and upset != "?" else None
+    if not crs or not picks:
+        return picks, upset_val
+
+    gap = abs(int(rank_a or 50) - int(rank_b or 50))
+    covered = set(picks) | ({upset_val} if upset_val else set())
+
+    # Deep home favourite: keep 0:0/1:1 cold path (Netherlands 0:0 Haiti)
+    if sp_win is not None and sp_win <= 1.18 and gap >= 38:
+        if _score_outcome(picks[0]) == "win":
+            if upset_val == "1:1" and "0:0" in crs:
+                upset_val = "0:0"
+                covered.add("0:0")
+            elif not any(_score_outcome(s) == "draw" for s in covered):
+                for draw_score in ("0:0", "1:1"):
+                    if draw_score in crs:
+                        upset_val = draw_score
+                        covered.add(draw_score)
+                        break
+
+    # Extreme rout: 胜其它 catches 5:0+ (Germany 7:1 Curacao)
+    if sp_win is not None and sp_win <= 1.10 and gap >= 48 and expected_a >= 2.0:
+        if _score_outcome(picks[0]) == "win" and _has_crs_special(crs, "胜其它"):
+            sec = picks[1] if len(picks) > 1 else picks[0]
+            if sec == picks[0] or _score_outcome(sec) == "win":
+                picks = [picks[0], "胜其它"]
+
+    # Open high-xG games: ensure a 4+ total-goals line in the triple
+    total_xg = expected_a + expected_b
+    if total_xg >= 3.0:
+        has_high = any(
+            sum(map(int, s.split(":"))) >= 4
+            for s in covered
+            if ":" in s
+        )
+        if not has_high:
+            for score, odd in _rank_crs(crs, covered):
+                if sum(map(int, score.split(":"))) >= 4 and float(odd) <= 20.0:
+                    if len(picks) >= 2 and _score_outcome(picks[1]) == _score_outcome(picks[0]):
+                        picks[1] = score
+                    else:
+                        upset_val = score
+                    break
+
+    return picks[:2], upset_val
 
 
 def ensure_triple_direction_coverage(

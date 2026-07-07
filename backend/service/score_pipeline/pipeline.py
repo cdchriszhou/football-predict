@@ -225,6 +225,14 @@ class ScorePredictionPipeline:
                 sp_draw=sp_draw,
             )
 
+        from service.score_pick import ensure_extreme_mismatch_triple_coverage
+        best, upset = ensure_extreme_mismatch_triple_coverage(
+            best, upset, crs,
+            sp_win=sp_win, sp_lose=sp_lose,
+            rank_a=rank_a, rank_b=rank_b,
+            expected_a=expected_a, expected_b=expected_b,
+        )
+
         # ── Validate ──
         best, upset, warnings = self.validator.validate(
             best, upset, crs,

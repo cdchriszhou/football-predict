@@ -999,3 +999,43 @@ def test_knockout_r32_replay_hits():
         )
         assert hit, f"{h['team_a']} vs {h['team_b']} actual={actual} picks={all_p}"
 
+
+def test_extreme_fav_adds_stalemate_upset():
+    from service.score_pick import ensure_extreme_mismatch_triple_coverage
+
+    crs = {
+        "3:0": 6.0, "4:0": 8.0, "2:0": 7.0, "1:0": 9.0,
+        "0:0": 15.0, "1:1": 12.0, "胜其它": 18.0,
+    }
+    picks, upset = ensure_extreme_mismatch_triple_coverage(
+        ["3:0", "4:0"], "2:0", crs,
+        sp_win=1.08, rank_a=7, rank_b=88, expected_a=2.8, expected_b=0.4,
+    )
+    assert upset in ("0:0", "1:1")
+    assert picks[0] == "3:0"
+
+
+def test_extreme_rout_promotes_win_other_secondary():
+    from service.score_pick import ensure_extreme_mismatch_triple_coverage, score_matches_pick
+
+    crs = {
+        "3:0": 5.5, "4:0": 7.0, "2:0": 6.0, "1:1": 12.0, "胜其它": 9.0,
+    }
+    picks, _ = ensure_extreme_mismatch_triple_coverage(
+        ["3:0", "4:0"], "1:1", crs,
+        sp_win=1.05, rank_a=5, rank_b=95, expected_a=3.2, expected_b=0.3,
+    )
+    assert picks[1] == "胜其它"
+    assert score_matches_pick("7:1", "胜其它", crs)
+
+
+def test_align_respects_crs_when_wdl_margin_small():
+    from service.score_pick import align_score_picks_to_wdl
+
+    crs = {"0:2": 5.5, "0:1": 6.0, "1:1": 7.0, "1:2": 9.0}
+    out = align_score_picks_to_wdl(
+        ["0:2", "0:1"], crs,
+        win_rate=44.0, draw_rate=28.0, lose_rate=28.0,
+    )
+    assert out[0] == "0:2"
+
