@@ -717,6 +717,15 @@ HISTORICAL_MATCHES: list[dict] = [
      "rank_a": 14, "rank_b": 42, "stage": "1/16决赛", "group_name": "", "matchday": 0,
      "location": "休斯顿", "stadium": "NRG体育场",
      "match_time": "2026-07-04T09:30:00"},
+    # ═══ 2026-07-05 1/8 — Round of 16 ═══
+    {"year": 2026, "team_a": "加拿大", "team_b": "摩洛哥", "result_a": 0, "result_b": 3,
+     "rank_a": 45, "rank_b": 8, "stage": "1/8决赛", "group_name": "", "matchday": 0,
+     "location": "休斯顿", "stadium": "NRG体育场",
+     "match_time": "2026-07-05T00:00:00"},
+    {"year": 2026, "team_a": "巴拉圭", "team_b": "法国", "result_a": 0, "result_b": 1,
+     "rank_a": 40, "rank_b": 2, "stage": "1/8决赛", "group_name": "", "matchday": 0,
+     "location": "费城", "stadium": "林肯金融球场",
+     "match_time": "2026-07-05T05:00:00"},
     # ═══ 2026-07-06 1/8 — Round of 16 ═══
     {"year": 2026, "team_a": "巴西", "team_b": "挪威", "result_a": 1, "result_b": 2,
      "rank_a": 6, "rank_b": 20, "stage": "1/8决赛", "group_name": "", "matchday": 0,

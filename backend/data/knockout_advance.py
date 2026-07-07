@@ -162,14 +162,32 @@ def parse_feeder(name: str) -> tuple[str, int] | tuple[str, None]:
     return ("team", None)
 
 
-def match_winner(m: Any) -> str | None:
+def match_winner(
+    m: Any,
+    *,
+    match_no: int | None = None,
+    by_no: dict[int, Any] | None = None,
+) -> str | None:
     if m is None:
         return None
     ra = _field(m, "result_a")
     rb = _field(m, "result_b")
+    if ra is None or rb is None:
+        from data.match_status import confirmed_scores_from_history
+        hist = confirmed_scores_from_history(m)
+        if hist:
+            ra, rb = hist["result_a"], hist["result_b"]
+        else:
+            return None
     ta = _field(m, "team_a")
     tb = _field(m, "team_b")
-    if ra is None or rb is None or not ta or not tb:
+    if match_no and by_no:
+        rta, rtb = resolve_fixture_teams(match_no, by_no)
+        ta = rta or (ta if ta and not str(ta).startswith("第") else None)
+        tb = rtb or (tb if tb and not str(tb).startswith("第") else None)
+    elif (ta and str(ta).startswith("第")) or (tb and str(tb).startswith("第")):
+        return None
+    if not ta or not tb:
         return None
     if ra > rb:
         return ta
@@ -185,8 +203,13 @@ def match_winner(m: Any) -> str | None:
     return None
 
 
-def match_loser(m: Any) -> str | None:
-    w = match_winner(m)
+def match_loser(
+    m: Any,
+    *,
+    match_no: int | None = None,
+    by_no: dict[int, Any] | None = None,
+) -> str | None:
+    w = match_winner(m, match_no=match_no, by_no=by_no)
     if not w or m is None:
         return None
     ta = _field(m, "team_a")
@@ -256,9 +279,9 @@ def resolve_feeder_team(name: str, by_no: dict[int, Any], cache: dict[str, str |
         return cache[name]
     feeder = by_no.get(ref_no or -1)
     if kind == "winner":
-        out = match_winner(feeder)
+        out = match_winner(feeder, match_no=ref_no, by_no=by_no)
     else:
-        out = match_loser(feeder)
+        out = match_loser(feeder, match_no=ref_no, by_no=by_no)
     cache[name] = out
     return out
 

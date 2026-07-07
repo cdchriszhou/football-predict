@@ -20,6 +20,7 @@ from data.match_status import (
 )
 from data.status_constants import (
     MATCH_FINISHED,
+    MATCH_LIVE,
     MATCH_UPCOMING,
     match_status_in_db_values,
     normalize_match_status,
@@ -173,21 +174,20 @@ async def get_knockout_bracket(
     comp_slug = resolve_competition(competition)
     await _ensure_results_synced(db, comp_slug)
     if comp_slug == "worldcup-2026":
-        from data.knockout_advance import ensure_knockout_fixtures, advance_knockout_teams
+        from data.knockout_advance import (
+            ensure_knockout_fixtures,
+            advance_knockout_teams,
+            invalidate_knockout_slot_index_cache,
+        )
 
         created = await ensure_knockout_fixtures(db, comp_slug)
-        if created:
-            try:
-                await advance_knockout_teams(db, comp_slug)
-            except Exception:
-                pass
-        else:
-            try:
-                from service.write_guard import is_heavy_job_running
-                if not is_heavy_job_running():
-                    await advance_knockout_teams(db, comp_slug)
-            except Exception:
-                pass
+        try:
+            from service.write_guard import is_heavy_job_running
+            if created or not is_heavy_job_running():
+                await advance_knockout_teams(db, comp_slug, flush=False)
+        except Exception:
+            pass
+        invalidate_knockout_slot_index_cache(comp_slug)
 
     ko_index = await _knockout_by_no(db, comp_slug)
     stages = ["1/16决赛", "1/8决赛", "1/4决赛", "半决赛", "季军赛", "决赛"]
