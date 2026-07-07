@@ -313,7 +313,7 @@ async function loadDailyReport() {
   }
   dailyReportLoading.value = true
   try {
-    const res = await getDailyScoreBacktest(14)
+    const res = await getDailyScoreBacktest(30)
     dailyReport.value = res.data || null
   } catch {
     dailyReport.value = null

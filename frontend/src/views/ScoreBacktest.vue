@@ -223,9 +223,14 @@ function formatTime(iso) {
 
 function formatMatchDate(iso) {
   if (!iso) return '—'
-  const d = new Date(String(iso).replace(' ', 'T'))
-  if (Number.isNaN(d.getTime())) return String(iso).slice(0, 10)
-  return d.toLocaleDateString(locale.value, { month: 'short', day: 'numeric' })
+  const s = String(iso)
+  if (s.length >= 10 && s[4] === '-' && s[7] === '-') {
+    const d = new Date(`${s.slice(0, 10)}T12:00:00+08:00`)
+    if (!Number.isNaN(d.getTime())) {
+      return d.toLocaleDateString(locale.value, { month: 'short', day: 'numeric' })
+    }
+  }
+  return formatDateTimeInTz(iso, 'Asia/Shanghai', locale.value)
 }
 
 watch(groups, (list) => {

@@ -12,7 +12,7 @@ from db.redis_client import cache_delete, cache_get, cache_set
 from data.worldcup_history import HISTORICAL_MATCHES, rank_to_abilities
 from data.worldcup_schedule_lookup import canonical_kickoff_beijing
 from db.models import Match, Odds, Prediction
-from utils.datetime_helpers import china_today
+from utils.datetime_helpers import CHINA_TZ, china_today, format_beijing_iso
 from utils.score_prediction import normalize_score_prediction
 from service.score_pick import (
     is_knockout_stage,
@@ -36,7 +36,7 @@ NOTES = [
 ]
 
 DAILY_REPORT_CACHE_TTL = 300
-DAILY_REPORT_CACHE_PREFIX = "score_backtest_daily:v6:"
+DAILY_REPORT_CACHE_PREFIX = "score_backtest_daily:v7:"
 
 
 def _history_row(team_a: str, team_b: str, year: int = 2026) -> dict | None:
@@ -328,7 +328,7 @@ def _evaluate_match(
         "primary_hit": primary_hit,
         "triple_hit": triple_hit,
         "pick_source": pick_source,
-        "match_time": match_time.isoformat() if match_time else None,
+        "match_time": format_beijing_iso(match_time),
         "stage": stage,
         "group_name": group_name,
         "matchday": matchday,
@@ -411,7 +411,7 @@ async def _collect_evaluated_rows(
             euro_wdl = _wdl_from_european(hist.get("european"))
             wdl = euro_wdl or (50.0, 25.0, 25.0)
 
-        kickoff = _resolve_kickoff(team_a, team_b, match.match_time, hist)
+        kickoff = _resolve_backtest_kickoff(team_a, team_b, match.match_time, hist)
         published = _picks_from_db_prediction(pred_row)
 
         row = _evaluate_match(
@@ -456,7 +456,7 @@ async def _collect_evaluated_rows(
             crs=crs,
             wdl=wdl,
             odds_meta=euro,
-            match_time=_resolve_kickoff(ta, tb, None, hist),
+            match_time=_resolve_backtest_kickoff(ta, tb, None, hist),
             stage=hist.get("stage") or "",
             group_name=hist.get("group_name"),
             matchday=hist.get("matchday"),
@@ -499,24 +499,55 @@ def _resolve_kickoff(
     return canonical_kickoff_beijing(team_a, team_b)
 
 
+def _resolve_backtest_kickoff(
+    team_a: str,
+    team_b: str,
+    db_time: datetime | None = None,
+    hist: dict | None = None,
+) -> datetime | None:
+    """Prefer official Beijing schedule, then history seed, then DB wall-clock."""
+    canon = canonical_kickoff_beijing(team_a, team_b)
+    if canon:
+        return canon
+    if hist and hist.get("match_time"):
+        parsed = _parse_match_time(hist.get("match_time"))
+        if parsed:
+            return parsed
+    if db_time:
+        return db_time
+    return None
+
+
 def _match_beijing_date(row: dict) -> str | None:
     mt = row.get("match_time")
     if not mt:
         return None
-    if isinstance(mt, datetime):
-        return mt.strftime("%Y-%m-%d")
-    s = str(mt).strip()
-    if len(s) >= 10 and s[4] == "-" and s[7] == "-":
-        return s[:10]
-    return None
+    parsed = _parse_match_time(mt)
+    if parsed is None:
+        return None
+    if parsed.tzinfo is not None:
+        return parsed.astimezone(CHINA_TZ).strftime("%Y-%m-%d")
+    return parsed.strftime("%Y-%m-%d")
+
+
+def _format_beijing_date_label(date_key: str) -> str:
+    try:
+        d = datetime.strptime(date_key, "%Y-%m-%d")
+        return f"{d.month}月{d.day}日"
+    except ValueError:
+        return date_key
 
 
 def _backtest_group_key_label(row: dict, *, prefer_date: bool) -> tuple[str, str]:
     """Group key/label for backtest UI — World Cup by Beijing date, leagues by matchday."""
     date_key = _match_beijing_date(row)
     md = row.get("matchday")
+    stage = (row.get("stage") or "").strip()
     if prefer_date and date_key:
-        return f"d{date_key}", date_key
+        label = _format_beijing_date_label(date_key)
+        if stage and stage != "小组赛":
+            label = f"{label} · {stage}"
+        return f"d{date_key}", label
     if md:
         return f"md{md}", f"第{md}轮"
     if date_key:
@@ -694,7 +725,7 @@ async def compute_score_backtest(
         g["triple_hit_rate"] = round(g["triple_hits"] / ev * 100, 1)
         group_list.append(g)
     if prefer_date:
-        group_list.sort(key=lambda x: x["label"])
+        group_list.sort(key=lambda x: x["label"], reverse=True)
     else:
         group_list.sort(key=lambda x: (x.get("matchday") or 99, x["label"]))
 

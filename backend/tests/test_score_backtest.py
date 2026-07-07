@@ -1,4 +1,6 @@
 """Tests for score backtest service."""
+from datetime import datetime
+
 import pytest
 
 from service.score_backtest import (
@@ -60,7 +62,7 @@ def test_backtest_prefers_date_for_worldcup_rows():
     row = _sample_row("2026-06-17", True, True, matchday=1)
     key, label = _backtest_group_key_label(row, prefer_date=True)
     assert key == "d2026-06-17"
-    assert label == "2026-06-17"
+    assert label == "6月17日"
 
 
 def test_canada_draw_primary():
@@ -135,6 +137,30 @@ def test_ghana_panama_kickoff_is_june18_beijing():
     assert kickoff is not None
     assert kickoff.strftime("%Y-%m-%d") == "2026-06-18"
     assert kickoff.hour == 7
+
+
+def test_july_knockout_groups_use_beijing_date():
+    from service.score_backtest import _resolve_backtest_kickoff, _backtest_group_key_label
+
+    kickoff = _resolve_backtest_kickoff("科特迪瓦", "挪威", datetime(2026, 6, 30, 17, 0))
+    assert kickoff.strftime("%Y-%m-%d") == "2026-07-01"
+    row = {
+        "match_time": kickoff.isoformat(),
+        "stage": "1/16决赛",
+        "matchday": None,
+    }
+    key, label = _backtest_group_key_label(row, prefer_date=True)
+    assert key == "d2026-07-01"
+    assert "7月1日" in label
+    assert "1/16" in label
+
+    hist_kickoff = _resolve_backtest_kickoff(
+        "巴拉圭",
+        "法国",
+        datetime(2026, 6, 30, 17, 0),
+        {"match_time": "2026-07-05T05:00:00"},
+    )
+    assert hist_kickoff.strftime("%Y-%m-%d") == "2026-07-05"
 
 
 def test_june18_daily_report_has_four_matches():
