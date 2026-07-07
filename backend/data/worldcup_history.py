@@ -726,6 +726,15 @@ HISTORICAL_MATCHES: list[dict] = [
      "rank_a": 15, "rank_b": 5, "stage": "1/8决赛", "group_name": "", "matchday": 0,
      "location": "墨西哥城", "stadium": "阿兹特克体育场",
      "match_time": "2026-07-06T08:00:00"},
+    # ═══ 2026-07-07 1/8 — Round of 16 ═══
+    {"year": 2026, "team_a": "葡萄牙", "team_b": "西班牙", "result_a": 0, "result_b": 1,
+     "rank_a": 6, "rank_b": 8, "stage": "1/8决赛", "group_name": "", "matchday": 0,
+     "location": "洛杉矶", "stadium": "SoFi体育场",
+     "match_time": "2026-07-07T02:00:00"},
+    {"year": 2026, "team_a": "美国", "team_b": "比利时", "result_a": 1, "result_b": 4,
+     "rank_a": 12, "rank_b": 3, "stage": "1/8决赛", "group_name": "", "matchday": 0,
+     "location": "西雅图", "stadium": "流明球场",
+     "match_time": "2026-07-07T05:00:00"},
 ]
 # fmt: on
 

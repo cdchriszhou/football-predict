@@ -923,6 +923,15 @@ async def sync_live_scores(db: AsyncSession, slug: str, *, network: bool = False
 
 async def sync_match_results_for_read(db: AsyncSession, slug: str) -> int:
     """Fast sync for HTTP read endpoints — no repair/reconcile/network blocking."""
+    if slug == "worldcup-2026":
+        try:
+            from service.write_guard import is_heavy_job_running
+            if not is_heavy_job_running():
+                from data.knockout_advance import advance_knockout_teams
+                await advance_knockout_teams(db, slug)
+        except Exception as exc:
+            logger.warning("Knockout advance skipped on read sync [%s]: %s", slug, exc)
+
     applied = await apply_confirmed_results(db, slug, recent_days=14, flush=False)
     if slug != "worldcup-2026":
         return applied
@@ -1125,7 +1134,8 @@ def confirmed_scores_from_history(match) -> dict | None:
             continue
         ta, tb = item["team_a"], item["team_b"]
         reversed_match = False
-        if not (ma.startswith("第") or mb.startswith("第")):
+        placeholders = ma.startswith("第") or mb.startswith("第")
+        if not placeholders:
             if ma == ta and mb == tb:
                 reversed_match = False
             elif ma == tb and mb == ta:
