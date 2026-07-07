@@ -51,7 +51,7 @@
           :description="emptyHint"
           :image-size="60"
         />
-        <el-collapse v-else v-model="expandedGroups" accordion>
+        <el-collapse v-else v-model="expandedGroups">
           <el-collapse-item
             v-for="group in groups"
             :key="group.group_key"
@@ -128,7 +128,7 @@ const { t, locale } = useI18n()
 const loading = ref(false)
 const data = ref(null)
 const disclaimer = ref('')
-const expandedGroups = ref('')
+const expandedGroups = ref([])
 const autoRefresh = ref(true)
 const lastUpdated = ref(null)
 
@@ -229,8 +229,8 @@ function formatMatchDate(iso) {
 }
 
 watch(groups, (list) => {
-  if (list.length && !expandedGroups.value) {
-    expandedGroups.value = list[0].group_key
+  if (list.length && !expandedGroups.value.length) {
+    expandedGroups.value = list.map((g) => g.group_key)
   }
 }, { immediate: true })
 
@@ -247,7 +247,7 @@ async function loadData() {
     lastUpdated.value = new Date()
     disclaimer.value = data.value?.disclaimer || t('scoreBacktest.disclaimer')
     if (groups.value.length) {
-      expandedGroups.value = groups.value[0].group_key
+      expandedGroups.value = groups.value.map((g) => g.group_key)
     }
   } catch (e) {
     data.value = null

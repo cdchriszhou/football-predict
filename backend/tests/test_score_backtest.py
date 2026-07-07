@@ -95,6 +95,21 @@ def test_uzbekistan_colombia_cluster_prefers_concession():
     assert moderate == ["0:2", "1:2"]
 
 
+def test_evaluate_knockout_without_book_crs():
+    row = _evaluate_match(
+        team_a="巴拉圭",
+        team_b="法国",
+        actual="0:1",
+        crs={},
+        wdl=(35.0, 28.0, 37.0),
+        odds_meta=None,
+        stage="1/8决赛",
+    )
+    assert row is not None
+    assert row["crs_source"] == "synthetic_ko"
+    assert row["primary_pick"]
+
+
 def test_evaluate_match_uses_published_picks():
     crs = {"0:2": 5.7, "1:3": 8.5, "1:1": 10.5}
     row = _evaluate_match(

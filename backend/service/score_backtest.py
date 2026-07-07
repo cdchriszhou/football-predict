@@ -15,6 +15,8 @@ from db.models import Match, Odds, Prediction
 from utils.datetime_helpers import china_today
 from utils.score_prediction import normalize_score_prediction
 from service.score_pick import (
+    is_knockout_stage,
+    poisson_to_synthetic_crs,
     refine_wdl_after_score_pick,
     run_full_score_pipeline,
     score_matches_pick,
@@ -29,12 +31,12 @@ DISCLAIMER = (
 NOTES = [
     "首推：CRS 锚定管线输出的第一推荐比分。",
     "三选：首推、次推与冷门选项中任一命中即计为命中（含胜/平/负其它桶）。",
-    "仅纳入已有 CRS 比分赔率且赛果已确认的场次。",
-    "胜平负概率优先取自数据库预测记录，并与欧赔隐含平局做纠偏。",
+    "小组赛优先使用数据库或历史种子中的 CRS；淘汰赛无 CRS 时用 Poisson 合成赔率回测。",
+    "胜平负概率优先取自数据库预测记录，并与欧赔隐含概率做纠偏。",
 ]
 
 DAILY_REPORT_CACHE_TTL = 300
-DAILY_REPORT_CACHE_PREFIX = "score_backtest_daily:v5:"
+DAILY_REPORT_CACHE_PREFIX = "score_backtest_daily:v6:"
 
 
 def _history_row(team_a: str, team_b: str, year: int = 2026) -> dict | None:
@@ -42,6 +44,95 @@ def _history_row(team_a: str, team_b: str, year: int = 2026) -> dict | None:
         if m.get("year") == year and m.get("team_a") == team_a and m.get("team_b") == team_b:
             return m
     return None
+
+
+def _find_history_for_match(
+    team_a: str,
+    team_b: str,
+    *,
+    stage: str = "",
+    match_time: datetime | None = None,
+    year: int = 2026,
+) -> dict | None:
+    """Exact team match, then kickoff window for same stage (knockout placeholders)."""
+    row = _history_row(team_a, team_b, year)
+    if row:
+        return row
+    if not match_time:
+        return None
+    window = timedelta(minutes=45)
+    best: dict | None = None
+    best_delta = window.total_seconds() + 1
+    for item in HISTORICAL_MATCHES:
+        if item.get("year") != year:
+            continue
+        if stage and item.get("stage", "小组赛") != stage:
+            continue
+        mt = _parse_match_time(item.get("match_time"))
+        if mt is None:
+            continue
+        delta = abs((match_time - mt).total_seconds())
+        if delta <= window.total_seconds() and delta < best_delta:
+            ta, tb = item["team_a"], item["team_b"]
+            if {ta, tb} == {team_a, team_b} or not team_a.startswith("第"):
+                best, best_delta = item, delta
+    return best
+
+
+def _wdl_from_european(euro: dict | None) -> tuple[float, float, float] | None:
+    if not euro:
+        return None
+    w, d, l = euro.get("win_win"), euro.get("draw"), euro.get("win_lose")
+    if not (w and d and l):
+        return None
+    try:
+        over = 1 / float(w) + 1 / float(d) + 1 / float(l)
+        return (1 / float(w) / over * 100, 1 / float(d) / over * 100, 1 / float(l) / over * 100)
+    except (TypeError, ValueError, ZeroDivisionError):
+        return None
+
+
+def _ensure_crs_for_backtest(
+    crs: dict[str, float],
+    *,
+    team_a: str,
+    team_b: str,
+    stage: str,
+    wdl: tuple[float, float, float] | None,
+    odds_meta: dict | None,
+) -> tuple[dict[str, float], str]:
+    """Return CRS map and source tag (book|synthetic_ko|synthetic|empty)."""
+    if crs:
+        return crs, "book"
+    exp_a, exp_b = _expected_goals(team_a, team_b)
+    ra = TEAM_DATA.get(team_a, {}).get("rank", 50)
+    rb = TEAM_DATA.get(team_b, {}).get("rank", 50)
+    wr, dr, lr = wdl if wdl else (50.0, 25.0, 25.0)
+    inferred = _wdl_from_european(odds_meta)
+    if inferred:
+        wr, dr, lr = inferred
+    hints = _poisson_model_hints(exp_a, exp_b, dr)
+    if is_knockout_stage(stage):
+        from service.score_pick import prepare_pipeline_crs_and_hints
+        synth, _, _ = prepare_pipeline_crs_and_hints(
+            None,
+            expected_a=exp_a,
+            expected_b=exp_b,
+            win_rate=wr,
+            draw_rate=dr,
+            lose_rate=lr,
+            model_scores=hints,
+            stage=stage,
+            rank_a=ra,
+            rank_b=rb,
+        )
+        if synth:
+            return synth, "synthetic_ko"
+        return {}, "empty"
+    synth = poisson_to_synthetic_crs(exp_a, exp_b, dr)
+    if synth and (wdl or inferred):
+        return synth, "synthetic"
+    return {}, "empty"
 
 
 def _expected_goals(team_a: str, team_b: str) -> tuple[float, float]:
@@ -203,7 +294,15 @@ def _evaluate_match(
     location: str | None = None,
     published_picks: tuple[str, str, str | None, list[str]] | None = None,
 ) -> dict | None:
-    if not crs:
+    crs, crs_source = _ensure_crs_for_backtest(
+        crs or {},
+        team_a=team_a,
+        team_b=team_b,
+        stage=stage or "",
+        wdl=wdl,
+        odds_meta=odds_meta,
+    )
+    if crs_source == "empty":
         return None
     if published_picks:
         p1, p2, upset, all_picks = published_picks
@@ -213,8 +312,11 @@ def _evaluate_match(
             team_a, team_b, crs, wdl, odds_meta, stage=stage or None,
         )
         pick_source = "replay"
-    primary_hit = score_matches_pick(actual, p1, crs)
-    triple_hit = any(score_matches_pick(actual, p, crs) for p in all_picks if p)
+    if crs_source != "book":
+        pick_source = f"{pick_source}_{crs_source}"
+    eval_crs = crs if crs else {"1:0": 10.0}
+    primary_hit = score_matches_pick(actual, p1, eval_crs)
+    triple_hit = any(score_matches_pick(actual, p, eval_crs) for p in all_picks if p)
     return {
         "match_id": match_id,
         "team_a": team_a,
@@ -231,7 +333,8 @@ def _evaluate_match(
         "group_name": group_name,
         "matchday": matchday,
         "location": location,
-        "has_crs": True,
+        "has_crs": crs_source == "book",
+        "crs_source": crs_source,
     }
 
 
@@ -250,6 +353,11 @@ async def _collect_evaluated_rows(
     competition_slug: str = "worldcup-2026",
 ) -> tuple[list[dict], int, dict[str, int]]:
     """Evaluate finished matches with CRS odds; returns (rows, skipped, skip_reasons)."""
+    ko_index: dict | None = None
+    if competition_slug == "worldcup-2026":
+        from data.knockout_advance import load_knockout_slot_index_cached, display_teams_for_match
+        ko_index = await load_knockout_slot_index_cached(db, competition_slug)
+
     rows = (await db.execute(
         select(Match).where(
             Match.competition_slug == competition_slug,
@@ -264,6 +372,13 @@ async def _collect_evaluated_rows(
 
     for match in rows:
         actual = f"{match.result_a}:{match.result_b}"
+        team_a, team_b = match.team_a, match.team_b
+        if ko_index is not None:
+            from data.knockout_advance import display_teams_for_match
+            team_a, team_b = display_teams_for_match(match, ko_index)
+            if not team_a or not team_b:
+                team_a = team_a or match.team_a
+                team_b = team_b or match.team_b
         all_odds = (await db.execute(
             select(Odds).where(Odds.match_id == match.id).order_by(Odds.id.desc())
         )).scalars().all()
@@ -286,19 +401,22 @@ async def _collect_evaluated_rows(
         if pred_row:
             wdl = (pred_row.win_rate, pred_row.draw_rate, pred_row.lose_rate)
 
-        hist = _history_row(match.team_a, match.team_b)
+        hist = _find_history_for_match(
+            team_a, team_b, stage=match.stage or "", match_time=match.match_time,
+        )
         if not crs and hist:
             crs = {str(k): float(v) for k, v in (hist.get("score_odds") or {}).items()}
             odds_meta = odds_meta or _odds_meta_from_history(hist)
         if not wdl and hist:
-            wdl = (50.0, 25.0, 25.0)
+            euro_wdl = _wdl_from_european(hist.get("european"))
+            wdl = euro_wdl or (50.0, 25.0, 25.0)
 
-        kickoff = _resolve_kickoff(match.team_a, match.team_b, match.match_time, hist)
+        kickoff = _resolve_kickoff(team_a, team_b, match.match_time, hist)
         published = _picks_from_db_prediction(pred_row)
 
         row = _evaluate_match(
-            team_a=match.team_a,
-            team_b=match.team_b,
+            team_a=team_a,
+            team_b=team_b,
             actual=actual,
             crs=crs,
             wdl=wdl,
@@ -315,7 +433,7 @@ async def _collect_evaluated_rows(
             evaluated.append(row)
         else:
             skipped += 1
-            reason = "no_crs" if not crs else "eval_failed"
+            reason = "no_crs_or_wdl" if not crs and not is_knockout_stage(match.stage or "") else "eval_failed"
             skip_reasons[reason] = skip_reasons.get(reason, 0) + 1
 
     seen = {(r["team_a"], r["team_b"]) for r in evaluated}
@@ -328,16 +446,16 @@ async def _collect_evaluated_rows(
         if hist.get("result_a") is None or hist.get("result_b") is None:
             continue
         crs = {str(k): float(v) for k, v in (hist.get("score_odds") or {}).items()}
-        if not crs:
-            continue
+        euro = _odds_meta_from_history(hist)
+        wdl = _wdl_from_european(hist.get("european")) or (50.0, 25.0, 25.0)
         actual = f"{hist['result_a']}:{hist['result_b']}"
         row = _evaluate_match(
             team_a=ta,
             team_b=tb,
             actual=actual,
             crs=crs,
-            wdl=(50.0, 25.0, 25.0),
-            odds_meta=_odds_meta_from_history(hist),
+            wdl=wdl,
+            odds_meta=euro,
             match_time=_resolve_kickoff(ta, tb, None, hist),
             stage=hist.get("stage") or "",
             group_name=hist.get("group_name"),
