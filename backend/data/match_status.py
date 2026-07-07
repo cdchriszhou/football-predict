@@ -922,16 +922,7 @@ async def sync_live_scores(db: AsyncSession, slug: str, *, network: bool = False
 
 
 async def sync_match_results_for_read(db: AsyncSession, slug: str) -> int:
-    """Fast sync for HTTP read endpoints — no repair/reconcile/network blocking."""
-    if slug == "worldcup-2026":
-        try:
-            from service.write_guard import is_heavy_job_running
-            if not is_heavy_job_running():
-                from data.knockout_advance import advance_knockout_teams
-                await advance_knockout_teams(db, slug)
-        except Exception as exc:
-            logger.warning("Knockout advance skipped on read sync [%s]: %s", slug, exc)
-
+    """Fast sync for HTTP read endpoints — no DB writes (avoid SQLite lock on dashboard)."""
     applied = await apply_confirmed_results(db, slug, recent_days=14, flush=False)
     if slug != "worldcup-2026":
         return applied

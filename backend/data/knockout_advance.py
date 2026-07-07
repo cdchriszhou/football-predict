@@ -352,7 +352,12 @@ def display_teams_for_match(m: Match, by_no: dict[int, Any]) -> tuple[str, str]:
     return ta, tb
 
 
-async def advance_knockout_teams(db: AsyncSession, slug: str = "worldcup-2026") -> int:
+async def advance_knockout_teams(
+    db: AsyncSession,
+    slug: str = "worldcup-2026",
+    *,
+    flush: bool = True,
+) -> int:
     """Fill placeholder team names on later knockout rounds from finished feeders."""
     if slug != "worldcup-2026":
         return 0
@@ -392,7 +397,7 @@ async def advance_knockout_teams(db: AsyncSession, slug: str = "worldcup-2026") 
             by_no[no] = row
             updated += 1
 
-    if updated:
+    if updated and flush:
         from db.sqlite_write import flush_session
         await flush_session(db)
         invalidate_knockout_slot_index_cache(slug)
