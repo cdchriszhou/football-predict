@@ -4,6 +4,7 @@ from types import SimpleNamespace
 from data.knockout_advance import (
     build_slot_index,
     display_teams_for_match,
+    materialize_knockout_slot_index,
     match_winner,
     resolve_fixture_teams,
 )
@@ -81,3 +82,20 @@ def test_resolve_r16_from_finished_r32():
 
     ta, tb = resolve_fixture_teams(91, by_no)
     assert ta == "巴西"
+
+
+def test_materialize_knockout_slot_index_produces_dicts():
+    row = {
+        "id": 77, "stage": "1/16决赛", "team_a": "法国", "team_b": "瑞典",
+        "result_a": 3, "result_b": 0, "penalty_a": None, "penalty_b": None,
+        "match_time": "2026-07-01T06:00:00", "competition_slug": "worldcup-2026",
+        "group_name": "", "location": "", "stadium": "", "status": "finished",
+        "season": None, "matchday": None,
+    }
+    idx = materialize_knockout_slot_index({77: row})
+    assert isinstance(idx[77], dict)
+    assert idx[77]["team_a"] == "法国"
+    # display_teams must not touch SQLAlchemy when fed materialized rows
+    m = SimpleNamespace(id=77, team_a="法国", team_b="瑞典", competition_slug="worldcup-2026")
+    ta, tb = display_teams_for_match(m, idx)
+    assert ta == "法国" and tb == "瑞典"

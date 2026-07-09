@@ -242,6 +242,34 @@ def _field(m: Any, name: str, default=None):
     return getattr(m, name, default)
 
 
+def materialize_knockout_row(row: Any) -> dict:
+    """Plain snapshot for slot-index cache (avoid detached SQLAlchemy instances)."""
+    if isinstance(row, dict):
+        return dict(row)
+    return {
+        "id": row.id,
+        "competition_slug": row.competition_slug,
+        "stage": row.stage,
+        "group_name": row.group_name,
+        "team_a": row.team_a,
+        "team_b": row.team_b,
+        "match_time": row.match_time,
+        "location": row.location,
+        "stadium": row.stadium,
+        "result_a": row.result_a,
+        "result_b": row.result_b,
+        "penalty_a": row.penalty_a,
+        "penalty_b": row.penalty_b,
+        "status": row.status,
+        "season": row.season,
+        "matchday": row.matchday,
+    }
+
+
+def materialize_knockout_slot_index(index: dict[int, Any]) -> dict[int, dict]:
+    return {no: materialize_knockout_row(row) for no, row in index.items() if row is not None}
+
+
 def build_slot_index(stage_rows: dict[str, list[Any]]) -> dict[int, Any]:
     """Map FIFA match_no → API/DB row (same rules as frontend buildMatchIndex)."""
     seen: dict[str, Any] = {}
@@ -352,8 +380,9 @@ async def load_knockout_slot_index_cached(db: AsyncSession, slug: str = "worldcu
     if cached and now - cached[0] < _KO_INDEX_TTL_SEC:
         return cached[1]
     index = await load_knockout_slot_index(db, slug)
-    _ko_index_cache[slug] = (now, index)
-    return index
+    materialized = materialize_knockout_slot_index(index)
+    _ko_index_cache[slug] = (now, materialized)
+    return materialized
 
 
 def invalidate_knockout_slot_index_cache(slug: str = "worldcup-2026") -> None:
@@ -377,8 +406,9 @@ def display_teams_for_match(m: Match, by_no: dict[int, Any]) -> tuple[str, str]:
         return db_a, db_b
 
     match_no = None
+    mid = _field(m, "id")
     for no, row in by_no.items():
-        if _field(row, "id") == m.id:
+        if _field(row, "id") == mid:
             match_no = no
             break
     if match_no is None:

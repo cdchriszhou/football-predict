@@ -26,6 +26,7 @@ from data.status_constants import (
     normalize_match_status,
 )
 from datetime import date, datetime, timedelta
+from types import SimpleNamespace
 from utils.datetime_helpers import china_now, beijing_day_bounds_naive, format_beijing_iso
 
 import json
@@ -73,7 +74,14 @@ def _season_ended(comp_slug: str) -> bool:
     return bool(closing and datetime.utcnow() > closing)
 
 
+def _as_match_row(m: Match | dict) -> Match | SimpleNamespace:
+    if isinstance(m, dict):
+        return SimpleNamespace(**m)
+    return m
+
+
 def match_to_dict(m: Match, *, knockout_by_no: dict | None = None) -> dict:
+    m = _as_match_row(m)
     status = resolve_public_match_status(m)
     ra, rb = m.result_a, m.result_b
     pa, pb = m.penalty_a, m.penalty_b
