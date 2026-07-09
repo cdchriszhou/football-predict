@@ -281,17 +281,22 @@ async def get_recent_results(
         Match.competition_slug == comp_slug,
         Match.match_time.isnot(None),
         Match.match_time >= cutoff,
-        Match.result_a.isnot(None),
-        Match.result_b.isnot(None),
     ]
     season_filter = _club_season_filter(comp_slug)
     if season_filter is not None:
         filters.append(season_filter)
     matches = (await db.execute(
-        select(Match).where(*filters).order_by(Match.match_time.desc()).limit(limit)
+        select(Match).where(*filters).order_by(Match.match_time.desc()).limit(limit * 4)
     )).scalars().all()
     ko_index = await _knockout_by_no(db, comp_slug)
-    return success([match_to_dict(m, knockout_by_no=ko_index) for m in matches])
+    data: list[dict] = []
+    for m in matches:
+        row = match_to_dict(m, knockout_by_no=ko_index)
+        if row.get("result_a") is not None and row.get("result_b") is not None:
+            data.append(row)
+        if len(data) >= limit:
+            break
+    return success(data)
 
 
 @router.get("/today")
@@ -319,12 +324,27 @@ async def get_today_matches(
         select(Match).where(*today_filters).order_by(Match.match_time.asc())
     )).scalars().all()
 
+    kickoff_today = [m for m in matches if include_in_today_dashboard(m)]
+    source = kickoff_today
+    # Rest day: 今日赛果 still shows yesterday's finished fixtures (World Cup).
+    if comp_slug == "worldcup-2026" and not kickoff_today:
+        recent_cutoff = today_start - timedelta(days=1)
+        source = list((await db.execute(
+            select(Match).where(
+                Match.competition_slug == comp_slug,
+                Match.match_time.isnot(None),
+                Match.match_time >= recent_cutoff,
+                Match.match_time < today_start,
+            ).order_by(Match.match_time.asc())
+        )).scalars().all())
+
     ko_index = await _knockout_by_no(db, comp_slug)
-    data = [
-        match_to_dict(m, knockout_by_no=ko_index)
-        for m in matches
-        if include_in_today_dashboard(m)
-    ]
+    data = [match_to_dict(m, knockout_by_no=ko_index) for m in source]
+    if comp_slug == "worldcup-2026" and not kickoff_today:
+        data = [
+            d for d in data
+            if d.get("result_a") is not None and d.get("result_b") is not None
+        ]
     return success(data)
 
 

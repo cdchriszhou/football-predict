@@ -359,10 +359,10 @@ const displayTodayMatches = computed(() => {
   for (const m of store.todayMatches) {
     if (beijingDateKey(m.match_time) === todayKey) byId.set(m.id, m)
   }
-  // If /today timed out or returned empty, reuse recent-results for the same Beijing day.
+  // If /today timed out or returned empty, reuse recent-results as fallback.
   if (!byId.size && compStore.isWorldCup) {
     for (const m of store.recentResults) {
-      if (beijingDateKey(m.match_time) === todayKey) byId.set(m.id, m)
+      byId.set(m.id, m)
     }
   }
   const rows = [...byId.values()].sort(

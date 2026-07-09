@@ -1150,6 +1150,13 @@ def confirmed_scores_from_history(match) -> dict | None:
     return best
 
 
+def match_has_display_score(match) -> bool:
+    """True when regulation score can be shown (DB row or history overlay)."""
+    if match_has_recorded_score(match):
+        return True
+    return confirmed_scores_from_history(match) is not None
+
+
 def _now_beijing_naive() -> datetime:
     return china_now().replace(tzinfo=None)
 
