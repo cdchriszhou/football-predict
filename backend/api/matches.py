@@ -200,6 +200,14 @@ async def get_knockout_bracket(
             ).order_by(Match.match_time.asc())
         )).scalars().all())
         payload[stage] = [match_to_dict(m, knockout_by_no=ko_index) for m in rows]
+
+    slots: dict[str, dict] = {}
+    if ko_index:
+        for match_no, row in ko_index.items():
+            if row is None:
+                continue
+            slots[str(match_no)] = match_to_dict(row, knockout_by_no=ko_index)
+    payload["slots"] = slots
     return success(payload)
 
 

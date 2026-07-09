@@ -119,11 +119,13 @@ async function loadAll() {
   try {
     const res = await getKnockoutBracket()
     if (res?.data && typeof res.data === 'object') {
-      byStage.value = res.data
+      const { slots, ...stages } = res.data
+      byStage.value = stages
+      matchIndex.value = buildMatchIndex(stages, slots)
     } else {
       byStage.value = {}
+      matchIndex.value = buildMatchIndex({})
     }
-    matchIndex.value = buildMatchIndex(byStage.value)
   } catch (err) {
     console.warn('[bracket] load failed:', err?.message || err)
     byStage.value = {}

@@ -121,7 +121,7 @@ function dedupeMatches(rows) {
 }
 
 /** Index loaded API rows for bracket slot lookup */
-export function buildMatchIndex(stageRows) {
+export function buildMatchIndex(stageRows, apiSlots = null) {
   const flat = dedupeMatches(Object.values(stageRows || {}).flat())
   const byTeams = new Map()
   for (const m of flat) {
@@ -132,13 +132,24 @@ export function buildMatchIndex(stageRows) {
 
   const byStageSlot = {}
 
+  if (apiSlots && typeof apiSlots === 'object') {
+    for (const [noStr, row] of Object.entries(apiSlots)) {
+      if (!row) continue
+      const no = Number(noStr)
+      const fx = FIXTURE_BY_NO[no]
+      if (!fx) continue
+      if (!byStageSlot[fx.stage]) byStageSlot[fx.stage] = {}
+      byStageSlot[fx.stage][no] = row
+    }
+  }
+
   for (const side of ['left', 'right']) {
     for (const [stage, nos] of Object.entries(BRACKET_LAYOUT[side])) {
       if (!byStageSlot[stage]) byStageSlot[stage] = {}
       const pool = dedupeMatches(stageRows?.[stage] || [])
 
       for (const no of nos) {
-        if (byStageSlot[stage][no]) continue
+        if (byStageSlot[stage]?.[no]) continue
         const fx = FIXTURE_BY_NO[no]
         if (!fx) continue
         let hit = findRowForFixture(fx, pool, byTeams)
@@ -155,6 +166,7 @@ export function buildMatchIndex(stageRows) {
     ['季军赛', BRACKET_LAYOUT.center.third],
   ]) {
     if (!byStageSlot[stage]) byStageSlot[stage] = {}
+    if (byStageSlot[stage][no]) continue
     const pool = dedupeMatches(stageRows?.[stage] || [])
     byStageSlot[stage][no] = pool[0] || null
   }

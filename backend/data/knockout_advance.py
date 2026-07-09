@@ -25,6 +25,15 @@ def _parse_kickoff(value) -> datetime | None:
         return None
     if isinstance(value, datetime):
         return value.replace(tzinfo=None) if value.tzinfo else value
+    if isinstance(value, str):
+        s = value.strip().replace("Z", "+00:00")
+        if not s or "T" not in s and " " not in s:
+            return None
+        try:
+            dt = datetime.fromisoformat(s[:26])
+            return dt.replace(tzinfo=None) if dt.tzinfo else dt
+        except ValueError:
+            return None
     return None
 
 
