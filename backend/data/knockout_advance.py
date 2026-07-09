@@ -181,6 +181,7 @@ def match_winner(
         return None
     ra = _field(m, "result_a")
     rb = _field(m, "result_b")
+    hist = None
     if ra is None or rb is None:
         from data.match_status import confirmed_scores_from_history
         hist = confirmed_scores_from_history(m)
@@ -204,6 +205,15 @@ def match_winner(
         return tb
     pa = _field(m, "penalty_a")
     pb = _field(m, "penalty_b")
+    if (pa is None or pb is None) and ra == rb:
+        if hist is None:
+            from data.match_status import confirmed_scores_from_history
+            hist = confirmed_scores_from_history(m)
+        if hist:
+            if pa is None:
+                pa = hist.get("penalty_a")
+            if pb is None:
+                pb = hist.get("penalty_b")
     if pa is not None and pb is not None:
         if pa > pb:
             return ta
