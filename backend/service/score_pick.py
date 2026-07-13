@@ -1809,6 +1809,9 @@ def run_full_score_pipeline(
     Unified CRS score pick pipeline — production, backtest, batch API must all use this.
     Returns (best_scores[:2], upset, all_picks, warnings).
 
+    All scorelines are regulation time (90 minutes) only — sporttery CRS settlement
+    excludes extra-time and penalty-shootout goals.
+
     Set skip_wdl_resilience=True when the caller has already applied W/D/L context
     adjustments (e.g. via CalibratedRuleEngine / apply_context_to_rates) to avoid
     double-counting resilience signals on win/draw/lose rates.

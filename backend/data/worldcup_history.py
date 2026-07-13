@@ -760,7 +760,7 @@ HISTORICAL_MATCHES: list[dict] = [
      "location": "波士顿", "stadium": "吉列体育场",
      "match_time": "2026-07-10T04:00:00"},
     {"year": 2026, "team_a": "西班牙", "team_b": "比利时", "result_a": 2, "result_b": 1,
-     "extra_time": True,
+     "regulation_a": 1, "regulation_b": 1, "extra_time": True,
      "rank_a": 8, "rank_b": 3, "stage": "1/4决赛", "group_name": "", "matchday": 0,
      "location": "洛杉矶", "stadium": "索菲体育场",
      "match_time": "2026-07-11T00:00:00"},

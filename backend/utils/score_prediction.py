@@ -5,8 +5,67 @@ import json
 
 LIKELY_SCORE_COUNT = 2
 
+# Sporttery CRS settles on regulation time (90 min); ET / penalty goals excluded.
+SPORTTERY_SCORE_NOTE = "比分预测为常规时间（90分钟）赛果，体彩 CRS 不含加时及点球进球。"
 
-def parse_best_score_payload(val) -> dict:
+
+def sporttery_actual_score(
+    *,
+    result_a: int,
+    result_b: int,
+    regulation_a: int | None = None,
+    regulation_b: int | None = None,
+    extra_time: bool = False,
+    reversed_teams: bool = False,
+) -> str:
+    """Actual score for CRS / sporttery settlement (regulation time only)."""
+    if extra_time and regulation_a is not None and regulation_b is not None:
+        ra, rb = int(regulation_a), int(regulation_b)
+    else:
+        ra, rb = int(result_a), int(result_b)
+    if reversed_teams:
+        ra, rb = rb, ra
+    return f"{ra}:{rb}"
+
+
+def actual_score_from_history(
+    hist: dict,
+    *,
+    team_a: str | None = None,
+    team_b: str | None = None,
+) -> str | None:
+    """Regulation-time actual from a worldcup_history row (sporttery口径)."""
+    if hist.get("result_a") is None or hist.get("result_b") is None:
+        return None
+    reversed_teams = False
+    if team_a and team_b:
+        ta, tb = hist.get("team_a"), hist.get("team_b")
+        if ta == team_b and tb == team_a:
+            reversed_teams = True
+    return sporttery_actual_score(
+        result_a=int(hist["result_a"]),
+        result_b=int(hist["result_b"]),
+        regulation_a=hist.get("regulation_a"),
+        regulation_b=hist.get("regulation_b"),
+        extra_time=bool(hist.get("extra_time")),
+        reversed_teams=reversed_teams,
+    )
+
+
+def actual_score_for_match(
+    *,
+    result_a: int,
+    result_b: int,
+    team_a: str,
+    team_b: str,
+    hist: dict | None = None,
+) -> str:
+    """Best available sporttery actual: history regulation overlay, else DB full-time."""
+    if hist:
+        from_hist = actual_score_from_history(hist, team_a=team_a, team_b=team_b)
+        if from_hist:
+            return from_hist
+    return f"{int(result_a)}:{int(result_b)}"
     """Parse best_score DB field — array, object, or legacy string."""
     empty = {"scores": [], "upset": None}
     if val is None:

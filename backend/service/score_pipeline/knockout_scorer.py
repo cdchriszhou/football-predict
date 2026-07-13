@@ -47,7 +47,7 @@ class KnockoutMarketScorer(BaseScorer):
 
         # ── Signal 4: Extra time probability ──
         et_prob = self._compute_et_probability(inp, actual_stage)
-        adjustments = self._apply_et_adjustment(adjustments, inp, et_prob)
+        adjustments = self._apply_regulation_draw_adjustment(adjustments, inp, et_prob)
 
         # ── Signal 5: Draw protection (knockout-specific) ──
         adjustments = self._apply_ko_draw_protection(adjustments, inp)
@@ -220,12 +220,12 @@ class KnockoutMarketScorer(BaseScorer):
         imp_draw = (inp.odds_dict or {}).get("imp_draw", inp.draw_rate)
         return estimate_et_probability(rank_gap, draw_odds, imp_draw, stage)
 
-    def _apply_et_adjustment(
+    def _apply_regulation_draw_adjustment(
         self, adj: dict[str, float], inp: ScorerInput, et_prob: float,
     ) -> dict[str, float]:
         """
-        When ET probability is high, boost draw scores and narrow margins.
-        This reflects the reality that knockout matches are often tight.
+        When regulation-time draw is likely (often leads to ET), boost draw scores.
+        Sporttery CRS uses 90-minute score only — this is the correct settlement target.
         """
         result = dict(adj)
         if et_prob < 0.12:
@@ -342,5 +342,5 @@ class KnockoutMarketScorer(BaseScorer):
     def _build_rationale(self, stage: str, et_prob: float) -> str:
         parts = [f"KO {stage}"]
         if et_prob >= 0.15:
-            parts.append(f"ET prob {et_prob:.0%}")
+            parts.append(f"常规平局 {et_prob:.0%}")
         return "; ".join(parts)

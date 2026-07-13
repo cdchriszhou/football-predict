@@ -26,13 +26,16 @@ from service.rule_engine import RuleEngine
 DISCLAIMER = (
     "回测使用赛前 CRS 比分赔率与胜平负概率，在已知赛果的场次上重跑当前算法，"
     "用于评估逻辑可靠性，不代表未来场次命中率。"
+    "赛果对比采用体彩 CRS 口径：常规时间（90分钟）比分，不含加时及点球进球。"
 )
 
 NOTES = [
     "首推：CRS 锚定管线输出的第一推荐比分。",
     "三选：首推、次推与冷门选项中任一命中即计为命中（含胜/平/负其它桶）。",
+    "所有推荐比分均为常规时间（90分钟）赛果，与体彩 CRS 结算一致。",
     "小组赛优先使用数据库或历史种子中的 CRS；淘汰赛无 CRS 时用 Poisson 合成赔率回测。",
     "胜平负概率优先取自数据库预测记录，并与欧赔隐含概率做纠偏。",
+    "加时赛果场次以 history 中 regulation_a/b 作为实际比分；无则使用终场比分。",
 ]
 
 DAILY_REPORT_CACHE_TTL = 300
@@ -374,7 +377,6 @@ async def _collect_evaluated_rows(
     skip_reasons: dict[str, int] = {}
 
     for match in rows:
-        actual = f"{match.result_a}:{match.result_b}"
         team_a, team_b = match.team_a, match.team_b
         if ko_index is not None:
             from data.knockout_advance import display_teams_for_match
@@ -382,6 +384,17 @@ async def _collect_evaluated_rows(
             if not team_a or not team_b:
                 team_a = team_a or match.team_a
                 team_b = team_b or match.team_b
+        hist = _find_history_for_match(
+            team_a, team_b, stage=match.stage or "", match_time=match.match_time,
+        )
+        from utils.score_prediction import actual_score_for_match
+        actual = actual_score_for_match(
+            result_a=int(match.result_a),
+            result_b=int(match.result_b),
+            team_a=team_a,
+            team_b=team_b,
+            hist=hist,
+        )
         all_odds = (await db.execute(
             select(Odds).where(Odds.match_id == match.id).order_by(Odds.id.desc())
         )).scalars().all()
@@ -404,9 +417,6 @@ async def _collect_evaluated_rows(
         if pred_row:
             wdl = (pred_row.win_rate, pred_row.draw_rate, pred_row.lose_rate)
 
-        hist = _find_history_for_match(
-            team_a, team_b, stage=match.stage or "", match_time=match.match_time,
-        )
         if not crs and hist:
             crs = {str(k): float(v) for k, v in (hist.get("score_odds") or {}).items()}
             odds_meta = odds_meta or _odds_meta_from_history(hist)
@@ -451,7 +461,8 @@ async def _collect_evaluated_rows(
         crs = {str(k): float(v) for k, v in (hist.get("score_odds") or {}).items()}
         euro = _odds_meta_from_history(hist)
         wdl = _wdl_from_european(hist.get("european")) or (50.0, 25.0, 25.0)
-        actual = f"{hist['result_a']}:{hist['result_b']}"
+        from utils.score_prediction import actual_score_from_history
+        actual = actual_score_from_history(hist) or f"{hist['result_a']}:{hist['result_b']}"
         row = _evaluate_match(
             team_a=ta,
             team_b=tb,

@@ -129,6 +129,9 @@ def _append_calibrated_score_note(
     note = f"[热门比分] {' / '.join(picks)}"
     if upset and upset != "?":
         note += f"（冷门 {upset}）"
+    from utils.score_prediction import SPORTTERY_SCORE_NOTE
+    if SPORTTERY_SCORE_NOTE not in (reason or ""):
+        note = f"{note}；{SPORTTERY_SCORE_NOTE}"
     if note in (reason or ""):
         return reason or ""
     return f"{reason} | {note}" if reason else note
