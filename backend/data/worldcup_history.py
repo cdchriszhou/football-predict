@@ -754,6 +754,23 @@ HISTORICAL_MATCHES: list[dict] = [
      "rank_a": 19, "rank_b": 14, "stage": "1/8决赛", "group_name": "", "matchday": 0,
      "location": "温哥华", "stadium": "卑诗体育馆",
      "match_time": "2026-07-08T01:00:00"},
+    # ═══ 2026-07-10 ~ 2026-07-12 1/4 — Quarter-finals ═══
+    {"year": 2026, "team_a": "法国", "team_b": "摩洛哥", "result_a": 2, "result_b": 0,
+     "rank_a": 2, "rank_b": 8, "stage": "1/4决赛", "group_name": "", "matchday": 0,
+     "location": "波士顿", "stadium": "吉列体育场",
+     "match_time": "2026-07-10T04:00:00"},
+    {"year": 2026, "team_a": "西班牙", "team_b": "比利时", "result_a": 2, "result_b": 1,
+     "rank_a": 8, "rank_b": 3, "stage": "1/4决赛", "group_name": "", "matchday": 0,
+     "location": "洛杉矶", "stadium": "索菲体育场",
+     "match_time": "2026-07-11T00:00:00"},
+    {"year": 2026, "team_a": "挪威", "team_b": "英格兰", "result_a": 1, "result_b": 2,
+     "rank_a": 20, "rank_b": 5, "stage": "1/4决赛", "group_name": "", "matchday": 0,
+     "location": "迈阿密", "stadium": "硬石体育场",
+     "match_time": "2026-07-12T05:00:00"},
+    {"year": 2026, "team_a": "阿根廷", "team_b": "瑞士", "result_a": 3, "result_b": 1,
+     "rank_a": 1, "rank_b": 19, "stage": "1/4决赛", "group_name": "", "matchday": 0,
+     "location": "堪萨斯城", "stadium": "箭头体育场",
+     "match_time": "2026-07-12T08:00:00"},
 ]
 # fmt: on
 

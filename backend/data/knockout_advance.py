@@ -199,6 +199,20 @@ def match_winner(
         return None
     if not ta or not tb:
         return None
+    db_ta = _field(m, "team_a")
+    db_tb = _field(m, "team_b")
+    if (
+        db_ta and db_tb
+        and not str(db_ta).startswith("第")
+        and not str(db_tb).startswith("第")
+        and db_ta != ta
+        and db_tb != tb
+        and db_ta == tb
+        and db_tb == ta
+    ):
+        ra, rb = rb, ra
+        if pa is not None and pb is not None:
+            pa, pb = pb, pa
     if ra > rb:
         return ta
     if rb > ra:
@@ -233,6 +247,12 @@ def match_loser(
         return None
     ta = _field(m, "team_a")
     tb = _field(m, "team_b")
+    if match_no and by_no:
+        rta, rtb = resolve_fixture_teams(match_no, by_no)
+        ta = rta or (ta if ta and not str(ta).startswith("第") else None)
+        tb = rtb or (tb if tb and not str(tb).startswith("第") else None)
+    if not ta or not tb:
+        return None
     return tb if w == ta else ta
 
 
