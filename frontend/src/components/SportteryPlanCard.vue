@@ -3,6 +3,7 @@
     <div class="plan-card-head">
       <span class="match-num">{{ pick.match_num }}</span>
       <span class="kickoff">{{ formatKickoff(pick.kickoff) }}</span>
+      <el-tag v-if="preview" size="small" type="info">{{ saleDateLabel }}</el-tag>
       <el-tag size="small" type="warning">{{ t('sportteryPlan.playCrs') }}</el-tag>
     </div>
 
@@ -89,9 +90,15 @@ const compStore = useCompetitionStore()
 
 const props = defineProps({
   pick: { type: Object, required: true },
+  preview: { type: Boolean, default: false },
 })
 
 const basePath = computed(() => compStore.basePath)
+
+const saleDateLabel = computed(() => {
+  if (!props.pick.sale_date) return t('sportteryPlan.upcomingTag')
+  return t('sportteryPlan.upcomingSaleDate', { date: props.pick.sale_date })
+})
 
 const scorePickList = computed(() => {
   let list

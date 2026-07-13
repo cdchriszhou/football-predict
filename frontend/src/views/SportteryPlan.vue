@@ -39,14 +39,30 @@
 
     <div v-loading="loading">
       <el-empty
-        v-if="!loading && (!plan || plan.on_sale_count === 0)"
+        v-if="!loading && (!plan || (plan.on_sale_count === 0 && !plan.upcoming_count))"
         :description="emptyTitle"
       >
         <p class="empty-hint">{{ emptyHint }}</p>
       </el-empty>
 
       <template v-else-if="plan">
-        <section class="plan-section">
+        <section v-if="plan.upcoming_singles?.length" class="plan-section upcoming-section">
+          <h3 class="section-title">{{ t('sportteryPlan.upcomingTitle') }}</h3>
+          <p class="section-hint">{{ t('sportteryPlan.upcomingHint') }}</p>
+          <el-row :gutter="16" class="plan-grid">
+            <el-col
+              v-for="row in plan.upcoming_singles"
+              :key="'up-' + (row.match_num || `${row.team_a}-${row.team_b}`)"
+              :xs="24"
+              :sm="12"
+              :lg="8"
+            >
+              <SportteryPlanCard :pick="row" preview />
+            </el-col>
+          </el-row>
+        </section>
+
+        <section v-if="plan.singles?.length" class="plan-section">
           <h3 class="section-title">{{ t('sportteryPlan.singleTitle') }}</h3>
           <p class="section-hint">{{ t('sportteryPlan.singleHint') }}</p>
           <el-row :gutter="16" class="plan-grid">

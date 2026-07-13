@@ -8,7 +8,7 @@ For reference only; not betting advice.
 from __future__ import annotations
 
 import json
-from datetime import datetime, date as date_type
+from datetime import datetime, date as date_type, timedelta
 from math import prod
 from statistics import mean
 from typing import Optional
@@ -23,7 +23,7 @@ from crawler.sporttery_client import (
     normalize_team_name,
     to_db_odds,
 )
-from utils.datetime_helpers import china_today
+from utils.datetime_helpers import CHINA_TZ, china_now, china_today
 from db.models import Match, Odds, Prediction, Team
 from data.status_constants import MATCH_LIVE, MATCH_UPCOMING, PLAYER_ACTIVE, match_status_in_db_values
 from service.calibration_service import CalibratedRuleEngine
@@ -74,27 +74,69 @@ def _is_competition_league(league: str, hints: tuple[str, ...]) -> bool:
     return any(h in league for h in hints)
 
 
-def _is_purchasable_today(st_match: dict, today: date_type) -> bool:
-    """True when sporttery lists the match for today's sale window (China date)."""
+def _parse_sale_date(st_match: dict) -> date_type | None:
+    sale_date = st_match.get("sale_date")
+    if not sale_date:
+        return None
+    try:
+        return date_type.fromisoformat(str(sale_date)[:10])
+    except ValueError:
+        return None
+
+
+def _kickoff_not_yet_passed(st_match: dict, *, now: datetime | None = None) -> bool:
+    kickoff = st_match.get("kickoff")
+    if not kickoff:
+        return True
+    ref = now or china_now()
+    if kickoff.tzinfo is None:
+        ko = kickoff.replace(tzinfo=CHINA_TZ)
+    else:
+        ko = kickoff.astimezone(CHINA_TZ)
+    ref_aware = ref if ref.tzinfo else ref.replace(tzinfo=CHINA_TZ)
+    return ko > ref_aware
+
+
+def _is_sporttery_stopped(st_match: dict) -> bool:
     sell_status = str(st_match.get("sell_status") or "").strip()
-    if sell_status and sell_status not in ("1", "Selling", "selling", "在售"):
-        lowered = sell_status.lower()
-        if lowered in ("0", "stop", "stopped", "停售", "close", "closed"):
-            return False
+    if not sell_status:
+        return False
+    if sell_status in ("1", "2", "Selling", "selling", "在售"):
+        return False
+    lowered = sell_status.lower()
+    return lowered in ("0", "stop", "stopped", "停售", "close", "closed")
+
+
+def _is_purchasable_today(st_match: dict, today: date_type) -> bool:
+    """True when match is in an open sporttery sale window (China date/time).
+
+    Sale opens on ``sale_date`` and stays open until kickoff — not only on that calendar day.
+    """
+    if _is_sporttery_stopped(st_match):
+        return False
+    if not _kickoff_not_yet_passed(st_match):
+        return False
+
+    sale_day = _parse_sale_date(st_match)
+    if sale_day is not None:
+        return sale_day <= today
 
     kickoff = st_match.get("kickoff")
     if kickoff and kickoff.date() < today:
         return False
-
-    sale_date = st_match.get("sale_date")
-    if sale_date:
-        try:
-            return date_type.fromisoformat(str(sale_date)[:10]) == today
-        except ValueError:
-            pass
-
-    # On-sale pool item without sale_date: still purchasable if not kicked off
     return True
+
+
+def _is_upcoming_on_sale(st_match: dict, today: date_type, *, max_days: int = 3) -> bool:
+    """Listed in sporttery pool but sale window not open yet (preview only)."""
+    if _is_sporttery_stopped(st_match):
+        return False
+    if not _kickoff_not_yet_passed(st_match):
+        return False
+    sale_day = _parse_sale_date(st_match)
+    if sale_day is None or sale_day <= today:
+        return False
+    return sale_day <= today + timedelta(days=max_days)
 
 
 def _implied_probs(win: float, draw: float, lose: float) -> dict[str, float]:
@@ -1075,42 +1117,65 @@ def _build_parlays(singles: list[dict]) -> list[dict]:
     return parlays
 
 
-async def get_today_sporttery_plan(db: AsyncSession, competition_slug: str = "worldcup-2026") -> dict:
-    today = china_today()
-    sporttery_pool = await fetch_sporttery_on_sale(force_refresh=True)
-    fetch_status = get_sporttery_fetch_status()
-    hints = league_hints_for(competition_slug) or WORLD_CUP_LEAGUE_HINTS
-    comp = get_competition(competition_slug)
-    league_label = comp["short_name"] if comp else "赛事"
-    is_club = comp.get("type") == "club"
+async def _st_match_passes_competition_filter(
+    db: AsyncSession,
+    st: dict,
+    *,
+    competition_slug: str,
+    hints: tuple[str, ...],
+    is_club: bool,
+) -> bool:
+    league = st.get("league") or ""
+    league_ok = _is_competition_league(league, hints)
+    db_m = await _find_db_match(
+        db, st["home_team"], st["away_team"], st.get("kickoff"), competition_slug,
+    )
+    if league_ok:
+        if is_club and not db_m:
+            return False
+    elif not db_m:
+        return False
+    return True
 
-    today_matches: list[dict] = []
+
+async def _collect_competition_st_matches(
+    db: AsyncSession,
+    sporttery_pool: list[dict],
+    *,
+    competition_slug: str,
+    hints: tuple[str, ...],
+    is_club: bool,
+    today: date_type,
+    purchasable_only: bool,
+    upcoming_only: bool = False,
+) -> list[dict]:
+    out: list[dict] = []
     seen_nums: set[str] = set()
     for st in sporttery_pool:
-        if not _is_purchasable_today(st, today):
-            continue
-        kickoff = st.get("kickoff")
-        if kickoff and kickoff.date() < today:
-            continue
-        league = st.get("league") or ""
-        league_ok = _is_competition_league(league, hints)
-        db_m = await _find_db_match(
-            db, st["home_team"], st["away_team"], kickoff, competition_slug,
-        )
-
-        if league_ok:
-            if is_club and not db_m:
+        if purchasable_only:
+            if not _is_purchasable_today(st, today):
                 continue
-        elif not db_m:
+        elif upcoming_only:
+            if not _is_upcoming_on_sale(st, today):
+                continue
+        else:
+            continue
+
+        kickoff = st.get("kickoff")
+        if kickoff and kickoff.date() < today and not upcoming_only:
+            continue
+        if not await _st_match_passes_competition_filter(
+            db, st, competition_slug=competition_slug, hints=hints, is_club=is_club,
+        ):
             continue
 
         num = st.get("match_num") or ""
         if num in seen_nums:
             continue
         seen_nums.add(num)
-        today_matches.append(st)
+        out.append(st)
 
-    if not today_matches:
+    if purchasable_only and not out:
         db_upcoming = (await db.execute(
             select(Match).where(
                 Match.competition_slug == competition_slug,
@@ -1130,20 +1195,31 @@ async def get_today_sporttery_plan(db: AsyncSession, competition_slug: str = "wo
                 num = hit.get("match_num") or ""
                 if num not in seen_nums:
                     seen_nums.add(num)
-                    today_matches.append(hit)
+                    out.append(hit)
+    return out
 
+
+async def _build_singles_from_st_matches(
+    db: AsyncSession,
+    st_matches: list[dict],
+    *,
+    competition_slug: str,
+    is_club: bool,
+    purchasable: bool,
+) -> list[dict]:
     db_by_st: dict[int, Match] = {}
     match_ids: list[int] = []
-    for i, st in enumerate(today_matches):
-        dm = await _find_db_match(db, st["home_team"], st["away_team"], st.get("kickoff"), competition_slug)
+    for i, st in enumerate(st_matches):
+        dm = await _find_db_match(
+            db, st["home_team"], st["away_team"], st.get("kickoff"), competition_slug,
+        )
         if dm:
             db_by_st[i] = dm
             match_ids.append(dm.id)
 
     preds = await _latest_predictions(db, match_ids)
-
     singles: list[dict] = []
-    for i, st in enumerate(today_matches):
+    for i, st in enumerate(st_matches):
         dm = db_by_st.get(i)
         if is_club and not dm:
             continue
@@ -1162,18 +1238,62 @@ async def get_today_sporttery_plan(db: AsyncSession, competition_slug: str = "wo
         analysis = await _build_match_analysis(db, dm, pred, sporttery_odds)
         pick = _build_single_pick(st, dm, analysis)
         if pick:
+            pick["purchasable"] = purchasable
+            sale_day = _parse_sale_date(st)
+            if sale_day:
+                pick["sale_date"] = sale_day.isoformat()
             singles.append(pick)
-
     singles.sort(key=lambda s: s.get("kickoff") or "")
+    return singles
+
+
+async def get_today_sporttery_plan(db: AsyncSession, competition_slug: str = "worldcup-2026") -> dict:
+    today = china_today()
+    sporttery_pool = await fetch_sporttery_on_sale(force_refresh=True)
+    fetch_status = get_sporttery_fetch_status()
+    hints = league_hints_for(competition_slug) or WORLD_CUP_LEAGUE_HINTS
+    comp = get_competition(competition_slug)
+    is_club = comp.get("type") == "club"
+
+    today_matches = await _collect_competition_st_matches(
+        db, sporttery_pool,
+        competition_slug=competition_slug,
+        hints=hints,
+        is_club=is_club,
+        today=today,
+        purchasable_only=True,
+    )
+    upcoming_matches = await _collect_competition_st_matches(
+        db, sporttery_pool,
+        competition_slug=competition_slug,
+        hints=hints,
+        is_club=is_club,
+        today=today,
+        purchasable_only=False,
+        upcoming_only=True,
+    )
+
+    singles = await _build_singles_from_st_matches(
+        db, today_matches,
+        competition_slug=competition_slug,
+        is_club=is_club,
+        purchasable=True,
+    )
+    upcoming_singles = await _build_singles_from_st_matches(
+        db, upcoming_matches,
+        competition_slug=competition_slug,
+        is_club=is_club,
+        purchasable=False,
+    )
 
     if singles:
         empty_reason = None
     elif not sporttery_pool and fetch_status.get("last_error"):
         empty_reason = "sporttery_unreachable"
-    elif not today_matches:
+    elif not today_matches and not upcoming_singles:
         empty_reason = "today_no_on_sale"
     else:
-        empty_reason = "no_score_odds"
+        empty_reason = "no_score_odds" if today_matches else None
 
     parlays = _build_parlays(singles)
 
@@ -1182,6 +1302,8 @@ async def get_today_sporttery_plan(db: AsyncSession, competition_slug: str = "wo
         "updated_at": datetime.now().isoformat(),
         "on_sale_count": len(singles),
         "singles": singles,
+        "upcoming_singles": upcoming_singles,
+        "upcoming_count": len(upcoming_singles),
         "parlays": parlays,
         "parlay_folds": sorted({p["fold"] for p in parlays}),
         "default_stake_yuan": DEFAULT_STAKE_YUAN,
@@ -1190,6 +1312,7 @@ async def get_today_sporttery_plan(db: AsyncSession, competition_slug: str = "wo
         "sporttery_status": fetch_status,
         "sporttery_pool_size": len(sporttery_pool),
         "today_match_candidates": len(today_matches),
+        "upcoming_match_candidates": len(upcoming_matches),
         "competition_slug": competition_slug,
         "methodology": {
             "description": "基于体彩官方CRS比分赔率，融合球队能力、外围盘口、规则引擎与AI预测比分",
