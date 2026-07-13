@@ -97,6 +97,14 @@ def match_to_dict(m: Match, *, knockout_by_no: dict | None = None) -> dict:
         ra, rb = None, None
         pa, pb = None, None
 
+    from data.match_status import history_match_overlay
+    meta = history_match_overlay(m)
+    if meta.get("penalty_a") is not None and meta.get("penalty_b") is not None:
+        pa, pb = meta["penalty_a"], meta["penalty_b"]
+    extra_time = bool(meta.get("extra_time"))
+    regulation_a = meta.get("regulation_a")
+    regulation_b = meta.get("regulation_b")
+
     team_a, team_b = m.team_a, m.team_b
     if knockout_by_no is not None and m.competition_slug == "worldcup-2026":
         from data.knockout_advance import display_teams_for_match
@@ -111,6 +119,9 @@ def match_to_dict(m: Match, *, knockout_by_no: dict | None = None) -> dict:
         "result_a": ra, "result_b": rb,
         "penalty_a": pa,
         "penalty_b": pb,
+        "extra_time": extra_time,
+        "regulation_a": regulation_a,
+        "regulation_b": regulation_b,
         "status": status,
         "season": m.season, "matchday": m.matchday,
     }

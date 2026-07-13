@@ -9,7 +9,7 @@
       <span class="team">{{ node.team_b || t('bracket.tbd') }}</span>
       <span class="score" v-if="hasMatchScore(node)">{{ node.result_b }}</span>
     </div>
-    <div v-if="penaltyLine" class="penalty-line">{{ penaltyLine }}</div>
+    <div v-if="scoreNote" class="penalty-line">{{ scoreNote }}</div>
   </div>
 </template>
 
@@ -26,10 +26,21 @@ const props = defineProps({
   compact: { type: Boolean, default: false },
 })
 
-const penaltyLine = computed(() => {
+const scoreNote = computed(() => {
   const n = props.node
-  if (n.penalty_a == null || n.penalty_b == null) return ''
-  return t('match.penaltyShort', { score: `${n.penalty_a} - ${n.penalty_b}` })
+  if (n.penalty_a != null && n.penalty_b != null) {
+    return t('match.penaltyShort', { score: `${n.penalty_a} - ${n.penalty_b}` })
+  }
+  if (n.extra_time) {
+    if (n.regulation_a != null && n.regulation_b != null) {
+      return t('match.extraTimeWithRegulation', {
+        reg: `${n.regulation_a} - ${n.regulation_b}`,
+        final: `${n.result_a} - ${n.result_b}`,
+      })
+    }
+    return t('match.extraTimeShort')
+  }
+  return ''
 })
 
 function isWinner(team) {

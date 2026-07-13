@@ -121,3 +121,23 @@ def test_match_to_dict_overlays_qf_score():
     )
     d = match_to_dict(m)
     assert d["result_a"] == 3 and d["result_b"] == 1
+    assert d["extra_time"] is True
+    assert d["regulation_a"] == 1 and d["regulation_b"] == 1
+
+
+def test_history_overlay_penalties_on_draw_without_db_pens():
+    from data.match_status import history_match_overlay
+
+    m = SimpleNamespace(
+        competition_slug="worldcup-2026",
+        stage="1/8决赛",
+        team_a="瑞士",
+        team_b="哥伦比亚",
+        match_time=datetime(2026, 7, 8, 1, 0),
+        result_a=0,
+        result_b=0,
+        penalty_a=None,
+        penalty_b=None,
+    )
+    meta = history_match_overlay(m)
+    assert meta["penalty_a"] == 4 and meta["penalty_b"] == 3

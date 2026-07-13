@@ -242,6 +242,8 @@ export default {
     upsetScore: 'Upset',
     likelyScores: 'Likely scores',
     penaltyShort: 'Pens {score}',
+    extraTimeShort: 'AET',
+    extraTimeWithRegulation: 'FT {reg} · AET {final}',
     handicap: 'Hcp {line}',
     noMarketOdds: 'No market odds',
     noSporttery: 'Lottery not on sale',

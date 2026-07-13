@@ -1099,16 +1099,47 @@ def confirmed_scores_from_history(match) -> dict | None:
         return None
     if match_has_recorded_score(match):
         return None
+    item, reversed_match = _best_history_item_for_match(match)
+    if not item:
+        return None
+    ra, rb = int(item["result_a"]), int(item["result_b"])
+    pa, pb = item.get("penalty_a"), item.get("penalty_b")
+    if reversed_match:
+        ra, rb = rb, ra
+        if pa is not None and pb is not None:
+            pa, pb = pb, pa
+    out = {
+        "result_a": ra,
+        "result_b": rb,
+        "penalty_a": int(pa) if pa is not None else None,
+        "penalty_b": int(pb) if pb is not None else None,
+    }
+    if item.get("extra_time"):
+        out["extra_time"] = True
+    if item.get("regulation_a") is not None and item.get("regulation_b") is not None:
+        rga, rgb = int(item["regulation_a"]), int(item["regulation_b"])
+        if reversed_match:
+            rga, rgb = rgb, rga
+        out["regulation_a"] = rga
+        out["regulation_b"] = rgb
+    return out
+
+
+def _best_history_item_for_match(match) -> tuple[dict | None, bool]:
+    """Find the closest worldcup_history row for a fixture (kickoff window)."""
+    if getattr(match, "competition_slug", None) != "worldcup-2026":
+        return None, False
     from data.worldcup_history import HISTORICAL_MATCHES
 
     stage = getattr(match, "stage", "") or "小组赛"
     mt = effective_kickoff_naive(match) or getattr(match, "match_time", None)
     if mt is None:
-        return None
+        return None, False
     window = timedelta(minutes=45)
     ma, mb = getattr(match, "team_a", "") or "", getattr(match, "team_b", "") or ""
 
     best: dict | None = None
+    best_reversed = False
     best_delta = window.total_seconds() + 1
     for item in HISTORICAL_MATCHES:
         if item.get("year") != 2026:
@@ -1135,19 +1166,37 @@ def confirmed_scores_from_history(match) -> dict | None:
                 continue
         if delta <= best_delta:
             best_delta = delta
-            ra, rb = int(item["result_a"]), int(item["result_b"])
-            pa, pb = item.get("penalty_a"), item.get("penalty_b")
+            best = item
+            best_reversed = reversed_match
+    return best, best_reversed
+
+
+def history_match_overlay(match) -> dict:
+    """Overlay penalties / extra-time metadata from history onto an existing row."""
+    item, reversed_match = _best_history_item_for_match(match)
+    if not item:
+        return {}
+    ra = getattr(match, "result_a", None)
+    rb = getattr(match, "result_b", None)
+    pa = getattr(match, "penalty_a", None)
+    pb = getattr(match, "penalty_b", None)
+    out: dict = {}
+    if ra is not None and rb is not None and ra == rb and (pa is None or pb is None):
+        ipa, ipb = item.get("penalty_a"), item.get("penalty_b")
+        if ipa is not None and ipb is not None:
             if reversed_match:
-                ra, rb = rb, ra
-                if pa is not None and pb is not None:
-                    pa, pb = pb, pa
-            best = {
-                "result_a": ra,
-                "result_b": rb,
-                "penalty_a": int(pa) if pa is not None else None,
-                "penalty_b": int(pb) if pb is not None else None,
-            }
-    return best
+                ipa, ipb = ipb, ipa
+            out["penalty_a"] = int(ipa)
+            out["penalty_b"] = int(ipb)
+    if item.get("extra_time"):
+        out["extra_time"] = True
+    if item.get("regulation_a") is not None and item.get("regulation_b") is not None:
+        rga, rgb = int(item["regulation_a"]), int(item["regulation_b"])
+        if reversed_match:
+            rga, rgb = rgb, rga
+        out["regulation_a"] = rga
+        out["regulation_b"] = rgb
+    return out
 
 
 def match_has_display_score(match) -> bool:

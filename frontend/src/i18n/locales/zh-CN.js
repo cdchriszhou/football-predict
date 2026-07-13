@@ -245,6 +245,8 @@ export default {
     upsetScore: '冷门',
     likelyScores: '热门比分',
     penaltyShort: '点球 {score}',
+    extraTimeShort: '加时',
+    extraTimeWithRegulation: '常规 {reg} · 加时 {final}',
     handicap: '让{line}',
     noMarketOdds: '外围盘口暂无数据',
     noSporttery: '竞彩盘口暂未开售',
