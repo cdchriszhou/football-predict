@@ -66,6 +66,9 @@ def actual_score_for_match(
         if from_hist:
             return from_hist
     return f"{int(result_a)}:{int(result_b)}"
+
+
+def parse_best_score_payload(val) -> dict:
     """Parse best_score DB field — array, object, or legacy string."""
     empty = {"scores": [], "upset": None}
     if val is None:
