@@ -970,7 +970,8 @@ def test_knockout_germany_paraguay_includes_draw_secondary():
         rank_a=10, rank_b=40, stage="1/16决赛",
     )
     assert _score_outcome(scores[0]) == "win"
-    assert "1:1" in scores or _score_outcome(scores[1]) == "draw"
+    # Rank gap 30 — favour win cluster over ET draw secondary
+    assert _score_outcome(scores[1]) == "win"
 
 
 def test_knockout_r32_replay_hits():
@@ -1038,4 +1039,53 @@ def test_align_respects_crs_when_wdl_margin_small():
         win_rate=44.0, draw_rate=28.0, lose_rate=28.0,
     )
     assert out[0] == "0:2"
+
+
+def test_cap_knockout_wdl_pulls_inflated_draw():
+    from service.score_pick import cap_knockout_wdl_to_market
+
+    w, d, l = cap_knockout_wdl_to_market(
+        26.0, 44.0, 30.0, "1/8决赛",
+        sp_win=2.80, sp_draw=3.20, sp_lose=2.50,
+    )
+    assert d < 44.0
+    assert d <= 36.0
+
+
+def test_knockout_synthetic_crs_lowers_draw_for_clear_fav():
+    from service.score_pick import build_knockout_synthetic_crs, _score_outcome
+
+    crs = build_knockout_synthetic_crs(
+        2.1, 0.8,
+        win_rate=62.0, draw_rate=42.0, lose_rate=18.0,
+        sp_win=1.45, sp_draw=4.5, sp_lose=6.0,
+    )
+    assert crs
+    draw_scores = [s for s in crs if _score_outcome(s) == "draw"]
+    win_scores = [s for s in crs if _score_outcome(s) == "win"]
+    assert draw_scores and win_scores
+    best_draw = min(draw_scores, key=lambda s: crs[s])
+    best_win = min(win_scores, key=lambda s: crs[s])
+    assert crs[best_win] < crs[best_draw]
+
+
+def test_apply_stage_draw_skips_knockout_clear_fav():
+    from service.score_pick import apply_stage_draw_adjustment
+
+    w, d, l = apply_stage_draw_adjustment(
+        58.0, 24.0, 18.0, "1/8决赛", sp_win=1.45, sp_lose=6.5,
+    )
+    assert (w, d, l) == (58.0, 24.0, 18.0)
+
+
+def test_promote_knockout_blowout_when_xg_gap_large():
+    from service.score_pick import promote_knockout_blowout_scores
+
+    crs = {"1:1": 6.0, "0:1": 7.0, "0:2": 8.0, "0:3": 10.0, "1:2": 9.0}
+    out = promote_knockout_blowout_scores(
+        ["1:1", "0:1"], crs,
+        expected_a=0.9, expected_b=2.4,
+        stage="1/8决赛", win_rate=25.0, lose_rate=58.0, rank_gap=30,
+    )
+    assert out[0] in ("0:2", "0:3", "1:3")
 

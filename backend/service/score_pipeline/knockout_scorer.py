@@ -231,8 +231,8 @@ class KnockoutMarketScorer(BaseScorer):
         if et_prob < 0.12:
             return result
 
-        # Boost draw scores proportionally to ET probability
-        boost = et_prob * 0.8
+        # Boost draw scores proportionally to ET probability (halved — R16+ high-scoring)
+        boost = et_prob * 0.4
         for s in inp.score_odds:
             if ":" not in str(s):
                 continue
@@ -240,15 +240,15 @@ class KnockoutMarketScorer(BaseScorer):
                 ga, gb = map(int, s.split(":"))
             except ValueError:
                 continue
-            # Boost draws strongly
+            # Boost draws moderately
             if ga == gb:
-                result[s] = result.get(s, 0) + boost * 0.6
-            # Boost narrow 1-goal margins moderately
+                result[s] = result.get(s, 0) + boost * 0.35
+            # Boost narrow 1-goal margins slightly
             elif abs(ga - gb) == 1:
-                result[s] = result.get(s, 0) + boost * 0.3
+                result[s] = result.get(s, 0) + boost * 0.2
             # Demote blowouts
             elif abs(ga - gb) >= 3:
-                result[s] = result.get(s, 0) - boost * 0.4
+                result[s] = result.get(s, 0) - boost * 0.3
 
         return result
 
@@ -267,15 +267,15 @@ class KnockoutMarketScorer(BaseScorer):
             return result
 
         draw_odd = float(draw_odds)
-        # Stronger signal for lower draw odds
+        # Stronger signal for lower draw odds (halved vs original)
         if draw_odd < 2.8:
-            boost = 0.30
+            boost = 0.15
         elif draw_odd < 3.0:
-            boost = 0.20
+            boost = 0.10
         elif draw_odd < 3.2:
-            boost = 0.12
-        else:
             boost = 0.06
+        else:
+            boost = 0.03
 
         for s in inp.score_odds:
             if ":" not in str(s):

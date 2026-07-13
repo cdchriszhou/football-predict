@@ -302,7 +302,7 @@ def adjust_wdl_for_resilience(
     if bump <= 0:
         return win_rate, draw_rate, lose_rate
 
-    d_cap = float(cfg.get("RESILIENCE_DRAW_CAP", 40.0))
+    d_cap = float(cfg.get("RESILIENCE_DRAW_CAP", 30.0))
     d = min(d_cap, draw_rate + bump)
     if signals.get("fav_a"):
         w = max(36.0, win_rate - bump * 0.85)

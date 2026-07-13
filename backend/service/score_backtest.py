@@ -125,6 +125,9 @@ def _ensure_crs_for_backtest(
             stage=stage,
             rank_a=ra,
             rank_b=rb,
+            sp_win=odds_meta.get("win_win") if odds_meta else None,
+            sp_draw=odds_meta.get("draw") if odds_meta else None,
+            sp_lose=odds_meta.get("win_lose") if odds_meta else None,
         )
         if synth:
             return synth, "synthetic_ko"

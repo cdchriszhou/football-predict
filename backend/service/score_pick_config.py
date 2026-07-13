@@ -180,9 +180,9 @@ DEFAULT_CONFIG: ScorePickConfig = {
     "DRAW_GAP_CAP_STRICT": 1.2,
     "HOME_WIN_GAP_CAP": 4.0,
 
-    # Stage-based adjustments
+    # Stage-based adjustments (KO lowered — 2026 R16+ had 7/8 non-draw results)
     "STAGE_DRAW_BOOST_GROUP": 3.0,
-    "STAGE_DRAW_BOOST_KO": 8.0,
+    "STAGE_DRAW_BOOST_KO": 3.0,
     "STAGE_DRAW_BOOST_FINAL": 4.0,
 
     # Resilience adjustment (降低50%权重以避免过度预测平局)
@@ -248,18 +248,18 @@ DEFAULT_CONFIG: ScorePickConfig = {
     "MARKET_CRS_SCORER_WEIGHT": 0.30,
     "CONTEXT_SCORER_WEIGHT": 0.15,
     "RESILIENCE_SCORER_WEIGHT": 0.05,
-    "PIPELINE_USE_NEW_ENSEMBLE": True,
+    "PIPELINE_USE_NEW_ENSEMBLE": False,
     "AGGREGATOR_MIN_WEIGHT": 0.001,
 
     # New: Knockout stage parameters
     "KNOCKOUT_SCORER_WEIGHT": 0.10,
     "KO_ROUND_PARAMS": {
-        "1/16决赛": {"goal_reduction": 0.90, "draw_boost": 6.0, "et_base": 0.16},
-        "1/8决赛": {"goal_reduction": 0.88, "draw_boost": 7.0, "et_base": 0.18},
-        "1/4决赛": {"goal_reduction": 0.85, "draw_boost": 8.0, "et_base": 0.20},
-        "半决赛":  {"goal_reduction": 0.82, "draw_boost": 9.0, "et_base": 0.22},
-        "决赛":    {"goal_reduction": 0.80, "draw_boost": 8.0, "et_base": 0.25},
-        "季军赛":  {"goal_reduction": 0.95, "draw_boost": 4.0, "et_base": 0.10},
+        "1/16决赛": {"goal_reduction": 0.92, "draw_boost": 3.0, "et_base": 0.12},
+        "1/8决赛": {"goal_reduction": 0.90, "draw_boost": 3.0, "et_base": 0.12},
+        "1/4决赛": {"goal_reduction": 0.88, "draw_boost": 3.5, "et_base": 0.14},
+        "半决赛":  {"goal_reduction": 0.85, "draw_boost": 4.0, "et_base": 0.16},
+        "决赛":    {"goal_reduction": 0.83, "draw_boost": 4.0, "et_base": 0.18},
+        "季军赛":  {"goal_reduction": 0.95, "draw_boost": 2.5, "et_base": 0.08},
     },
 }
 

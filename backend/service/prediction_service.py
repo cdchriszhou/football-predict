@@ -719,6 +719,9 @@ class PredictionService:
                     stage=match.stage,
                     rank_a=(team_a_dict or {}).get("rank"),
                     rank_b=(team_b_dict or {}).get("rank"),
+                    sp_win=(market_odds or {}).get("win_win"),
+                    sp_draw=(market_odds or {}).get("draw"),
+                    sp_lose=(market_odds or {}).get("win_lose"),
                 )
                 if score_odds and match.stage not in ("", "小组赛"):
                     scores, upset, _, pick_warnings = run_full_score_pipeline(

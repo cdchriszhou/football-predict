@@ -67,8 +67,12 @@ def _knockout_favorite_primary(
     side: str,
 ) -> str | None:
     """Pick a realistic favourite win score (2:1 comeback-friendly, not only 0:0/1:1)."""
-    prefs_home = ["2:1", "1:0", "2:0", "3:1", "1:2"]
-    prefs_away = ["1:2", "0:1", "0:2", "1:3", "2:1"]
+    if abs(margin) >= 1.5:
+        prefs_home = ["2:0", "3:1", "2:1", "1:0", "3:0"]
+        prefs_away = ["0:2", "1:3", "1:2", "0:1", "0:3"]
+    else:
+        prefs_home = ["2:1", "1:0", "2:0", "3:1", "1:2"]
+        prefs_away = ["1:2", "0:1", "0:2", "1:3", "2:1"]
     prefs = prefs_home if side == "win" else prefs_away
     by_score = {s: p for s, p in ranked}
     for s in prefs:
@@ -84,19 +88,28 @@ def _knockout_favorite_secondary(
     rank_gap: int,
     win_rate: float,
     lose_rate: float,
+    draw_rate: float = 28.0,
+    xg_gap: float = 0.0,
 ) -> str:
-    """Moderate favourites keep 1:1 as secondary (ET path); heavy favourites cluster wins."""
+    """Heavy favourites cluster wins; ET draw only when matchup is genuinely tight."""
     heavy = (rank_gap >= 35) or (rank_gap >= 22 and max(win_rate, lose_rate) >= 58.0)
     if heavy:
         alt = _first_score_with_outcome(ranked, _score_outcome(primary), exclude={primary})
         if alt:
             return alt
         return "2:0" if _score_outcome(primary) == "win" else "0:2"
-    draw = _first_score_with_outcome(ranked, "draw")
-    if draw and draw != primary:
-        return draw
+    tight = (
+        rank_gap < 12
+        and max(win_rate, lose_rate) < 55.0
+        and draw_rate >= 30.0
+        and xg_gap < 1.0
+    )
+    if tight:
+        draw = _first_score_with_outcome(ranked, "draw")
+        if draw and draw != primary:
+            return draw
     alt = _first_score_with_outcome(ranked, _score_outcome(primary), exclude={primary})
-    return alt or ("1:1" if not heavy else primary)
+    return alt or ("2:1" if _score_outcome(primary) == "win" else "1:2")
 
 
 def finalize_knockout_score_picks(
@@ -142,9 +155,16 @@ def finalize_knockout_score_picks(
             rank_gap=rank_gap,
             win_rate=win_rate,
             lose_rate=lose_rate,
+            draw_rate=draw_rate,
+            xg_gap=abs(margin),
         )
-        # Moderate knockout favourite: keep 1:1 ET path in likely pair
-        if rank_gap < 22 and wdl_margin < 22:
+        # Only keep draw secondary for genuinely tight knockout matchups
+        if (
+            rank_gap < 12
+            and wdl_margin < 18
+            and draw_rate >= 32.0
+            and abs(margin) < 1.0
+        ):
             draw_alt = _first_score_with_outcome(ranked, "draw", exclude={primary})
             if draw_alt and draw_alt != primary:
                 secondary = draw_alt
@@ -198,6 +218,121 @@ def poisson_to_synthetic_crs(
     return out
 
 
+def _effective_knockout_draw_rate(
+    draw_rate: float,
+    *,
+    win_rate: float,
+    lose_rate: float,
+    sp_win: float | None = None,
+    sp_draw: float | None = None,
+    sp_lose: float | None = None,
+) -> float:
+    """Cap model draw for knockout synthetic CRS when market fav is clear."""
+    dr = float(draw_rate)
+    if sp_win and sp_draw and sp_lose:
+        try:
+            over = 1.0 / float(sp_win) + 1.0 / float(sp_draw) + 1.0 / float(sp_lose)
+            market_draw = (1.0 / float(sp_draw)) / over * 100.0
+            dr = min(dr, market_draw + 4.0)
+        except (TypeError, ValueError, ZeroDivisionError):
+            pass
+    clear_fav = (sp_win is not None and sp_win < 1.60) or (sp_lose is not None and sp_lose < 1.60)
+    if clear_fav:
+        dr = min(dr, 28.0)
+    if max(win_rate, lose_rate) >= 55.0 and abs(win_rate - lose_rate) >= 15.0:
+        dr = min(dr, 26.0)
+    return max(18.0, dr)
+
+
+def build_knockout_synthetic_crs(
+    expected_a: float,
+    expected_b: float,
+    *,
+    win_rate: float,
+    draw_rate: float,
+    lose_rate: float,
+    sp_win: float | None = None,
+    sp_draw: float | None = None,
+    sp_lose: float | None = None,
+) -> dict[str, float]:
+    """Poisson CRS for knockout, anchored to market W/D/L when book CRS missing."""
+    eff_dr = _effective_knockout_draw_rate(
+        draw_rate,
+        win_rate=win_rate,
+        lose_rate=lose_rate,
+        sp_win=sp_win,
+        sp_draw=sp_draw,
+        sp_lose=sp_lose,
+    )
+    out = poisson_to_synthetic_crs(expected_a, expected_b, eff_dr)
+    if not out:
+        return {}
+    dom = "win" if win_rate >= lose_rate else "lose"
+    for score in list(out.keys()):
+        outcome = _score_outcome(score)
+        try:
+            odd = float(out[score])
+        except (TypeError, ValueError):
+            continue
+        if outcome == dom:
+            out[score] = round(odd * 0.88, 2)
+        elif outcome == "draw":
+            out[score] = round(odd * 1.18, 2)
+    return out
+
+
+def cap_knockout_wdl_to_market(
+    win_rate: float,
+    draw_rate: float,
+    lose_rate: float,
+    stage: str | None,
+    *,
+    sp_win: float | None = None,
+    sp_draw: float | None = None,
+    sp_lose: float | None = None,
+) -> tuple[float, float, float]:
+    """Pull inflated model draw toward market implied draw in knockout rounds."""
+    if not is_knockout_stage(stage):
+        return win_rate, draw_rate, lose_rate
+    if not (sp_win and sp_draw and sp_lose):
+        return win_rate, draw_rate, lose_rate
+    try:
+        over = 1.0 / float(sp_win) + 1.0 / float(sp_draw) + 1.0 / float(sp_lose)
+        market_draw = (1.0 / float(sp_draw)) / over * 100.0
+    except (TypeError, ValueError, ZeroDivisionError):
+        return win_rate, draw_rate, lose_rate
+    if draw_rate <= market_draw + 10.0:
+        return win_rate, draw_rate, lose_rate
+    target_d = min(draw_rate, market_draw + 6.0)
+    shift = draw_rate - target_d
+    return _normalize_wdl(win_rate + shift / 2, target_d, lose_rate + shift / 2)
+
+
+def prefer_close_crs_secondary(
+    best_scores: list[str],
+    score_odds: dict[str, float] | None,
+    *,
+    stage: str | None = None,
+) -> list[str]:
+    """Knockout only: same-outcome secondary prefers tighter CRS neighbor (2:1 over 3:1)."""
+    if not is_knockout_stage(stage) or not best_scores or len(best_scores) < 2 or not score_odds:
+        return best_scores
+    primary, secondary = best_scores[0], best_scores[1]
+    if _score_outcome(primary) != _score_outcome(secondary):
+        return best_scores
+    alt = _best_same_outcome_alternate(_rank_crs(score_odds, set()), primary, gap_cap=4.0)
+    if not alt or alt == secondary:
+        return best_scores
+    try:
+        sec_total = sum(map(int, secondary.split(":")))
+        alt_total = sum(map(int, alt.split(":")))
+    except ValueError:
+        return best_scores
+    if alt_total < sec_total:
+        return [primary, alt]
+    return best_scores
+
+
 def prepare_pipeline_crs_and_hints(
     crs: dict[str, float] | None,
     *,
@@ -210,12 +345,15 @@ def prepare_pipeline_crs_and_hints(
     stage: str | None,
     rank_a: int | None = None,
     rank_b: int | None = None,
+    sp_win: float | None = None,
+    sp_draw: float | None = None,
+    sp_lose: float | None = None,
 ) -> tuple[dict[str, float], list[str], str | None]:
     """
     Normalize CRS input for run_full_score_pipeline.
 
-    Knockout fixtures without bookmaker CRS get Poisson-synthetic odds after
-    finalize_knockout_score_picks (same path as prediction_service).
+    Knockout fixtures without bookmaker CRS get market-anchored Poisson synthetic
+    odds after finalize_knockout_score_picks (same path as prediction_service).
     """
     hints = [s for s in (model_scores or []) if s and s != "?"]
     if crs:
@@ -236,7 +374,16 @@ def prepare_pipeline_crs_and_hints(
         stage=stage,
     )
     hints = ko_scores or hints
-    synthetic = poisson_to_synthetic_crs(expected_a, expected_b, draw_rate)
+    synthetic = build_knockout_synthetic_crs(
+        expected_a,
+        expected_b,
+        win_rate=win_rate,
+        draw_rate=draw_rate,
+        lose_rate=lose_rate,
+        sp_win=sp_win,
+        sp_draw=sp_draw,
+        sp_lose=sp_lose,
+    )
     if synthetic:
         return synthetic, hints, ko_upset
     return {}, hints, ko_upset
@@ -1090,6 +1237,52 @@ def promote_open_game_high_score(
     return best_scores
 
 
+def promote_knockout_blowout_scores(
+    best_scores: list[str],
+    score_odds: dict[str, float] | None,
+    *,
+    expected_a: float = 1.2,
+    expected_b: float = 1.0,
+    stage: str | None = None,
+    win_rate: float = 50.0,
+    lose_rate: float = 50.0,
+    rank_gap: int = 0,
+) -> list[str]:
+    """Knockout: when xG/rank gap implies rout, promote 2:0+ over draw cluster."""
+    if not is_knockout_stage(stage) or not best_scores or not score_odds:
+        return best_scores
+    xg_gap = abs(expected_a - expected_b)
+    if xg_gap < 1.5 and rank_gap < 25:
+        return best_scores
+    ranked = _rank_crs(score_odds, set())
+    if not ranked:
+        return best_scores
+    cmap = _crs_map(ranked)
+    fav_side = "win" if expected_a >= expected_b else "lose"
+    if fav_side == "win" and win_rate + 5 < lose_rate:
+        fav_side = "lose"
+    elif fav_side == "lose" and lose_rate + 5 < win_rate:
+        fav_side = "win"
+    prefs = (
+        ["3:0", "2:0", "3:1", "2:1", "4:0"]
+        if fav_side == "win"
+        else ["0:3", "0:2", "1:3", "1:2", "0:4"]
+    )
+    primary = best_scores[0]
+    pri_out = _score_outcome(primary)
+    if pri_out == fav_side:
+        return best_scores
+    for score in prefs:
+        if score not in cmap or _score_outcome(score) != fav_side:
+            continue
+        secondary = best_scores[1] if len(best_scores) > 1 else score
+        if _score_outcome(secondary) == fav_side:
+            return [score, secondary]
+        alt = _best_same_outcome_alternate(ranked, score, gap_cap=6.0)
+        return [score, alt or secondary]
+    return best_scores
+
+
 def promote_narrow_home_win_over_draw(
     best_scores: list[str],
     score_odds: dict[str, float] | None,
@@ -1116,15 +1309,8 @@ def promote_narrow_home_win_over_draw(
 
 def _stage_draw_promotion_boost(stage: str | None) -> float:
     """Extra draw weight for CRS draw-promotion rules only (not global W/D/L)."""
-    if not stage:
-        return 0.0
-    if stage == "小组赛":
-        return 5.0    # was 4.0
-    if stage in ("1/16决赛", "1/8决赛", "1/4决赛", "半决赛"):
-        return 8.0    # was 6.0
-    if stage in ("季军赛", "决赛"):
-        return 4.0    # was 3.0
-    return 0.0
+    from service.score_pick_config import stage_draw_boost
+    return stage_draw_boost(stage)
 
 
 def prefer_poisson_primary_when_close(
@@ -1640,10 +1826,18 @@ def run_full_score_pipeline(
         stage=stage,
         rank_a=rank_a,
         rank_b=rank_b,
+        sp_win=sp_win,
+        sp_draw=sp_draw,
+        sp_lose=sp_lose,
     )
     if not crs:
         fallback = hints[:2] if hints else ["?"]
         return fallback, pre_upset, fallback + ([pre_upset] if pre_upset else []), []
+
+    win_rate, draw_rate, lose_rate = cap_knockout_wdl_to_market(
+        win_rate, draw_rate, lose_rate, stage,
+        sp_win=sp_win, sp_draw=sp_draw, sp_lose=sp_lose,
+    )
 
     # ── New weighted-ensemble pipeline (feature-flagged) ──
     from service.score_pick_config import get_config
@@ -1765,6 +1959,13 @@ def run_full_score_pipeline(
         expected_a=expected_a, expected_b=expected_b,
         win_rate=win_rate, lose_rate=lose_rate,
     )
+    gap = abs(int(rank_a or 50) - int(rank_b or 50))
+    best = promote_knockout_blowout_scores(
+        best, crs,
+        expected_a=expected_a, expected_b=expected_b,
+        stage=stage, win_rate=win_rate, lose_rate=lose_rate,
+        rank_gap=gap,
+    )
     best = promote_narrow_home_win_over_draw(
         best, crs, win_rate=win_rate, lose_rate=lose_rate,
     )
@@ -1784,6 +1985,7 @@ def run_full_score_pipeline(
         team_a=team_a or {},
         team_b=team_b or {},
     )
+    best = prefer_close_crs_secondary(best, crs, stage=stage)
     best = align_score_picks_to_wdl(
         best,
         crs,
@@ -1799,7 +2001,6 @@ def run_full_score_pipeline(
                if rank_a is not None and rank_b is not None else {}),
         },
     )
-    gap = abs(int(rank_a or 50) - int(rank_b or 50))
     best = ensure_rout_score_in_likely_pair(
         best, crs, sp_win=sp_win, sp_lose=sp_lose, win_rate=win_rate, lose_rate=lose_rate,
         rank_gap=gap, resilience=_resilience, draw_rate=draw_rate,
@@ -2534,10 +2735,10 @@ def apply_stage_draw_adjustment(
     sp_win: float | None = None,
     sp_lose: float | None = None,
 ) -> tuple[float, float, float]:
-    """Stage-based draw uplift — tuned for 2026 World Cup 32%+ observed draw rate.
+    """Stage-based draw uplift — tuned for 2026 World Cup observed draw rate.
 
     Boost is scaled down when the market strongly favours one side (sp < 1.60),
-    since clear favourites draw less often.
+    since clear favourites draw less often. Knockout clear favourites skip uplift.
     """
     if not stage:
         return win_rate, draw_rate, lose_rate
@@ -2548,8 +2749,11 @@ def apply_stage_draw_adjustment(
     if boost <= 0:
         return win_rate, draw_rate, lose_rate
 
-    # Scale down boost for clear favourites (they draw less often)
     clear_fav = (sp_win is not None and sp_win < 1.60) or (sp_lose is not None and sp_lose < 1.60)
+    if clear_fav and is_knockout_stage(stage):
+        return win_rate, draw_rate, lose_rate
+
+    # Scale down boost for clear favourites (they draw less often)
     if clear_fav:
         boost *= 0.40   # reduce boost for one-sided matchups
 
