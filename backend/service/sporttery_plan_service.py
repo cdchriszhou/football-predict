@@ -7,7 +7,9 @@ For reference only; not betting advice.
 """
 from __future__ import annotations
 
+import asyncio
 import json
+import re
 from datetime import datetime, date as date_type, timedelta
 from math import prod
 from statistics import mean
@@ -24,6 +26,7 @@ from crawler.sporttery_client import (
     to_db_odds,
 )
 from utils.datetime_helpers import CHINA_TZ, china_now, china_today
+from utils.logger import logger
 from db.models import Match, Odds, Prediction, Team
 from data.status_constants import MATCH_LIVE, MATCH_UPCOMING, PLAYER_ACTIVE, match_status_in_db_values
 from service.calibration_service import CalibratedRuleEngine
@@ -66,6 +69,82 @@ _BLEND_WEIGHTS = {
     "market": 0.20,
     "sporttery": 0.15,
 }
+
+
+def _prediction_has_llm(pred: Optional[Prediction]) -> bool:
+    if not pred:
+        return False
+    mu = (pred.model_used or "").lower()
+    return any(x in mu for x in ("deepseek", "qwen", "glm"))
+
+
+def _parse_llm_score_refs(reason: str | None) -> list[dict]:
+    """Extract per-model score hints from fused prediction reason ([deepseek] … | [glm] …)."""
+    if not reason:
+        return []
+    from crawler.sporttery_client import normalize_score_line
+
+    refs: list[dict] = []
+    for part in reason.split("|"):
+        part = part.strip()
+        m = re.match(r"\[([^\]]+)\]", part)
+        if not m:
+            continue
+        tag = m.group(1).lower()
+        if tag not in ("deepseek", "qwen", "glm"):
+            continue
+        model = {
+            "deepseek": "DeepSeek",
+            "qwen": "Qwen",
+            "glm": "GLM",
+        }.get(tag, m.group(1))
+        scores: list[str] = []
+        for raw in re.findall(r"\d+[:：\-]\d+", part):
+            s = normalize_score_line(raw.replace("-", ":"))
+            if s and s not in scores:
+                scores.append(s)
+        snippet = part[m.end():].strip()
+        refs.append({
+            "model": model,
+            "scores": scores[:3],
+            "snippet": snippet[:100] if snippet else "",
+        })
+    return refs
+
+
+async def _ensure_llm_predictions(db: AsyncSession, match_ids: list[int]) -> dict[int, Prediction]:
+    """Run multi-LLM predict for plan matches missing DeepSeek/GLM/Qwen fusion."""
+    preds = await _latest_predictions(db, match_ids)
+    if not match_ids:
+        return preds
+
+    from service.prediction_service import PredictionService, get_configured_models
+
+    if not get_configured_models():
+        return preds
+
+    need = [mid for mid in match_ids if not _prediction_has_llm(preds.get(mid))]
+    if not need:
+        return preds
+
+    from db import async_session
+
+    async def _predict_one(mid: int) -> None:
+        try:
+            async with async_session() as sess:
+                await PredictionService().predict_match(mid, sess, model="auto", skip_cache=False)
+        except Exception as exc:
+            logger.warning("sporttery plan LLM predict failed match %s: %s", mid, exc)
+
+    try:
+        await asyncio.wait_for(
+            asyncio.gather(*[_predict_one(m) for m in need]),
+            timeout=min(55.0, 28.0 * len(need)),
+        )
+    except asyncio.TimeoutError:
+        logger.warning("sporttery plan LLM predict timeout for match_ids=%s", need)
+
+    return await _latest_predictions(db, match_ids)
 
 
 def _is_competition_league(league: str, hints: tuple[str, ...]) -> bool:
@@ -641,15 +720,26 @@ async def _build_match_analysis(
                 "lose": rule_lose,
             },
         },
+        "llm_score_refs": _parse_llm_score_refs(prediction.reason if prediction else None),
         "fused_recommendation": blend,
         "alerts": context_analysis.alerts + fused.get("market_signals", {}).get("alerts", [])[:3],
     }
+
+    llm_refs = references["llm_score_refs"]
+    if llm_refs:
+        primaries = {r["scores"][0] for r in llm_refs if r.get("scores")}
+        if len(primaries) > 1:
+            references["alerts"] = list(references["alerts"]) + ["多模型比分存在分歧，体彩方案置信度下调"]
 
     return {
         "has_db_match": True,
         "blend": blend,
         "references": references,
-        "confidence_penalty": context_analysis.confidence_penalty,
+        "llm_score_refs": llm_refs,
+        "has_llm_prediction": _prediction_has_llm(prediction),
+        "confidence_penalty": context_analysis.confidence_penalty + (
+            0.10 if not _prediction_has_llm(prediction) else 0.0
+        ),
         "alerts": references["alerts"],
         "matchday": matchday,
         "rule_result": rule_result,
@@ -787,10 +877,29 @@ def _build_score_reason(
     analysis: dict,
 ) -> str:
     parts: list[str] = []
-    if rank == 0:
-        parts.append(f"模型首推比分 {scoreline}")
+    llm_refs = analysis.get("llm_score_refs") or []
+    has_llm = analysis.get("has_llm_prediction") or bool(llm_refs)
+
+    if has_llm:
+        if rank == 0:
+            parts.append(f"AI融合首推比分 {scoreline}")
+        else:
+            parts.append(f"AI融合候选比分 {scoreline}（第{rank + 1}位）")
+        llm_bits: list[str] = []
+        for ref in llm_refs[:4]:
+            sc = ref.get("scores") or []
+            if sc:
+                llm_bits.append(f"{ref['model']} {'/'.join(sc[:2])}")
+        if llm_bits:
+            parts.append("各模型参考：" + "；".join(llm_bits))
+        primaries = {r["scores"][0] for r in llm_refs if r.get("scores")}
+        if len(primaries) > 1:
+            parts.append("DeepSeek/GLM 等模型首推不一致，请谨慎参考")
     else:
-        parts.append(f"模型预测比分 {scoreline}（第{rank + 1}候选）")
+        if rank == 0:
+            parts.append(f"体彩CRS热门比分 {scoreline}（暂无 AI 预测，非模型定论）")
+        else:
+            parts.append(f"CRS 次热比分 {scoreline}（第{rank + 1}候选）")
 
     alts = [s for s in model_scores if s != scoreline][:2]
     if alts:
@@ -806,8 +915,11 @@ def _build_score_reason(
 
     ai = refs.get("models", {}).get("ai")
     if ai:
-        parts.append(f"AI融合{ai.get('model', 'auto')} 胜/平/负 {ai.get('win', 0):.0f}/{ai.get('draw', 0):.0f}/{ai.get('lose', 0):.0f}%")
-    else:
+        parts.append(
+            f"AI融合({ai.get('model', 'auto')}) 胜/平/负 "
+            f"{ai.get('win', 0):.0f}/{ai.get('draw', 0):.0f}/{ai.get('lose', 0):.0f}%"
+        )
+    elif not has_llm:
         rule = refs.get("models", {}).get("rule_engine", {})
         if rule:
             parts.append(
@@ -821,7 +933,7 @@ def _build_score_reason(
     if alerts:
         parts.append(alerts[0])
 
-    return "；".join(parts[:4])
+    return "；".join(parts[:5])
 
 
 def _calc_score_confidence(
@@ -1041,6 +1153,8 @@ def _build_single_pick(
         "odds": pick_odd,
         "bet": _bet_payout(pick_odd),
         "confidence": conf,
+        "score_source": "ai_fusion" if analysis.get("has_llm_prediction") else "crs_fallback",
+        "llm_refs": analysis.get("llm_score_refs") or [],
         "model_win_rate": blend["win"],
         "model_draw_rate": blend["draw"],
         "model_lose_rate": blend["lose"],
@@ -1217,7 +1331,7 @@ async def _build_singles_from_st_matches(
             db_by_st[i] = dm
             match_ids.append(dm.id)
 
-    preds = await _latest_predictions(db, match_ids)
+    preds = await _ensure_llm_predictions(db, match_ids)
     singles: list[dict] = []
     for i, st in enumerate(st_matches):
         dm = db_by_st.get(i)

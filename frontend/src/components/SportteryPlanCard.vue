@@ -4,6 +4,9 @@
       <span class="match-num">{{ pick.match_num }}</span>
       <span class="kickoff">{{ formatKickoff(pick.kickoff) }}</span>
       <el-tag v-if="preview" size="small" type="info">{{ saleDateLabel }}</el-tag>
+      <el-tag v-else-if="pick.score_source === 'crs_fallback'" size="small" type="info">
+        {{ t('sportteryPlan.crsFallbackTag') }}
+      </el-tag>
       <el-tag size="small" type="warning">{{ t('sportteryPlan.playCrs') }}</el-tag>
     </div>
 
@@ -50,16 +53,24 @@
       >
         {{ t('sportteryPlan.cardViewMatch') }}
       </router-link>
-      <el-popover v-if="pick.references" placement="top" :width="360" trigger="click">
+      <el-popover v-if="pick.references || pick.llm_refs?.length" placement="top" :width="360" trigger="click">
         <template #reference>
           <el-button link type="primary" size="small" @click.stop>{{ t('sportteryPlan.viewRefs') }}</el-button>
         </template>
         <div class="refs-popover">
           <p class="refs-title">{{ t('sportteryPlan.refsTitle') }}</p>
-          <div class="refs-tags">
+          <div v-if="pick.data_sources?.length" class="refs-tags">
             <el-tag v-for="src in pick.data_sources" :key="src" size="small" style="margin:2px">{{ src }}</el-tag>
           </div>
-          <template v-if="pick.references.teams">
+          <template v-if="pick.llm_refs?.length">
+            <p class="refs-sub">{{ t('sportteryPlan.refsLlmScores') }}</p>
+            <div v-for="(ref, i) in pick.llm_refs" :key="i" class="llm-ref-line">
+              <strong>{{ ref.model }}</strong>
+              <span v-if="ref.scores?.length">{{ ref.scores.join(' / ') }}</span>
+              <span v-else class="muted">{{ t('sportteryPlan.refsLlmNoScore') }}</span>
+            </div>
+          </template>
+          <template v-if="pick.references?.teams">
             <p class="refs-sub">{{ t('sportteryPlan.refsTeams') }}</p>
             <div v-for="side in ['team_a', 'team_b']" :key="side" class="team-ref">
               <template v-if="pick.references.teams[side]?.available">
@@ -68,7 +79,7 @@
               </template>
             </div>
           </template>
-          <template v-if="pick.references.alerts?.length">
+          <template v-if="pick.references?.alerts?.length">
             <p class="refs-sub">{{ t('sportteryPlan.refsAlerts') }}</p>
             <p v-for="(a, i) in pick.references.alerts" :key="i" class="alert-line">{{ a }}</p>
           </template>
@@ -289,5 +300,15 @@ function formatKickoff(iso) {
 .alert-line {
   color: #e6a23c;
   margin: 2px 0;
+}
+.llm-ref-line {
+  margin: 4px 0;
+  font-size: 13px;
+}
+.llm-ref-line strong {
+  margin-right: 6px;
+}
+.llm-ref-line .muted {
+  color: #909399;
 }
 </style>
