@@ -196,8 +196,11 @@ const canShowSportteryEmpty = computed(
 )
 
 function displayTeamName(name) {
-  if (!name || String(name).startsWith('第')) return t('bracket.tbd')
-  return name
+  if (!name) return t('bracket.tbd')
+  const s = String(name)
+  // Feeder placeholders (第N场胜者/负者) — show TBD; real nation names never match.
+  if (/^第\d+场/.test(s)) return t('bracket.tbd')
+  return s
 }
 
 function fmt(v) {

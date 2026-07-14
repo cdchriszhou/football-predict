@@ -284,6 +284,22 @@ async def get_match_stages(
     return success(stages)
 
 
+async def _ensure_knockout_display_ready(db: AsyncSession, comp_slug: str) -> None:
+    """Advance feeder placeholders so dashboard/recent APIs show real team names."""
+    if comp_slug != "worldcup-2026":
+        return
+    try:
+        from data.knockout_advance import advance_knockout_teams, invalidate_knockout_slot_index_cache
+        from service.write_guard import is_heavy_job_running
+
+        if not is_heavy_job_running():
+            updated = await advance_knockout_teams(db, comp_slug, flush=True)
+            if updated:
+                invalidate_knockout_slot_index_cache(comp_slug)
+    except Exception:
+        pass
+
+
 @router.get("/recent-results")
 async def get_recent_results(
     competition: str = Query("worldcup-2026"),
@@ -295,6 +311,7 @@ async def get_recent_results(
     """Recently finished matches with scores (for dashboard)."""
     comp_slug = resolve_competition(competition)
     await _ensure_results_synced(db, comp_slug)
+    await _ensure_knockout_display_ready(db, comp_slug)
     cutoff = china_now().replace(tzinfo=None) - timedelta(hours=hours)
     filters = [
         Match.competition_slug == comp_slug,
@@ -326,6 +343,7 @@ async def get_today_matches(
 ):
     comp_slug = resolve_competition(competition)
     await _ensure_results_synced(db, comp_slug)
+    await _ensure_knockout_display_ready(db, comp_slug)
     today_start, today_end = beijing_day_bounds_naive()
     # Wider DB window so canonical kickoff (may differ from stale match_time) still matches today.
     query_start = today_start - timedelta(days=1)

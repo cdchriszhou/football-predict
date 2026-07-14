@@ -84,6 +84,60 @@ def test_resolve_r16_from_finished_r32():
     assert ta == "巴西"
 
 
+def test_display_teams_resolves_via_kickoff_and_history():
+    """Dashboard may return QF rows whose id is absent from the slot index."""
+    from datetime import datetime
+
+    r16 = {
+        89: {
+            "id": 201, "stage": "1/8决赛", "team_a": "法国", "team_b": "巴拉圭",
+            "result_a": 1, "result_b": 0, "penalty_a": None, "penalty_b": None,
+            "match_time": datetime(2026, 7, 5, 5, 0),
+        },
+        90: {
+            "id": 202, "stage": "1/8决赛", "team_a": "加拿大", "team_b": "摩洛哥",
+            "result_a": 0, "result_b": 3, "penalty_a": None, "penalty_b": None,
+            "match_time": datetime(2026, 7, 5, 0, 0),
+        },
+    }
+    # Finished QF still has feeder placeholders; id not present in by_no.
+    qf = SimpleNamespace(
+        id=9999,
+        stage="1/4决赛",
+        team_a="第89场胜者",
+        team_b="第90场胜者",
+        match_time=datetime(2026, 7, 10, 4, 0),
+        competition_slug="worldcup-2026",
+        result_a=2,
+        result_b=0,
+        penalty_a=None,
+        penalty_b=None,
+    )
+    ta, tb = display_teams_for_match(qf, r16)
+    assert ta == "法国"
+    assert tb == "摩洛哥"
+
+
+def test_display_teams_history_fallback_when_feeders_missing():
+    from datetime import datetime
+
+    qf = SimpleNamespace(
+        id=8888,
+        stage="1/4决赛",
+        team_a="第93场胜者",
+        team_b="第94场胜者",
+        match_time=datetime(2026, 7, 11, 0, 0),
+        competition_slug="worldcup-2026",
+        result_a=2,
+        result_b=1,
+        penalty_a=None,
+        penalty_b=None,
+    )
+    ta, tb = display_teams_for_match(qf, {})
+    assert ta == "西班牙"
+    assert tb == "比利时"
+
+
 def test_materialize_knockout_slot_index_produces_dicts():
     row = {
         "id": 77, "stage": "1/16决赛", "team_a": "法国", "team_b": "瑞典",

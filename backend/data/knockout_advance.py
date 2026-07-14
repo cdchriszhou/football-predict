@@ -418,6 +418,45 @@ def _clean_team_label(name: str | None) -> str:
     return str(name)
 
 
+def _match_no_for_row(m: Any, by_no: dict[int, Any]) -> int | None:
+    """Map a DB/API row to FIFA match_no (id first, then kickoff window)."""
+    mid = _field(m, "id")
+    if mid is not None:
+        for no, row in by_no.items():
+            if _field(row, "id") == mid:
+                return no
+
+    stage = _field(m, "stage")
+    mt = _parse_kickoff(_field(m, "match_time"))
+    if not stage or not mt:
+        return None
+    best_no = None
+    best_delta = KICKOFF_TOLERANCE_SEC + 1
+    for no, fx in FIXTURE_BY_NO.items():
+        if fx.get("stage") != stage:
+            continue
+        fx_mt = _parse_kickoff(fx.get("match_time"))
+        delta = _kickoff_delta(mt, fx_mt)
+        if delta is not None and delta <= KICKOFF_TOLERANCE_SEC and delta < best_delta:
+            best_no, best_delta = no, delta
+    return best_no
+
+
+def _history_teams_for_match(m: Any) -> tuple[str, str]:
+    """Fallback team names from worldcup_history when DB still has feeder placeholders."""
+    try:
+        from data.match_status import _best_history_item_for_match
+    except Exception:
+        return "", ""
+    item, reversed_match = _best_history_item_for_match(m)
+    if not item:
+        return "", ""
+    ta, tb = item["team_a"], item["team_b"]
+    if reversed_match:
+        ta, tb = tb, ta
+    return _clean_team_label(ta), _clean_team_label(tb)
+
+
 def display_teams_for_match(m: Match, by_no: dict[int, Any]) -> tuple[str, str]:
     """Resolve feeder placeholders to real team names for API display."""
     db_a = _clean_team_label(m.team_a)
@@ -425,26 +464,27 @@ def display_teams_for_match(m: Match, by_no: dict[int, Any]) -> tuple[str, str]:
     if db_a and db_b:
         return db_a, db_b
 
-    if not by_no:
-        return db_a, db_b
+    ta, tb = db_a, db_b
+    match_no = _match_no_for_row(m, by_no or {})
+    if match_no is not None and by_no:
+        fx = FIXTURE_BY_NO.get(match_no)
+        if fx:
+            resolved_a, resolved_b = resolve_fixture_teams(match_no, by_no)
+            if not fx["team_a"].startswith("第"):
+                ta = fx["team_a"]
+            elif resolved_a:
+                ta = resolved_a
+            if not fx["team_b"].startswith("第"):
+                tb = fx["team_b"]
+            elif resolved_b:
+                tb = resolved_b
 
-    match_no = None
-    mid = _field(m, "id")
-    for no, row in by_no.items():
-        if _field(row, "id") == mid:
-            match_no = no
-            break
-    if match_no is None:
-        return _clean_team_label(m.team_a), _clean_team_label(m.team_b)
+    if not ta or not tb:
+        hist_a, hist_b = _history_teams_for_match(m)
+        ta = ta or hist_a
+        tb = tb or hist_b
 
-    fx = FIXTURE_BY_NO.get(match_no)
-    if not fx:
-        return _clean_team_label(m.team_a), _clean_team_label(m.team_b)
-
-    resolved_a, resolved_b = resolve_fixture_teams(match_no, by_no)
-    ta = fx["team_a"] if not fx["team_a"].startswith("第") else (resolved_a or "")
-    tb = fx["team_b"] if not fx["team_b"].startswith("第") else (resolved_b or "")
-    return ta, tb
+    return ta or db_a, tb or db_b
 
 
 async def advance_knockout_teams(
