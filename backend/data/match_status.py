@@ -122,7 +122,10 @@ async def backfill_team_seasons(db: AsyncSession, slug: str) -> int:
 def _dedupe_fixture_key(slug: str, m: Match) -> tuple:
     """Grouping key for duplicate fixture detection."""
     if slug == "worldcup-2026":
-        pair = tuple(sorted([m.team_a, m.team_b]))
+        # Knockout: same official kickoff slot = same fixture (seed placeholder vs advanced names).
+        if m.stage and m.stage != "小组赛" and m.match_time is not None:
+            return ("ko_kickoff", m.stage, m.match_time.replace(microsecond=0))
+        pair = tuple(sorted([m.team_a or "", m.team_b or ""]))
         return (m.stage, m.group_name or "", pair)
     return (m.stage, m.group_name or "", m.team_a, m.team_b)
 

@@ -115,19 +115,22 @@
       </el-col>
     </el-row>
 
-    <!-- Recent finished results (World Cup) -->
-    <el-card v-if="compStore.isWorldCup" class="section-card" style="margin-top: 20px">
+    <!-- Recent finished results (World Cup) — skip when all already shown in 今日赛果 -->
+    <el-card
+      v-if="compStore.isWorldCup && displayedRecentResults.length"
+      class="section-card"
+      style="margin-top: 20px"
+    >
       <template #header>
         <div class="flex-between">
           <span class="card-title">{{ t('dashboard.recentResults') }}</span>
           <el-button text type="primary" @click="goMatches">{{ t('dashboard.viewFullSchedule') }}</el-button>
         </div>
       </template>
-      <el-empty v-if="store.recentResults.length === 0" :description="t('dashboard.noRecentResults')" />
-      <el-row v-else :gutter="16">
+      <el-row :gutter="16">
         <el-col
           :xs="24" :sm="12" :lg="8"
-          v-for="m in store.recentResults"
+          v-for="m in displayedRecentResults"
           :key="'recent-' + m.id"
         >
           <MatchCard :match="m" />
@@ -359,7 +362,13 @@ const displayTodayMatches = computed(() => {
   for (const m of store.todayMatches) {
     if (beijingDateKey(m.match_time) === todayKey) byId.set(m.id, m)
   }
-  // If /today timed out or returned empty, reuse recent-results as fallback.
+  // Rest day / empty today: show latest finished results, but keep one section only
+  // (exclude them from 「最近赛果」 via displayedRecentResults).
+  if (!byId.size && compStore.isWorldCup) {
+    for (const m of store.todayMatches) {
+      byId.set(m.id, m)
+    }
+  }
   if (!byId.size && compStore.isWorldCup) {
     for (const m of store.recentResults) {
       byId.set(m.id, m)
@@ -368,10 +377,38 @@ const displayTodayMatches = computed(() => {
   const rows = [...byId.values()].sort(
     (a, b) => new Date(a.match_time || 0) - new Date(b.match_time || 0),
   )
-  const withScore = rows.filter(
+  // Dedupe by stage + team pair in case API returns placeholder + advanced rows.
+  const seenPairs = new Set()
+  const deduped = []
+  for (const m of rows) {
+    const pairKey = [
+      m.stage || '',
+      [m.team_a || '', m.team_b || ''].map(String).sort().join('|'),
+      beijingDateKey(m.match_time),
+    ].join('::')
+    if (seenPairs.has(pairKey)) continue
+    seenPairs.add(pairKey)
+    deduped.push(m)
+  }
+  const withScore = deduped.filter(
     (m) => isEffectiveMatchStatus(m, 'finished') || isEffectiveMatchStatus(m, 'live'),
   )
-  return withScore.length ? withScore : rows
+  return withScore.length ? withScore : deduped
+})
+
+/** Recent results excluding matches already shown under 「今日赛果」. */
+const displayedRecentResults = computed(() => {
+  const todayIds = new Set(displayTodayMatches.value.map((m) => m.id))
+  const seenPairs = new Set(
+    displayTodayMatches.value.map((m) =>
+      [m.stage || '', [m.team_a || '', m.team_b || ''].map(String).sort().join('|')].join('::'),
+    ),
+  )
+  return store.recentResults.filter((m) => {
+    if (todayIds.has(m.id)) return false
+    const pairKey = [m.stage || '', [m.team_a || '', m.team_b || ''].map(String).sort().join('|')].join('::')
+    return !seenPairs.has(pairKey)
+  })
 })
 
 const upcomingPreviewLimit = computed(() => (compStore.isWorldCup ? 12 : 6))

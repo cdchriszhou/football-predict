@@ -326,10 +326,19 @@ async def get_recent_results(
     )).scalars().all()
     ko_index = await _knockout_by_no(db, comp_slug)
     data: list[dict] = []
+    seen_pairs: set[tuple] = set()
     for m in matches:
         row = match_to_dict(m, knockout_by_no=ko_index)
-        if row.get("result_a") is not None and row.get("result_b") is not None:
-            data.append(row)
+        if row.get("result_a") is None or row.get("result_b") is None:
+            continue
+        key = (
+            row.get("stage") or "",
+            tuple(sorted([row.get("team_a") or "", row.get("team_b") or ""])),
+        )
+        if key in seen_pairs:
+            continue
+        seen_pairs.add(key)
+        data.append(row)
         if len(data) >= limit:
             break
     return success(data)
@@ -363,25 +372,50 @@ async def get_today_matches(
 
     kickoff_today = [m for m in matches if include_in_today_dashboard(m)]
     source = kickoff_today
-    # Rest day: 今日赛果 still shows yesterday's finished fixtures (World Cup).
+    # Rest day: 今日赛果 shows the latest finished matchday within a short lookback
+    # (not only calendar yesterday — knockout gaps often span 1–2 rest days).
     if comp_slug == "worldcup-2026" and not kickoff_today:
-        recent_cutoff = today_start - timedelta(days=1)
-        source = list((await db.execute(
+        lookback_start = today_start - timedelta(days=4)
+        recent_rows = list((await db.execute(
             select(Match).where(
                 Match.competition_slug == comp_slug,
                 Match.match_time.isnot(None),
-                Match.match_time >= recent_cutoff,
+                Match.match_time >= lookback_start,
                 Match.match_time < today_start,
-            ).order_by(Match.match_time.asc())
+            ).order_by(Match.match_time.desc())
         )).scalars().all())
+        ko_index_preview = await _knockout_by_no(db, comp_slug)
+        scored: list[Match] = []
+        for m in recent_rows:
+            row = match_to_dict(m, knockout_by_no=ko_index_preview)
+            if row.get("result_a") is not None and row.get("result_b") is not None:
+                scored.append(m)
+        if scored:
+            # Keep the most recent calendar day that had finished fixtures.
+            last_day = scored[0].match_time.date()
+            source = sorted(
+                [m for m in scored if m.match_time and m.match_time.date() == last_day],
+                key=lambda m: m.match_time or today_start,
+            )
 
     ko_index = await _knockout_by_no(db, comp_slug)
     data = [match_to_dict(m, knockout_by_no=ko_index) for m in source]
     if comp_slug == "worldcup-2026" and not kickoff_today:
-        data = [
-            d for d in data
-            if d.get("result_a") is not None and d.get("result_b") is not None
-        ]
+        # Dedupe by display teams in case placeholder + advanced rows both scored.
+        seen: set[tuple] = set()
+        deduped: list[dict] = []
+        for d in data:
+            if d.get("result_a") is None or d.get("result_b") is None:
+                continue
+            key = (
+                d.get("stage") or "",
+                tuple(sorted([d.get("team_a") or "", d.get("team_b") or ""])),
+            )
+            if key in seen:
+                continue
+            seen.add(key)
+            deduped.append(d)
+        data = deduped
     return success(data)
 
 
