@@ -9,8 +9,12 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from db.models import Team, Player, Odds, Match
 from data.status_constants import MATCH_LIVE, MATCH_UPCOMING, match_status_in_db_values
-from db.redis_client import cache_get, cache_set
-from llm.deepseek_client import create_llm_client, _call_api, _parse_response
+from data.knockout_advance import (
+    display_teams_for_match,
+    load_knockout_slot_index_cached,
+    match_winner,
+)
+from llm.deepseek_client import create_llm_client, _call_api
 from service.prediction_service import get_configured_models
 from crawler.odds_scraper import DK_GROUP_ODDS, american_to_prob
 from utils.logger import logger
@@ -50,6 +54,188 @@ GROUPS = {
     "K": ["葡萄牙", "刚果(金)", "乌兹别克斯坦", "哥伦比亚"],
     "L": ["英格兰", "克罗地亚", "加纳", "巴拿马"],
 }
+
+
+def _is_real_team_name(name: str | None) -> bool:
+    if not name or not str(name).strip():
+        return False
+    s = str(name).strip()
+    if s.startswith("第") or s in ("?", "待定", "TBD"):
+        return False
+    if "胜者" in s or "负者" in s or "待定" in s:
+        return False
+    return True
+
+
+async def resolve_knockout_progress(
+    db: AsyncSession,
+    competition_slug: str = "worldcup-2026",
+) -> dict:
+    """Lock known semifinalists / finalists from scheduled knockout fixtures."""
+    progress = {
+        "semifinalists": [],
+        "finalists": [],
+        "champion": None,
+        "runner_up": None,
+        "notes": [],
+    }
+    try:
+        by_no = await load_knockout_slot_index_cached(db, competition_slug)
+    except Exception as e:
+        logger.warning(f"Failed to load knockout index for tournament lock: {e}")
+        by_no = None
+
+    semis = (await db.execute(
+        select(Match).where(
+            Match.competition_slug == competition_slug,
+            Match.stage == "半决赛",
+        ).order_by(Match.match_time.asc())
+    )).scalars().all()
+
+    semi_teams: list[str] = []
+    for m in semis:
+        if by_no is not None:
+            ta, tb = display_teams_for_match(m, by_no)
+        else:
+            ta, tb = m.team_a, m.team_b
+        for t in (ta, tb):
+            if _is_real_team_name(t) and t not in semi_teams:
+                semi_teams.append(t)
+    if len(semi_teams) >= 4:
+        progress["semifinalists"] = semi_teams[:4]
+        progress["notes"].append(f"四强已由半决赛对阵锁定：{'、'.join(semi_teams[:4])}")
+    elif len(semi_teams) >= 2:
+        progress["semifinalists"] = semi_teams
+        progress["notes"].append(f"部分四强已确定：{'、'.join(semi_teams)}")
+
+    finals = (await db.execute(
+        select(Match).where(
+            Match.competition_slug == competition_slug,
+            Match.stage == "决赛",
+        ).order_by(Match.match_time.asc())
+    )).scalars().all()
+
+    finalists: list[str] = []
+    for m in finals:
+        if by_no is not None:
+            ta, tb = display_teams_for_match(m, by_no)
+        else:
+            ta, tb = m.team_a, m.team_b
+        for t in (ta, tb):
+            if _is_real_team_name(t) and t not in finalists:
+                finalists.append(t)
+        winner = match_winner(m)
+        if winner and _is_real_team_name(winner):
+            progress["champion"] = winner
+            loser = ta if winner == tb else tb if winner == ta else None
+            if loser and _is_real_team_name(loser):
+                progress["runner_up"] = loser
+            progress["notes"].append(f"决赛已结束，冠军锁定：{winner}")
+    if len(finalists) >= 2:
+        progress["finalists"] = finalists[:2]
+        if not progress["champion"]:
+            progress["notes"].append(f"决赛对阵已确定：{' vs '.join(finalists[:2])}")
+        # Finalists are also semifinalists
+        for t in finalists[:2]:
+            if t not in progress["semifinalists"]:
+                progress["semifinalists"].append(t)
+
+    # If both semis finished, winners are the finalists even if final row not filled
+    if len(semis) >= 2 and not progress["finalists"]:
+        winners = []
+        for m in semis:
+            w = match_winner(m)
+            if w and _is_real_team_name(w) and w not in winners:
+                winners.append(w)
+        if len(winners) >= 2:
+            progress["finalists"] = winners[:2]
+            progress["notes"].append(f"半决赛已结束，决赛对阵：{' vs '.join(winners[:2])}")
+
+    return progress
+
+
+def _pick_from_candidates(
+    preferred: str,
+    candidates: list[str],
+    exclude: set[str] | None = None,
+) -> str:
+    exclude = exclude or set()
+    pool = [c for c in candidates if c not in exclude]
+    if not pool:
+        return preferred if preferred not in exclude else (candidates[0] if candidates else preferred)
+    if preferred in pool:
+        return preferred
+    return pool[0]
+
+
+def _apply_knockout_constraints(
+    pred: TournamentPrediction,
+    progress: dict,
+) -> TournamentPrediction:
+    """Override AI fantasy picks with already-decided knockout outcomes."""
+    semis = list(progress.get("semifinalists") or [])
+    finals = list(progress.get("finalists") or [])
+    locked_champ = progress.get("champion")
+    locked_runner = progress.get("runner_up")
+    notes = list(progress.get("notes") or [])
+
+    if not semis and not finals and not locked_champ:
+        return pred
+
+    champion = pred.champion
+    runner_up = pred.runner_up
+    semifinalists = list(pred.semifinalists or [])
+
+    if len(semis) >= 4:
+        semifinalists = semis[:4]
+    elif semis:
+        # Keep known teams; fill remaining from AI pick if still eligible
+        known = set(semis)
+        filled = list(semis)
+        for t in pred.semifinalists:
+            if t not in known and len(filled) < 4:
+                filled.append(t)
+                known.add(t)
+        semifinalists = filled[:4]
+
+    if locked_champ and locked_runner:
+        champion, runner_up = locked_champ, locked_runner
+    elif len(finals) >= 2:
+        champion = _pick_from_candidates(champion, finals)
+        runner_up = _pick_from_candidates(runner_up, finals, exclude={champion})
+    elif len(semifinalists) >= 4:
+        champion = _pick_from_candidates(champion, semifinalists)
+        runner_up = _pick_from_candidates(runner_up, semifinalists, exclude={champion})
+
+    # Ensure champion/runner_up are inside semifinalists
+    if champion not in semifinalists:
+        semifinalists = ([champion] + [t for t in semifinalists if t != champion])[:4]
+    if runner_up not in semifinalists:
+        semifinalists = (
+            [champion, runner_up]
+            + [t for t in semifinalists if t not in (champion, runner_up)]
+        )[:4]
+
+    conf = pred.confidence
+    reason = pred.reason or ""
+    if notes:
+        lock_note = "；".join(notes)
+        reason = f"【赛程锁定】{lock_note}。{reason}".strip()
+        if locked_champ:
+            conf = max(conf, 0.95)
+        elif len(finals) >= 2:
+            conf = max(conf, 0.88)
+        elif len(semis) >= 4:
+            conf = max(conf, 0.80)
+
+    return TournamentPrediction(
+        champion=champion,
+        runner_up=runner_up,
+        semifinalists=semifinalists[:4],
+        reason=reason,
+        model_used=pred.model_used,
+        confidence=round(min(0.95, conf), 2),
+    )
 
 
 def _market_strength(team_name: str) -> float:
@@ -122,7 +308,11 @@ def _team_summary(team) -> str:
     )
 
 
-def _build_tournament_prompt(teams: list, match_odds_summary: str = "") -> str:
+def _build_tournament_prompt(
+    teams: list,
+    match_odds_summary: str = "",
+    knockout_progress: dict | None = None,
+) -> str:
     """Build the comprehensive tournament prediction prompt including market data."""
     team_lines = "\n".join(_team_summary(t) for t in teams)
 
@@ -140,9 +330,30 @@ def _build_tournament_prompt(teams: list, match_odds_summary: str = "") -> str:
 {match_odds_summary}
 """
 
+    progress = knockout_progress or {}
+    lock_section = ""
+    if progress.get("notes") or progress.get("semifinalists") or progress.get("finalists"):
+        semis = progress.get("semifinalists") or []
+        finals = progress.get("finalists") or []
+        lines = ["【淘汰赛已确定赛果 — 必须严格遵守，不得改写】"]
+        if len(semis) >= 4:
+            lines.append(f"- 四强已锁定（只能这4支）：{', '.join(semis[:4])}")
+        elif semis:
+            lines.append(f"- 已确定进入四强：{', '.join(semis)}")
+        if len(finals) >= 2:
+            lines.append(f"- 决赛对阵已确定，冠军/亚军只能从这两队中选：{' vs '.join(finals[:2])}")
+        if progress.get("champion"):
+            lines.append(f"- 冠军已产生：{progress['champion']}")
+        if progress.get("runner_up"):
+            lines.append(f"- 亚军已产生：{progress['runner_up']}")
+        for note in progress.get("notes") or []:
+            lines.append(f"- {note}")
+        lines.append("若与上方锁定冲突，以锁定赛果为准。已淘汰球队（如未进四强的巴西等）禁止出现在 semifinalists。")
+        lock_section = "\n".join(lines) + "\n"
+
     return f"""你是专业世界杯足球预测分析师。请基于全部48支参赛球队的完整数据，结合博彩市场预测，进行科学的冠军/亚军/四强预测。
 
-【博彩市场预测 — 小组头名赔率排名 Top 20】
+{lock_section}【博彩市场预测 — 小组头名赔率排名 Top 20】
 赔率越低=市场越看好。隐含概率由美式赔率换算，反映了全球博彩市场的共识预期：
 {market_ranking}
 {odds_section}
@@ -161,15 +372,16 @@ def _build_tournament_prompt(teams: list, match_odds_summary: str = "") -> str:
 预测要求：
 1. 综合五维分析：
    a) FIFA排名与攻防能力（球队数据中的量化指标）
-   b) 博彩市场赔率（小组头名赔率和关键比赛盘口，反映市场共识预期，权重应占30-40%）
+   b) 博彩市场赔率（小组头名赔率和单场比赛盘口，反映市场共识预期，权重应占30-40%）
    c) 核心球员质量与战术风格
    d) 小组出线难度与淘汰赛路径
    e) 历史大赛表现与冠军底蕴
 2. 市场赔率是重要参考信号：博彩市场汇集了全球大量信息和资金，赔率隐含的判断往往比纯数据模型更全面
 3. champion 和 runner_up 必须是不同球队
-4. semifinalists 必须包含 champion 和 runner_up（共4支不同球队）
-5. reason 用中文写200字内，必须同时引用数据指标和市场赔率，说明冠军球队的核心优势
-6. confidence 反映预测把握度(0.5-0.95)
+4. semifinalists 必须包含 champion 和 runner_up（共4支不同球队）；若上方已锁定四强，必须原样使用锁定名单
+5. 若决赛对阵已确定，champion/runner_up 只能从决赛两队中选择
+6. reason 用中文写200字内，必须同时引用数据指标和市场赔率，说明冠军球队的核心优势；若有赛程锁定，先说明已确定事实再分析
+7. confidence 反映预测把握度(0.5-0.95)；四强已定时 confidence 应不低于0.8
 
 严格按JSON格式输出，不要任何多余文字：
 {{"champion": "冠军队名", "runner_up": "亚军队名", "semifinalists": ["四强1", "四强2", "四强3", "四强4"], "reason": "分析理由200字内", "confidence": 0.5-0.95}}"""
@@ -212,16 +424,59 @@ def _parse_tournament_response(data: dict, model_name: str) -> Optional[Tourname
         return None
 
 
-def _fallback_prediction(teams: list) -> TournamentPrediction:
+def _fallback_prediction(
+    teams: list,
+    knockout_progress: dict | None = None,
+) -> TournamentPrediction:
     """Fallback: market-implied strength weighted with FIFA ranking.
 
     Uses both DraftKings odds and FIFA ranking to produce a consensus fallback.
-    Market weight = 0.5, ranking weight = 0.5.
+    Market weight = 0.5, ranking weight = 0.5. Respects known knockout locks.
     """
+    progress = knockout_progress or {}
+    locked_semis = list(progress.get("semifinalists") or [])
+    locked_finals = list(progress.get("finalists") or [])
+
     def composite_score(team):
         rank_score = 1.0 / max((team.rank or 999) / 10, 1)
         market_score = _market_strength(team.name)
         return rank_score * 0.5 + market_score * 0.5
+
+    if len(locked_finals) >= 2:
+        name_to_team = {t.name: t for t in teams}
+        ranked = sorted(
+            [name_to_team[n] for n in locked_finals if n in name_to_team],
+            key=composite_score,
+            reverse=True,
+        )
+        names = [t.name for t in ranked] or locked_finals[:2]
+        champ, runner = names[0], names[1] if len(names) > 1 else names[0]
+        semis = locked_semis[:4] if len(locked_semis) >= 4 else (locked_semis + [n for n in names if n not in locked_semis])[:4]
+        return TournamentPrediction(
+            champion=champ,
+            runner_up=runner,
+            semifinalists=semis or names[:4],
+            reason="基于已确定决赛对阵与球队实力自动生成（AI模型暂不可用）",
+            model_used="rule_engine",
+            confidence=0.85,
+        )
+
+    if len(locked_semis) >= 4:
+        name_to_team = {t.name: t for t in teams}
+        ranked = sorted(
+            [name_to_team[n] for n in locked_semis[:4] if n in name_to_team],
+            key=composite_score,
+            reverse=True,
+        )
+        top4 = [t.name for t in ranked] or locked_semis[:4]
+        return TournamentPrediction(
+            champion=top4[0],
+            runner_up=top4[1] if len(top4) > 1 else top4[0],
+            semifinalists=locked_semis[:4],
+            reason="基于已锁定四强与球队实力自动生成（AI模型暂不可用）",
+            model_used="rule_engine",
+            confidence=0.8,
+        )
 
     sorted_teams = sorted(teams, key=composite_score, reverse=True)
     top4 = [t.name for t in sorted_teams[:4]]
@@ -261,7 +516,10 @@ class TournamentPredictionService:
             )).scalars().all()
             team._players = players
 
-        # 2. Load match odds for additional market signal
+        # 2. Lock known knockout outcomes from schedule (semis / final)
+        knockout_progress = await resolve_knockout_progress(db)
+
+        # 3. Load match odds for additional market signal
         match_odds_summary = ""
         try:
             matches = (await db.execute(
@@ -284,14 +542,14 @@ class TournamentPredictionService:
         except Exception as e:
             logger.warning(f"Failed to load match odds for tournament prompt: {e}")
 
-        # 3. Determine models to call
+        # 4. Determine models to call
         if model and model != "auto":
             models_to_call = [model]
         else:
             models_to_call = get_configured_models()
 
-        # 4. Call LLMs in parallel
-        prompt = _build_tournament_prompt(teams, match_odds_summary)
+        # 5. Call LLMs in parallel
+        prompt = _build_tournament_prompt(teams, match_odds_summary, knockout_progress)
         predictions: list[TournamentPrediction] = []
 
         if models_to_call:
@@ -311,13 +569,17 @@ class TournamentPredictionService:
             results = await asyncio.gather(*[call_one(m) for m in models_to_call], return_exceptions=True)
             predictions = [r for r in results if r is not None and not isinstance(r, Exception)]
 
-        # 5. Fuse results with market-weighted consensus
+        # 6. Fuse results, then hard-lock already decided knockout outcomes
         if predictions:
             fused = _fuse_tournament_predictions(predictions)
         else:
-            fused = _fallback_prediction(teams)
+            fused = _fallback_prediction(teams, knockout_progress)
 
+        fused = _apply_knockout_constraints(fused, knockout_progress)
         result = fused.to_dict()
+        if knockout_progress.get("notes"):
+            result["knockout_locked"] = True
+            result["knockout_notes"] = knockout_progress["notes"]
         return result
 
 
