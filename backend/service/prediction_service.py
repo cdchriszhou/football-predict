@@ -339,6 +339,11 @@ def _fuse_predictions(llm_results: list, rule_result, odds_dict: dict = None,
     normalized = normalize_score_prediction(best_scores, upset_score)
     win_rate, draw_rate, lose_rate = align_wdl_to_score_picks(
         normalized["best_scores"], win_rate, draw_rate, lose_rate,
+        stage=stage,
+        rank_a=(team_a or {}).get("rank"),
+        rank_b=(team_b or {}).get("rank"),
+        sp_win=(odds_dict or {}).get("win_win"),
+        sp_lose=(odds_dict or {}).get("win_lose"),
     )
     win_rate, draw_rate, lose_rate = _validate_rates(win_rate, draw_rate, lose_rate)
     if pick_warnings:
@@ -759,6 +764,8 @@ class PredictionService:
                 stage=match.stage,
                 rank_a=(team_a_dict or {}).get("rank"),
                 rank_b=(team_b_dict or {}).get("rank"),
+                sp_win=(odds_dict or {}).get("win_win") if odds_dict else None,
+                sp_lose=(odds_dict or {}).get("win_lose") if odds_dict else None,
             )
             w, d, l = _validate_rates(w, d, l)
             if pick_warnings:

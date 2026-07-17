@@ -934,6 +934,59 @@ def test_june27_cape_verde_saudi_likely_pair_not_opposite():
     assert not ({_score_outcome(fixed[0]), _score_outcome(fixed[1])} == {"win", "lose"})
 
 
+def test_late_knockout_open_market_covers_both_one_goal_wins():
+    """Semi-final open markets must not lock onto CRS 1:1 as primary."""
+    from service.score_pick import pick_crs_anchored_scores, pick_upset_from_crs, refine_wdl_after_score_pick
+
+    crs = {
+        "1:1": 5.0, "2:1": 6.75, "1:2": 8.5, "0:0": 7.5,
+        "1:0": 7.6, "0:1": 8.0, "2:0": 12.0, "0:2": 16.0,
+    }
+    best = pick_crs_anchored_scores(
+        crs,
+        win_rate=36.0, lose_rate=34.0, draw_rate=30.0,
+        expected_a=1.2, expected_b=1.15,
+        sp_win=2.35, sp_lose=2.94, sp_draw=2.75,
+        stage="半决赛",
+    )
+    assert best[0] != "1:1"
+    assert {_score_outcome(best[0]), _score_outcome(best[1])} == {"win", "lose"}
+    assert "1:2" in best or "2:1" in best
+    upset = pick_upset_from_crs(
+        crs, best,
+        win_rate=36.0, lose_rate=34.0, draw_rate=30.0,
+        sp_win=2.35, sp_lose=2.94, sp_draw=2.75,
+    )
+    assert upset and _score_outcome(upset) == "draw"
+    # England 1:2 Argentina — covered as secondary
+    assert "1:2" in best + ([upset] if upset else [])
+
+    w, d, l = refine_wdl_after_score_pick(
+        ["1:1", "2:1"], 36.0, 28.0, 36.0,
+        stage="半决赛", sp_win=2.35, sp_lose=2.94,
+    )
+    assert d < max(w, l) + 0.1 or d <= 36.0
+
+
+def test_late_knockout_france_spain_style_covers_away_one_goal():
+    from service.score_pick import pick_crs_anchored_scores, run_full_score_pipeline
+
+    crs = {
+        "1:1": 5.5, "2:1": 6.25, "1:2": 9.0, "0:2": 19.0,
+        "2:0": 13.0, "0:1": 11.0, "1:0": 9.7, "0:0": 12.5,
+    }
+    best, upset, all_picks, _ = run_full_score_pipeline(
+        crs,
+        win_rate=42.0, draw_rate=28.0, lose_rate=30.0,
+        expected_a=1.3, expected_b=1.1,
+        sp_win=2.03, sp_draw=3.13, sp_lose=3.15,
+        stage="半决赛",
+        rank_a=2, rank_b=8,
+    )
+    assert best[0] != "1:1"
+    assert "1:2" in all_picks or "0:2" in all_picks
+
+
 def test_knockout_brazil_japan_prefers_win_not_draw_primary():
     from service.score_pick import finalize_knockout_score_picks, align_wdl_to_score_picks
     from service.rule_engine import RuleEngine

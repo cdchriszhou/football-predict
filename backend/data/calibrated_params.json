@@ -18,11 +18,12 @@
   "manipulation_dampen": 0.15,
   "low_draw_odds": 3.6,
   "KO_ROUND_PARAMS": {
-    "1/8决赛": {"goal_reduction": 0.88, "draw_boost": 7.0, "et_base": 0.18},
-    "1/4决赛": {"goal_reduction": 0.85, "draw_boost": 8.0, "et_base": 0.20},
-    "半决赛":  {"goal_reduction": 0.82, "draw_boost": 9.0, "et_base": 0.22},
-    "决赛":    {"goal_reduction": 0.80, "draw_boost": 8.0, "et_base": 0.25},
-    "季军赛":  {"goal_reduction": 0.95, "draw_boost": 4.0, "et_base": 0.10}
+    "1/16决赛": {"goal_reduction": 0.92, "draw_boost": 3.0, "et_base": 0.12},
+    "1/8决赛": {"goal_reduction": 0.90, "draw_boost": 3.0, "et_base": 0.12},
+    "1/4决赛": {"goal_reduction": 0.88, "draw_boost": 3.5, "et_base": 0.14},
+    "半决赛":  {"goal_reduction": 0.85, "draw_boost": 3.0, "et_base": 0.16},
+    "决赛":    {"goal_reduction": 0.83, "draw_boost": 3.0, "et_base": 0.18},
+    "季军赛":  {"goal_reduction": 0.88, "draw_boost": 3.0, "et_base": 0.14}
   },
   "calibrated_at": "2026-06-12T07:05:24.148309",
   "backtest": {

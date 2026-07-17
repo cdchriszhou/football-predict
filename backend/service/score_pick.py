@@ -35,6 +35,90 @@ def is_knockout_stage(stage: str | None) -> bool:
     return bool(stage and stage not in ("", "小组赛"))
 
 
+def is_late_knockout_stage(stage: str | None) -> bool:
+    """Semi / final / 3rd-place — regulation draws are common but decisive scores dominate."""
+    return stage in ("半决赛", "决赛", "季军赛")
+
+
+def demote_draw_primary_late_knockout(
+    ranked: list[tuple[str, float]],
+    primary: str,
+    *,
+    win_rate: float,
+    lose_rate: float,
+    draw_rate: float,
+    sp_win: float | None = None,
+    sp_lose: float | None = None,
+    stage: str | None = None,
+) -> list[str] | None:
+    """Late knockout: when CRS tops with a draw, prefer a 1-goal decisive score.
+
+    2026 semis: France-Spain / England-Argentina both opened 1:1 on CRS but finished
+    0:2 / 1:2. Keep 1:1 as secondary when odds are close; cover both win directions.
+    """
+    if not is_late_knockout_stage(stage) or not ranked:
+        return None
+    if _score_outcome(primary) != "draw":
+        return None
+
+    cmap = _crs_map(ranked)
+    draw_odd = cmap.get(primary) or ranked[0][1]
+    market_open = (
+        sp_win is not None and sp_lose is not None
+        and float(sp_win) >= 1.85 and float(sp_lose) >= 1.85
+    )
+    lean_away = (
+        (sp_lose is not None and sp_win is not None and float(sp_lose) < float(sp_win) - 0.08)
+        or lose_rate >= win_rate + 4.0
+    )
+    lean_home = (
+        (sp_win is not None and sp_lose is not None and float(sp_win) < float(sp_lose) - 0.08)
+        or win_rate >= lose_rate + 4.0
+    )
+    # Open SF/final markets: force coverage of both 1-goal wins + draw.
+    if market_open or abs(win_rate - lose_rate) < 12.0:
+        home_prefs = ["2:1", "1:0", "3:1", "2:0"]
+        away_prefs = ["1:2", "0:1", "1:3", "0:2"]
+        if lean_away:
+            first_prefs, second_prefs = away_prefs, home_prefs
+        elif lean_home:
+            first_prefs, second_prefs = home_prefs, away_prefs
+        else:
+            # No lean — prefer the cheaper 1-goal CRS line as primary.
+            h = next((s for s in home_prefs if s in cmap), None)
+            a = next((s for s in away_prefs if s in cmap), None)
+            if h and a:
+                if cmap[a] <= cmap[h] * 1.05:
+                    first_prefs, second_prefs = away_prefs, home_prefs
+                else:
+                    first_prefs, second_prefs = home_prefs, away_prefs
+            else:
+                first_prefs, second_prefs = home_prefs, away_prefs
+
+        primary_pick = next(
+            (s for s in first_prefs if s in cmap and cmap[s] <= draw_odd * 2.2),
+            None,
+        )
+        alt = next(
+            (s for s in second_prefs if s in cmap and s != primary_pick),
+            None,
+        )
+        if primary_pick and alt and cmap.get(alt, 99) <= draw_odd * 1.85:
+            # Open late KO: both 1-goal directions in the likely pair; draw goes to upset.
+            return [primary_pick, alt]
+        if primary_pick:
+            return [primary_pick, primary]
+
+    # Clear favourite late KO: promote fav 1-goal when within ~1.6x of draw CRS.
+    fav_away = lean_away and not lean_home
+    prefs = ["1:2", "0:1", "2:1"] if fav_away else ["2:1", "1:0", "1:2"]
+    for score in prefs:
+        odd = cmap.get(score)
+        if odd and odd <= draw_odd * 1.65:
+            return [score, primary]
+    return None
+
+
 def _poisson_score_ranking(
     expected_a: float,
     expected_b: float,
@@ -2025,8 +2109,68 @@ def run_full_score_pipeline(
         best, upset, crs, model_scores=hints or None, apply_ensure_triple=False,
         win_rate=win_rate, draw_rate=draw_rate, lose_rate=lose_rate,
     )
+    best, upset = finalize_late_knockout_triple(
+        best, upset, crs,
+        win_rate=win_rate, lose_rate=lose_rate, draw_rate=draw_rate,
+        sp_win=sp_win, sp_lose=sp_lose, stage=stage,
+    )
     all_picks = best + ([upset] if upset else [])
     return best, upset, all_picks, warnings
+
+
+def finalize_late_knockout_triple(
+    best_scores: list[str],
+    upset: str | None,
+    score_odds: dict[str, float] | None,
+    *,
+    win_rate: float,
+    lose_rate: float,
+    draw_rate: float,
+    sp_win: float | None = None,
+    sp_lose: float | None = None,
+    stage: str | None = None,
+) -> tuple[list[str], str | None]:
+    """Keep open late-knockout triples spanning home win / away win / draw."""
+    if not is_late_knockout_stage(stage) or not score_odds:
+        return best_scores, upset
+    ranked = _rank_crs(score_odds, set())
+    if not ranked:
+        return best_scores, upset
+
+    demoted = demote_draw_primary_late_knockout(
+        ranked,
+        ranked[0][0],
+        win_rate=win_rate,
+        lose_rate=lose_rate,
+        draw_rate=draw_rate,
+        sp_win=sp_win,
+        sp_lose=sp_lose,
+        stage=stage,
+    )
+    picks = [s for s in (demoted or best_scores or []) if s and s != "?"][:2]
+    if len(picks) < 2:
+        return best_scores, upset
+
+    outs = {_score_outcome(picks[0]), _score_outcome(picks[1])}
+    upset_val = upset if upset and upset != "?" else None
+    if outs == {"win", "lose"}:
+        if not upset_val or _score_outcome(upset_val) != "draw":
+            upset_val = _best_draw(ranked, set(picks)) or "1:1"
+        return picks, upset_val
+    if "draw" in outs and len(outs) == 2:
+        # One decisive + draw — ensure opposite 1-goal is the cold pick.
+        have = next(iter(outs - {"draw"}))
+        need = "lose" if have == "win" else "win"
+        if not upset_val or _score_outcome(upset_val) != need:
+            prefs = ["1:2", "0:1", "0:2"] if need == "lose" else ["2:1", "1:0", "2:0"]
+            cmap = _crs_map(ranked)
+            for s in prefs:
+                if s not in picks and s in cmap:
+                    return picks, s
+            alt = _first_score_with_outcome(ranked, need, exclude=set(picks))
+            if alt:
+                return picks, alt
+    return picks, upset_val
 
 
 def canonical_score_recommendations(
@@ -2096,6 +2240,15 @@ def pick_crs_anchored_scores(
 
     primary, primary_odd = ranked[0]
     dr = draw_rate if draw_rate is not None else max(0.0, 100.0 - win_rate - lose_rate)
+
+    late_ko = demote_draw_primary_late_knockout(
+        ranked, primary,
+        win_rate=win_rate, lose_rate=lose_rate, draw_rate=dr,
+        sp_win=sp_win, sp_lose=sp_lose, stage=stage,
+    )
+    if late_ko:
+        return late_ko
+
     promo_dr = min(45.0, dr + _stage_draw_promotion_boost(stage))
     total_xg = expected_a + expected_b
     fav_a = win_rate >= lose_rate
@@ -2421,6 +2574,11 @@ def pick_upset_from_crs(
     if len(best_scores or []) >= 2:
         o0 = _score_outcome(best_scores[0])
         o1 = _score_outcome(best_scores[1])
+        # Likely pair already spans home+away win — cold pick should be a draw.
+        if {o0, o1} == {"win", "lose"}:
+            draw_pick = _best_draw(ranked, exclude)
+            if draw_pick:
+                return draw_pick
         if o0 == o1 == "win" and win_rate >= cluster_min_win:
             alt = _upset_from_different_outcome(ranked, exclude, primary_outcome="win")
             if alt:
@@ -2645,10 +2803,38 @@ def align_wdl_to_crs_primary(
     win_rate: float,
     draw_rate: float,
     lose_rate: float,
+    *,
+    stage: str | None = None,
+    sp_win: float | None = None,
+    sp_lose: float | None = None,
 ) -> tuple[float, float, float]:
-    """When CRS-anchored primary is a draw, tilt W/D/L toward draw."""
+    """When CRS-anchored primary is a draw, gently tilt W/D/L toward draw.
+
+    Late knockout / clear market favourite: do NOT make draw the dominant WDL
+    bucket (semis stored 41% draw after this lift while matches finished 0:2 / 1:2).
+    """
     if not best_scores or _score_outcome(best_scores[0]) != "draw":
         return win_rate, draw_rate, lose_rate
+
+    market_clear = False
+    if sp_win and sp_lose:
+        try:
+            market_clear = min(float(sp_win), float(sp_lose)) <= 1.70
+        except (TypeError, ValueError):
+            market_clear = False
+    model_clear = abs(win_rate - lose_rate) >= 10.0
+    if is_late_knockout_stage(stage) or market_clear or model_clear:
+        # Soft nudge only — keep original favourite direction.
+        bumped = min(36.0, max(draw_rate, draw_rate + 2.0))
+        if bumped <= draw_rate:
+            return win_rate, draw_rate, lose_rate
+        scale = (100.0 - bumped) / max(100.0 - draw_rate, 1.0)
+        return (
+            round(win_rate * scale, 1),
+            round(bumped, 1),
+            round(lose_rate * scale, 1),
+        )
+
     new_draw = max(draw_rate, win_rate, lose_rate, 30.0)
     remainder = 100.0 - new_draw
     fav_is_win = win_rate >= lose_rate
@@ -2672,11 +2858,14 @@ def align_wdl_to_score_picks(
     stage: str | None = None,
     rank_a: int | None = None,
     rank_b: int | None = None,
+    sp_win: float | None = None,
+    sp_lose: float | None = None,
 ) -> tuple[float, float, float]:
     """Align W/D/L with score picks — only nudge when primary is a draw."""
     return refine_wdl_after_score_pick(
         best_scores, win_rate, draw_rate, lose_rate,
         stage=stage, rank_a=rank_a, rank_b=rank_b,
+        sp_win=sp_win, sp_lose=sp_lose,
     )
 
 
@@ -2774,6 +2963,8 @@ def refine_wdl_after_score_pick(
     stage: str | None = None,
     rank_a: int | None = None,
     rank_b: int | None = None,
+    sp_win: float | None = None,
+    sp_lose: float | None = None,
 ) -> tuple[float, float, float]:
     """Do not rewrite win/lose rates from score — only tilt draw when primary is draw."""
     if not best_scores:
@@ -2781,9 +2972,17 @@ def refine_wdl_after_score_pick(
     if _score_outcome(best_scores[0]) == "draw":
         rank_gap = abs(int(rank_a or 50) - int(rank_b or 50))
         fav_clear = win_rate >= lose_rate + 8.0 or lose_rate >= win_rate + 8.0
+        if is_late_knockout_stage(stage):
+            return align_wdl_to_crs_primary(
+                best_scores, win_rate, draw_rate, lose_rate,
+                stage=stage, sp_win=sp_win, sp_lose=sp_lose,
+            )
         if is_knockout_stage(stage) and fav_clear and rank_gap >= 8:
             return win_rate, draw_rate, lose_rate
-        return align_wdl_to_crs_primary(best_scores, win_rate, draw_rate, lose_rate)
+        return align_wdl_to_crs_primary(
+            best_scores, win_rate, draw_rate, lose_rate,
+            stage=stage, sp_win=sp_win, sp_lose=sp_lose,
+        )
     return win_rate, draw_rate, lose_rate
 
 

@@ -183,7 +183,7 @@ DEFAULT_CONFIG: ScorePickConfig = {
     # Stage-based adjustments (KO lowered — 2026 R16+ had 7/8 non-draw results)
     "STAGE_DRAW_BOOST_GROUP": 3.0,
     "STAGE_DRAW_BOOST_KO": 3.0,
-    "STAGE_DRAW_BOOST_FINAL": 4.0,
+    "STAGE_DRAW_BOOST_FINAL": 2.5,
 
     # Resilience adjustment (降低50%权重以避免过度预测平局)
     "RESILIENCE_CLEAN_SHEET_BUMP": 5.0,
@@ -257,8 +257,9 @@ DEFAULT_CONFIG: ScorePickConfig = {
         "1/16决赛": {"goal_reduction": 0.92, "draw_boost": 3.0, "et_base": 0.12},
         "1/8决赛": {"goal_reduction": 0.90, "draw_boost": 3.0, "et_base": 0.12},
         "1/4决赛": {"goal_reduction": 0.88, "draw_boost": 3.5, "et_base": 0.14},
-        "半决赛":  {"goal_reduction": 0.85, "draw_boost": 4.0, "et_base": 0.16},
-        "决赛":    {"goal_reduction": 0.83, "draw_boost": 4.0, "et_base": 0.18},
+        "半决赛":  {"goal_reduction": 0.85, "draw_boost": 3.0, "et_base": 0.16},
+        "决赛":    {"goal_reduction": 0.83, "draw_boost": 3.0, "et_base": 0.18},
+        "季军赛":  {"goal_reduction": 0.88, "draw_boost": 3.0, "et_base": 0.14},
         "季军赛":  {"goal_reduction": 0.95, "draw_boost": 2.5, "et_base": 0.08},
     },
 }
