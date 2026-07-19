@@ -210,8 +210,12 @@ function updateCountdown() {
   const now = new Date()
   const opening = new Date(openingStr)
   const closing = closingStr ? new Date(closingStr) : null
+  const seasonStatus = compStore.current?.season_status
+    || compStore.list.find(c => c.slug === compStore.slug)?.season_status
 
-  if (closing && now > closing) {
+  // Prefer API-derived season_status so the header flips to ended when all
+  // fixtures are finished, even if closing_date is still slightly in the future.
+  if (seasonStatus === 'ended' || (closing && now > closing)) {
     countdownMode.value = 'ended'
     countdownText.value = ''
     return

@@ -19,7 +19,8 @@ COMPETITIONS: dict[str, dict] = {
             "groups": True,
         },
         "opening_date": "2026-06-11T20:00:00Z",
-        "closing_date": "2026-07-20T12:00:00Z",
+        # Final kickoff 03:00 BJT; mark ended after full-time + ET buffer.
+        "closing_date": "2026-07-19T22:00:00Z",
         "theme_color": "#1a237e",
         "timezone": "America/New_York",
         "timezone_label_key": "usa",

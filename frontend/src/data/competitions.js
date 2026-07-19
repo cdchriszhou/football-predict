@@ -9,7 +9,7 @@ export const FALLBACK_COMPETITIONS = [
     timezone: 'America/New_York',
     timezone_label_key: 'usa',
     opening_date: '2026-06-11T20:00:00Z',
-    closing_date: '2026-07-20T12:00:00Z',
+    closing_date: '2026-07-19T22:00:00Z',
     stats: { matches: 0, teams: 0, upcoming: 0 },
   },
   {

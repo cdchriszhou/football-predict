@@ -201,6 +201,8 @@ def match_winner(
         return None
     db_ta = _field(m, "team_a")
     db_tb = _field(m, "team_b")
+    pa = _field(m, "penalty_a")
+    pb = _field(m, "penalty_b")
     if (
         db_ta and db_tb
         and not str(db_ta).startswith("第")
@@ -217,8 +219,6 @@ def match_winner(
         return ta
     if rb > ra:
         return tb
-    pa = _field(m, "penalty_a")
-    pb = _field(m, "penalty_b")
     if (pa is None or pb is None) and ra == rb:
         if hist is None:
             from data.match_status import confirmed_scores_from_history

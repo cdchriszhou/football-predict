@@ -783,6 +783,16 @@ HISTORICAL_MATCHES: list[dict] = [
      "rank_a": 5, "rank_b": 1, "stage": "半决赛", "group_name": "", "matchday": 0,
      "location": "亚特兰大", "stadium": "梅赛德斯-奔驰体育场",
      "match_time": "2026-07-16T03:00:00"},
+    # ═══ 2026-07-19 季军赛 / 2026-07-20 决赛 ═══
+    {"year": 2026, "team_a": "法国", "team_b": "英格兰", "result_a": 4, "result_b": 6,
+     "rank_a": 2, "rank_b": 5, "stage": "季军赛", "group_name": "", "matchday": 0,
+     "location": "迈阿密", "stadium": "硬石体育场",
+     "match_time": "2026-07-19T05:00:00"},
+    {"year": 2026, "team_a": "西班牙", "team_b": "阿根廷", "result_a": 1, "result_b": 0,
+     "regulation_a": 0, "regulation_b": 0, "extra_time": True,
+     "rank_a": 8, "rank_b": 1, "stage": "决赛", "group_name": "", "matchday": 0,
+     "location": "纽约/新泽西", "stadium": "大都会人寿体育场",
+     "match_time": "2026-07-20T03:00:00"},
 ]
 # fmt: on
 
