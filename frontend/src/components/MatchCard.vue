@@ -33,8 +33,12 @@
       <div class="score-area">
         <template v-if="hasMatchScore(match) && (isEffectiveMatchStatus(match, 'finished') || isEffectiveMatchStatus(match, 'live'))">
           <span class="score" :class="{ live: isEffectiveMatchStatus(match, 'live') }">
-            {{ scoreLines.regulation }}
+            {{ scoreLines.final }}
           </span>
+          <span v-if="scoreLines.ninety" class="score-note">
+            {{ t('match.extraTimeWithRegulation', { reg: scoreLines.ninety, final: scoreLines.final }) }}
+          </span>
+          <span v-else-if="scoreLines.extraTime" class="score-note">{{ t('match.extraTimeShort') }}</span>
           <span v-if="scoreLines.penalty" class="penalty-score">
             {{ t('match.penaltyShort', { score: scoreLines.penalty }) }}
           </span>
@@ -241,7 +245,7 @@ function formatTime(tVal) {
 
 function formatLiveScore(m) {
   const lines = formatMatchScoreLines(m)
-  if (lines.regulation) return lines.regulation
+  if (lines.final) return lines.final
   return '0 - 0'
 }
 </script>
@@ -263,6 +267,14 @@ function formatLiveScore(m) {
 .score { font-size: 24px; font-weight: 800; }
 .score.live { color: #f44336; animation: pulse 1s infinite; }
 .score.pending { color: #909399; font-size: 20px; }
+.score-note {
+  display: block;
+  margin-top: 2px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #5c6bc0;
+  line-height: 1.3;
+}
 .penalty-score {
   display: block;
   margin-top: 2px;

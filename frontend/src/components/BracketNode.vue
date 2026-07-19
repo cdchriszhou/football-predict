@@ -28,19 +28,20 @@ const props = defineProps({
 
 const scoreNote = computed(() => {
   const n = props.node
+  const parts = []
+  if (n.extra_time && n.regulation_a != null && n.regulation_b != null
+      && n.result_a != null && n.result_b != null) {
+    parts.push(t('match.extraTimeWithRegulation', {
+      reg: `${n.regulation_a} - ${n.regulation_b}`,
+      final: `${n.result_a} - ${n.result_b}`,
+    }))
+  } else if (n.extra_time) {
+    parts.push(t('match.extraTimeShort'))
+  }
   if (n.penalty_a != null && n.penalty_b != null) {
-    return t('match.penaltyShort', { score: `${n.penalty_a} - ${n.penalty_b}` })
+    parts.push(t('match.penaltyShort', { score: `${n.penalty_a} - ${n.penalty_b}` }))
   }
-  if (n.extra_time) {
-    if (n.regulation_a != null && n.regulation_b != null) {
-      return t('match.extraTimeWithRegulation', {
-        reg: `${n.regulation_a} - ${n.regulation_b}`,
-        final: `${n.result_a} - ${n.result_b}`,
-      })
-    }
-    return t('match.extraTimeShort')
-  }
-  return ''
+  return parts.join(' · ')
 })
 
 function isWinner(team) {

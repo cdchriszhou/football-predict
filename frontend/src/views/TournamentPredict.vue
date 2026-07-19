@@ -32,73 +32,98 @@
 
     <!-- Prediction Content -->
     <div v-else class="prediction-content">
-      <!-- Champion & Runner-up -->
-      <el-row :gutter="24" class="final-row">
-        <!-- Champion -->
-        <el-col :xs="24" :sm="14" class="champion-col">
-          <el-card class="champion-card" shadow="hover">
-            <div class="crown-badge">
-              <el-icon :size="32" color="#ffc107"><TrophyBase /></el-icon>
-              <span>{{ t('tournament.champion') }}</span>
+      <!-- Final podium 1–4 when tournament finished -->
+      <template v-if="hasFinalPodium">
+        <el-card class="podium-card" shadow="hover">
+          <template #header>
+            <div class="section-header">
+              <el-icon :size="20" color="#ffc107"><TrophyBase /></el-icon>
+              <span class="card-title">{{ t('tournament.finalRanking') }}</span>
             </div>
-            <div class="final-team-display">
-              <img :src="flagUrl(prediction.champion, 120)" :alt="prediction.champion"
-                   class="final-flag champion-flag"
-                   @error="onFlagError(prediction.champion, 'champion')" />
-              <h2 class="final-team-name">{{ prediction.champion }}</h2>
-              <span class="final-rank" v-if="teamInfo(prediction.champion)?.rank">
-                FIFA #{{ teamInfo(prediction.champion).rank }}
-              </span>
-              <div class="final-attr-bars" v-if="teamInfo(prediction.champion)">
-                <div class="mini-bar" v-for="attr in miniAttrs" :key="attr.key">
-                  <span class="mini-label">{{ attr.label }}</span>
-                  <el-progress :percentage="teamInfo(prediction.champion)[attr.key] || 0"
-                               :stroke-width="6" :color="attr.color" :show-text="false" />
+          </template>
+          <el-row :gutter="16">
+            <el-col :xs="12" :sm="6" v-for="slot in podiumSlots" :key="slot.place">
+              <div class="podium-team" :class="'place-' + slot.place">
+                <span class="place-badge">{{ t('tournament.placeN', { n: slot.place }) }}</span>
+                <img :src="flagUrl(slot.team, 100)" :alt="slot.team" class="podium-flag"
+                     @error="onFlagError(slot.team, 'place' + slot.place)" />
+                <span class="podium-name">{{ slot.team }}</span>
+                <span class="podium-rank" v-if="teamInfo(slot.team)?.rank">
+                  FIFA #{{ teamInfo(slot.team).rank }}
+                </span>
+              </div>
+            </el-col>
+          </el-row>
+        </el-card>
+      </template>
+
+      <template v-else>
+        <!-- Champion & Runner-up -->
+        <el-row :gutter="24" class="final-row">
+          <el-col :xs="24" :sm="14" class="champion-col">
+            <el-card class="champion-card" shadow="hover">
+              <div class="crown-badge">
+                <el-icon :size="32" color="#ffc107"><TrophyBase /></el-icon>
+                <span>{{ t('tournament.champion') }}</span>
+              </div>
+              <div class="final-team-display">
+                <img :src="flagUrl(prediction.champion, 120)" :alt="prediction.champion"
+                     class="final-flag champion-flag"
+                     @error="onFlagError(prediction.champion, 'champion')" />
+                <h2 class="final-team-name">{{ prediction.champion }}</h2>
+                <span class="final-rank" v-if="teamInfo(prediction.champion)?.rank">
+                  FIFA #{{ teamInfo(prediction.champion).rank }}
+                </span>
+                <div class="final-attr-bars" v-if="teamInfo(prediction.champion)">
+                  <div class="mini-bar" v-for="attr in miniAttrs" :key="attr.key">
+                    <span class="mini-label">{{ attr.label }}</span>
+                    <el-progress :percentage="teamInfo(prediction.champion)[attr.key] || 0"
+                                 :stroke-width="6" :color="attr.color" :show-text="false" />
+                  </div>
                 </div>
               </div>
-            </div>
-          </el-card>
-        </el-col>
+            </el-card>
+          </el-col>
 
-        <!-- Runner-up -->
-        <el-col :xs="24" :sm="10" class="runnerup-col">
-          <el-card class="runnerup-card" shadow="hover">
-            <div class="crown-badge silver">
-              <el-icon :size="26" color="#90a4ae"><Medal /></el-icon>
-              <span>{{ t('tournament.runnerUp') }}</span>
-            </div>
-            <div class="final-team-display">
-              <img :src="flagUrl(prediction.runner_up, 100)" :alt="prediction.runner_up"
-                   class="final-flag runnerup-flag"
-                   @error="onFlagError(prediction.runner_up, 'runnerup')" />
-              <h3 class="final-team-name">{{ prediction.runner_up }}</h3>
-              <span class="final-rank" v-if="teamInfo(prediction.runner_up)?.rank">
-                FIFA #{{ teamInfo(prediction.runner_up).rank }}
-              </span>
-            </div>
-          </el-card>
-        </el-col>
-      </el-row>
-
-      <!-- Final Four -->
-      <el-card class="semifinal-card" style="margin-top: 20px">
-        <template #header>
-          <div class="section-header">
-            <el-icon :size="20" color="#1a237e"><Star /></el-icon>
-            <span class="card-title">{{ t('tournament.semifinalists') }}</span>
-          </div>
-        </template>
-        <el-row :gutter="16">
-          <el-col :xs="12" :sm="6" v-for="team in prediction.semifinalists" :key="team">
-            <div class="semi-team-card">
-              <img :src="flagUrl(team, 80)" :alt="team" class="semi-flag"
-                   @error="onFlagError(team, 'semi' + team)" />
-              <span class="semi-name">{{ team }}</span>
-              <span class="semi-rank" v-if="teamInfo(team)?.rank">FIFA #{{ teamInfo(team).rank }}</span>
-            </div>
+          <el-col :xs="24" :sm="10" class="runnerup-col">
+            <el-card class="runnerup-card" shadow="hover">
+              <div class="crown-badge silver">
+                <el-icon :size="26" color="#90a4ae"><Medal /></el-icon>
+                <span>{{ t('tournament.runnerUp') }}</span>
+              </div>
+              <div class="final-team-display">
+                <img :src="flagUrl(prediction.runner_up, 100)" :alt="prediction.runner_up"
+                     class="final-flag runnerup-flag"
+                     @error="onFlagError(prediction.runner_up, 'runnerup')" />
+                <h3 class="final-team-name">{{ prediction.runner_up }}</h3>
+                <span class="final-rank" v-if="teamInfo(prediction.runner_up)?.rank">
+                  FIFA #{{ teamInfo(prediction.runner_up).rank }}
+                </span>
+              </div>
+            </el-card>
           </el-col>
         </el-row>
-      </el-card>
+
+        <!-- Final Four -->
+        <el-card class="semifinal-card" style="margin-top: 20px">
+          <template #header>
+            <div class="section-header">
+              <el-icon :size="20" color="#1a237e"><Star /></el-icon>
+              <span class="card-title">{{ t('tournament.semifinalists') }}</span>
+            </div>
+          </template>
+          <el-row :gutter="16">
+            <el-col :xs="12" :sm="6" v-for="team in prediction.semifinalists" :key="team">
+              <div class="semi-team-card">
+                <img :src="flagUrl(team, 80)" :alt="team" class="semi-flag"
+                     @error="onFlagError(team, 'semi' + team)" />
+                <span class="semi-name">{{ team }}</span>
+                <span class="semi-rank" v-if="teamInfo(team)?.rank">FIFA #{{ teamInfo(team).rank }}</span>
+              </div>
+            </el-col>
+          </el-row>
+        </el-card>
+      </template>
 
       <!-- AI Reasoning -->
       <el-card class="reason-card" style="margin-top: 20px">
@@ -156,6 +181,22 @@ const miniAttrs = computed(() => [
   { key: 'speed', label: t('team.attrSpeed'), color: '#9c27b0' },
   { key: 'physical', label: t('team.attrPhysical'), color: '#e65100' },
 ])
+
+const hasFinalPodium = computed(() => {
+  const p = prediction.value
+  return !!(p?.champion && p?.runner_up && p?.third_place && p?.fourth_place)
+})
+
+const podiumSlots = computed(() => {
+  const p = prediction.value
+  if (!hasFinalPodium.value) return []
+  return [
+    { place: 1, team: p.champion },
+    { place: 2, team: p.runner_up },
+    { place: 3, team: p.third_place },
+    { place: 4, team: p.fourth_place },
+  ]
+})
 
 const splitReasons = computed(() => {
   if (!prediction.value?.reason) return []
@@ -258,6 +299,25 @@ onMounted(async () => {
 .semi-flag { width: 64px; height: 42px; border-radius: 4px; object-fit: cover; box-shadow: 0 1px 4px rgba(0,0,0,0.15); background: #f0f0f0; }
 .semi-name { font-size: 15px; font-weight: 700; }
 .semi-rank { font-size: 12px; color: #999; }
+
+/* Final podium 1–4 */
+.podium-card { border-radius: 12px; border: 2px solid #ffc107; }
+.podium-team {
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  padding: 18px 10px; border-radius: 12px; text-align: center;
+  background: #f5f7fa; min-height: 160px;
+}
+.podium-team.place-1 { background: linear-gradient(180deg, #fff8e1, #fffde7); border: 1px solid #ffc107; }
+.podium-team.place-2 { background: linear-gradient(180deg, #eceff1, #fafafa); border: 1px solid #b0bec5; }
+.podium-team.place-3 { background: linear-gradient(180deg, #fbe9e7, #fff8f6); border: 1px solid #ffab91; }
+.podium-team.place-4 { background: #f5f7fa; border: 1px solid #e0e0e0; }
+.place-badge {
+  font-size: 12px; font-weight: 800; letter-spacing: 0.02em;
+  padding: 2px 10px; border-radius: 999px; background: #fff; color: #1a237e;
+}
+.podium-flag { width: 72px; height: 48px; border-radius: 4px; object-fit: cover; box-shadow: 0 2px 8px rgba(0,0,0,0.15); background: #f0f0f0; }
+.podium-name { font-size: 16px; font-weight: 800; }
+.podium-rank { font-size: 12px; color: #999; }
 
 /* Reason */
 .reason-card { border-radius: 12px; }

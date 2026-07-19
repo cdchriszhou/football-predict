@@ -1,4 +1,4 @@
-"""Tournament-level prediction: champion, runner-up, semifinalists."""
+"""Tournament-level prediction: champion, runner-up, 3rd/4th, semifinalists."""
 import json
 import asyncio
 import math
@@ -10,8 +10,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from db.models import Team, Player, Odds, Match
 from data.status_constants import MATCH_LIVE, MATCH_UPCOMING, match_status_in_db_values
 from data.knockout_advance import (
+    _match_no_for_row,
     display_teams_for_match,
     load_knockout_slot_index_cached,
+    match_loser,
     match_winner,
 )
 from llm.deepseek_client import create_llm_client, _call_api
@@ -25,6 +27,8 @@ class TournamentPrediction:
     champion: str
     runner_up: str
     semifinalists: list = field(default_factory=list)
+    third_place: Optional[str] = None
+    fourth_place: Optional[str] = None
     reason: str = ""
     model_used: str = ""
     confidence: float = 0.7
@@ -34,6 +38,8 @@ class TournamentPrediction:
             "champion": self.champion,
             "runner_up": self.runner_up,
             "semifinalists": self.semifinalists,
+            "third_place": self.third_place,
+            "fourth_place": self.fourth_place,
             "reason": self.reason,
             "model_used": self.model_used,
             "confidence": self.confidence,
@@ -67,16 +73,28 @@ def _is_real_team_name(name: str | None) -> bool:
     return True
 
 
+def _resolved_winner(m, by_no: dict | None) -> str | None:
+    match_no = _match_no_for_row(m, by_no or {}) if by_no else None
+    return match_winner(m, match_no=match_no, by_no=by_no)
+
+
+def _resolved_loser(m, by_no: dict | None) -> str | None:
+    match_no = _match_no_for_row(m, by_no or {}) if by_no else None
+    return match_loser(m, match_no=match_no, by_no=by_no)
+
+
 async def resolve_knockout_progress(
     db: AsyncSession,
     competition_slug: str = "worldcup-2026",
 ) -> dict:
-    """Lock known semifinalists / finalists from scheduled knockout fixtures."""
+    """Lock known semifinalists / finalists / 3rd-4th from scheduled knockout fixtures."""
     progress = {
         "semifinalists": [],
         "finalists": [],
         "champion": None,
         "runner_up": None,
+        "third_place": None,
+        "fourth_place": None,
         "notes": [],
     }
     try:
@@ -124,10 +142,12 @@ async def resolve_knockout_progress(
         for t in (ta, tb):
             if _is_real_team_name(t) and t not in finalists:
                 finalists.append(t)
-        winner = match_winner(m)
+        winner = _resolved_winner(m, by_no)
         if winner and _is_real_team_name(winner):
             progress["champion"] = winner
-            loser = ta if winner == tb else tb if winner == ta else None
+            loser = _resolved_loser(m, by_no)
+            if not loser:
+                loser = ta if winner == tb else tb if winner == ta else None
             if loser and _is_real_team_name(loser):
                 progress["runner_up"] = loser
             progress["notes"].append(f"决赛已结束，冠军锁定：{winner}")
@@ -144,12 +164,30 @@ async def resolve_knockout_progress(
     if len(semis) >= 2 and not progress["finalists"]:
         winners = []
         for m in semis:
-            w = match_winner(m)
+            w = _resolved_winner(m, by_no)
             if w and _is_real_team_name(w) and w not in winners:
                 winners.append(w)
         if len(winners) >= 2:
             progress["finalists"] = winners[:2]
             progress["notes"].append(f"半决赛已结束，决赛对阵：{' vs '.join(winners[:2])}")
+
+    thirds = (await db.execute(
+        select(Match).where(
+            Match.competition_slug == competition_slug,
+            Match.stage == "季军赛",
+        ).order_by(Match.match_time.asc())
+    )).scalars().all()
+    for m in thirds:
+        winner = _resolved_winner(m, by_no)
+        loser = _resolved_loser(m, by_no)
+        if winner and _is_real_team_name(winner):
+            progress["third_place"] = winner
+            if loser and _is_real_team_name(loser):
+                progress["fourth_place"] = loser
+            progress["notes"].append(f"季军赛已结束，季军锁定：{winner}")
+            for t in (winner, loser):
+                if t and _is_real_team_name(t) and t not in progress["semifinalists"]:
+                    progress["semifinalists"].append(t)
 
     return progress
 
@@ -177,13 +215,17 @@ def _apply_knockout_constraints(
     finals = list(progress.get("finalists") or [])
     locked_champ = progress.get("champion")
     locked_runner = progress.get("runner_up")
+    locked_third = progress.get("third_place")
+    locked_fourth = progress.get("fourth_place")
     notes = list(progress.get("notes") or [])
 
-    if not semis and not finals and not locked_champ:
+    if not semis and not finals and not locked_champ and not locked_third:
         return pred
 
     champion = pred.champion
     runner_up = pred.runner_up
+    third_place = pred.third_place or locked_third
+    fourth_place = pred.fourth_place or locked_fourth
     semifinalists = list(pred.semifinalists or [])
 
     if len(semis) >= 4:
@@ -207,21 +249,36 @@ def _apply_knockout_constraints(
         champion = _pick_from_candidates(champion, semifinalists)
         runner_up = _pick_from_candidates(runner_up, semifinalists, exclude={champion})
 
-    # Ensure champion/runner_up are inside semifinalists
-    if champion not in semifinalists:
-        semifinalists = ([champion] + [t for t in semifinalists if t != champion])[:4]
-    if runner_up not in semifinalists:
-        semifinalists = (
-            [champion, runner_up]
-            + [t for t in semifinalists if t not in (champion, runner_up)]
-        )[:4]
+    if locked_third:
+        third_place = locked_third
+    if locked_fourth:
+        fourth_place = locked_fourth
+
+    # Order final four as 1–4 when podium is known
+    if locked_champ and locked_runner and locked_third and locked_fourth:
+        semifinalists = [champion, runner_up, third_place, fourth_place]
+    else:
+        # Ensure champion/runner_up are inside semifinalists
+        if champion not in semifinalists:
+            semifinalists = ([champion] + [t for t in semifinalists if t != champion])[:4]
+        if runner_up not in semifinalists:
+            semifinalists = (
+                [champion, runner_up]
+                + [t for t in semifinalists if t not in (champion, runner_up)]
+            )[:4]
+        if third_place and third_place not in semifinalists:
+            semifinalists = (semifinalists + [third_place])[:4]
+        if fourth_place and fourth_place not in semifinalists:
+            semifinalists = (semifinalists + [fourth_place])[:4]
 
     conf = pred.confidence
     reason = pred.reason or ""
     if notes:
         lock_note = "；".join(notes)
         reason = f"【赛程锁定】{lock_note}。{reason}".strip()
-        if locked_champ:
+        if locked_champ and locked_third:
+            conf = max(conf, 0.98)
+        elif locked_champ:
             conf = max(conf, 0.95)
         elif len(finals) >= 2:
             conf = max(conf, 0.88)
@@ -232,9 +289,11 @@ def _apply_knockout_constraints(
         champion=champion,
         runner_up=runner_up,
         semifinalists=semifinalists[:4],
+        third_place=third_place,
+        fourth_place=fourth_place,
         reason=reason,
         model_used=pred.model_used,
-        confidence=round(min(0.95, conf), 2),
+        confidence=round(min(0.98, conf), 2),
     )
 
 
@@ -346,6 +405,10 @@ def _build_tournament_prompt(
             lines.append(f"- 冠军已产生：{progress['champion']}")
         if progress.get("runner_up"):
             lines.append(f"- 亚军已产生：{progress['runner_up']}")
+        if progress.get("third_place"):
+            lines.append(f"- 季军已产生：{progress['third_place']}")
+        if progress.get("fourth_place"):
+            lines.append(f"- 第四名已产生：{progress['fourth_place']}")
         for note in progress.get("notes") or []:
             lines.append(f"- {note}")
         lines.append("若与上方锁定冲突，以锁定赛果为准。已淘汰球队（如未进四强的巴西等）禁止出现在 semifinalists。")

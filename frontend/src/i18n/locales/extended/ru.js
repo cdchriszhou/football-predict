@@ -153,6 +153,8 @@ export default {
     champion: 'Прогноз чемпиона',
     runnerUp: 'Прогноз вице-чемпиона',
     semifinalists: 'Полуфиналисты',
+    finalRanking: 'Итоговый рейтинг',
+    placeN: '{n}-е место',
     aiReason: 'Анализ ИИ',
     noDetail: 'Подробный анализ отсутствует',
     overallConfidence: 'Общая уверенность'

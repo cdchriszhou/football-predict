@@ -153,6 +153,8 @@ export default {
     champion: '冠軍預測',
     runnerUp: '亞軍預測',
     semifinalists: '四強球隊',
+    finalRanking: '最終排名',
+    placeN: '第{n}名',
     aiReason: 'AI 分析理由',
     noDetail: '暫無詳細分析',
     overallConfidence: '綜合置信度'

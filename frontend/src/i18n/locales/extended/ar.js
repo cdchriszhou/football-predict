@@ -153,6 +153,8 @@ export default {
     champion: 'توقع البطل',
     runnerUp: 'توقع الوصيف',
     semifinalists: 'فرق نصف النهائي',
+    finalRanking: 'الترتيب النهائي',
+    placeN: 'المركز {n}',
     aiReason: 'تحليل الذكاء الاصطناعي',
     noDetail: 'لا يوجد تحليل مفصّل',
     overallConfidence: 'الثقة الإجمالية'

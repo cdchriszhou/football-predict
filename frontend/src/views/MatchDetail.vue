@@ -18,13 +18,17 @@
           </div>
           <div class="hero-center">
             <template v-if="isEffectiveMatchStatus(match, 'finished')">
-              <span v-if="hasMatchScore(match)" class="hero-score">{{ scoreLines.regulation }}</span>
+              <span v-if="hasMatchScore(match)" class="hero-score">{{ scoreLines.final }}</span>
+              <span v-if="scoreLines.ninety" class="hero-penalty">
+                {{ t('match.extraTimeWithRegulation', { reg: scoreLines.ninety, final: scoreLines.final }) }}
+              </span>
+              <span v-else-if="scoreLines.extraTime" class="hero-penalty">{{ t('match.extraTimeShort') }}</span>
               <span v-if="scoreLines.penalty" class="hero-penalty">{{ t('match.penaltyShort', { score: scoreLines.penalty }) }}</span>
               <span v-else-if="!hasMatchScore(match)" class="hero-vs">VS</span>
               <el-tag type="info" size="small" effect="dark" class="hero-status-tag">{{ t('status.finished') }}</el-tag>
             </template>
             <template v-else-if="isEffectiveMatchStatus(match, 'live')">
-              <span class="hero-score live">{{ scoreLines.regulation || '0 - 0' }}</span>
+              <span class="hero-score live">{{ scoreLines.final || '0 - 0' }}</span>
               <el-tag type="danger" size="small">LIVE</el-tag>
             </template>
             <template v-else>

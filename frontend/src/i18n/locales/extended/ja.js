@@ -153,6 +153,8 @@ export default {
     champion: '優勝予測',
     runnerUp: '準優勝予測',
     semifinalists: '4強チーム',
+    finalRanking: '最終順位',
+    placeN: '第{n}位',
     aiReason: 'AI分析理由',
     noDetail: '詳細分析なし',
     overallConfidence: '総合信頼度'

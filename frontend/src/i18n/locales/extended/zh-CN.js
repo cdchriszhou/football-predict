@@ -165,6 +165,8 @@ export default {
     champion: '冠军预测',
     runnerUp: '亚军预测',
     semifinalists: '四强球队',
+    finalRanking: '最终排名',
+    placeN: '第{n}名',
     aiReason: 'AI 分析理由',
     noDetail: '暂无详细分析',
     overallConfidence: '综合置信度'

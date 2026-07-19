@@ -166,6 +166,8 @@ export default {
     champion: 'Champion prediction',
     runnerUp: 'Runner-up prediction',
     semifinalists: 'Semifinalists',
+    finalRanking: 'Final ranking',
+    placeN: 'Place {n}',
     aiReason: 'AI analysis',
     noDetail: 'No detailed analysis',
     overallConfidence: 'Overall confidence'

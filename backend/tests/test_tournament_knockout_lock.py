@@ -51,3 +51,30 @@ def test_apply_constraints_locks_finished_final():
     assert out.champion == "西班牙"
     assert out.runner_up == "阿根廷"
     assert out.confidence >= 0.95
+
+
+def test_apply_constraints_locks_final_podium_1_to_4():
+    pred = TournamentPrediction(
+        champion="巴西",
+        runner_up="法国",
+        semifinalists=["巴西", "法国", "德国", "荷兰"],
+        reason="旧预测",
+        model_used="test",
+        confidence=0.5,
+    )
+    progress = {
+        "semifinalists": ["西班牙", "法国", "英格兰", "阿根廷"],
+        "finalists": ["西班牙", "阿根廷"],
+        "champion": "西班牙",
+        "runner_up": "阿根廷",
+        "third_place": "英格兰",
+        "fourth_place": "法国",
+        "notes": ["决赛已结束，冠军锁定：西班牙", "季军赛已结束，季军锁定：英格兰"],
+    }
+    out = _apply_knockout_constraints(pred, progress)
+    assert out.champion == "西班牙"
+    assert out.runner_up == "阿根廷"
+    assert out.third_place == "英格兰"
+    assert out.fourth_place == "法国"
+    assert out.semifinalists == ["西班牙", "阿根廷", "英格兰", "法国"]
+    assert out.confidence >= 0.98
