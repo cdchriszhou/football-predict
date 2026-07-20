@@ -131,12 +131,13 @@
             >
               <div class="rec-nums-row">
                 <span
-                  v-for="(d, di) in recDigits(rec).slice(0, 6)"
+                  v-for="(d, di) in recDigits(rec).slice(0, 5)"
                   :key="'r' + di"
                   class="rec-ball rec-ball--red"
                 >{{ formatBall(d) }}</span>
               </div>
-              <div class="rec-nums-row rec-nums-row--blue">
+              <div class="rec-nums-row rec-nums-row--second">
+                <span class="rec-ball rec-ball--red">{{ formatBall(recDigits(rec)[5]) }}</span>
                 <span class="rec-plus">+</span>
                 <span class="rec-ball rec-ball--blue">{{ formatBall(recDigits(rec)[6]) }}</span>
               </div>
@@ -947,7 +948,7 @@ onUnmounted(() => {
   align-items: center;
   gap: 5px;
 }
-.rec-nums-row--blue {
+.rec-nums-row--second {
   gap: 6px;
 }
 .rec-plus {
