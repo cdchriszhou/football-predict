@@ -55,7 +55,7 @@ export default {
       serieA: 'セリエA',
       bundesliga: 'ブンデスリーガ',
       ligue1: 'リーグ・アン',
-      pailie: '配列3 / 5 / 七星彩 / 双色球',
+      pailie: '配列3 / 5 / 七星彩 / 双色球 / 大乐透',
     },
   },
   header: {

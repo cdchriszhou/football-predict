@@ -23,6 +23,7 @@
       <el-tab-pane :label="t('pailie.pl5')" name="pl5" />
       <el-tab-pane :label="t('pailie.qxc')" name="qxc" />
       <el-tab-pane :label="t('pailie.ssq')" name="ssq" />
+      <el-tab-pane :label="t('pailie.dlt')" name="dlt" />
     </el-tabs>
 
     <section class="panel pool-panel">
@@ -150,6 +151,26 @@
               </div>
             </div>
             <div
+              v-else-if="activeGame === 'dlt'"
+              class="rec-nums rec-nums--dlt"
+            >
+              <div class="rec-nums-row">
+                <span
+                  v-for="(d, di) in recDigits(rec).slice(0, 5)"
+                  :key="'f' + di"
+                  class="rec-ball rec-ball--red"
+                >{{ formatBall(d) }}</span>
+              </div>
+              <div class="rec-nums-row rec-nums-row--second">
+                <span class="rec-plus">+</span>
+                <span
+                  v-for="(d, di) in recDigits(rec).slice(5, 7)"
+                  :key="'b' + di"
+                  class="rec-ball rec-ball--blue"
+                >{{ formatBall(d) }}</span>
+              </div>
+            </div>
+            <div
               v-else-if="activeGame === 'qxc'"
               class="rec-nums rec-nums--qxc-wrap"
             >
@@ -261,6 +282,35 @@
           </div>
         </template>
 
+        <template v-else-if="activeGame === 'dlt'">
+          <div class="ssq-zone">
+            <div class="ssq-zone-title">{{ t('pailie.dltFront') }} <span class="ssq-count">{{ dltFront.length }}/5</span></div>
+            <div class="digit-row ssq-row">
+              <button
+                v-for="n in 35"
+                :key="'df' + n"
+                type="button"
+                class="digit-btn ssq-btn"
+                :class="{ active: dltFront.includes(n), hot: isHot(n), cold: isCold(n) }"
+                @click="toggleDltFront(n)"
+              >{{ formatBall(n) }}</button>
+            </div>
+          </div>
+          <div class="ssq-zone">
+            <div class="ssq-zone-title">{{ t('pailie.dltBack') }} <span class="ssq-count">{{ dltBack.length }}/2</span></div>
+            <div class="digit-row ssq-row">
+              <button
+                v-for="n in 12"
+                :key="'db' + n"
+                type="button"
+                class="digit-btn ssq-btn ssq-btn--blue"
+                :class="{ active: dltBack.includes(n) }"
+                @click="toggleDltBack(n)"
+              >{{ formatBall(n) }}</button>
+            </div>
+          </div>
+        </template>
+
         <div v-else class="digit-rows">
           <div v-for="(row, ri) in digitRows" :key="ri" class="digit-row">
             <span class="pos-label">{{ positionLabel(ri) }}</span>
@@ -356,9 +406,11 @@ const windowSize = ref(100)
 const useAi = ref(true)
 const selections = ref([[], [], []])
 const tickets = ref([])
-const poolGameIds = ['pl3', 'pl5', 'qxc', 'ssq']
+const poolGameIds = ['pl3', 'pl5', 'qxc', 'ssq', 'dlt']
 const ssqRed = ref([])
 const ssqBlue = ref(null)
+const dltFront = ref([])
+const dltBack = ref([])
 let poolTimer = null
 let recommendSeq = 0
 const recommendCache = new Map()
@@ -408,13 +460,16 @@ function gameName(gameId) {
   if (gameId === 'pl5') return t('pailie.pl5')
   if (gameId === 'qxc') return t('pailie.qxc')
   if (gameId === 'ssq') return t('pailie.ssq')
+  if (gameId === 'dlt') return t('pailie.dlt')
   return gameId
 }
 
 function formatBall(n) {
   const num = Number(n)
   if (!Number.isFinite(num)) return n
-  return activeGame.value === 'ssq' ? String(num).padStart(2, '0') : String(num)
+  return (activeGame.value === 'ssq' || activeGame.value === 'dlt')
+    ? String(num).padStart(2, '0')
+    : String(num)
 }
 
 function formatPool(text) {
@@ -462,7 +517,9 @@ function pct(rate) {
 }
 
 function barWidth(rate) {
-  const base = activeGame.value === 'ssq' ? 6 / 33 : 1 / 10
+  let base = 1 / 10
+  if (activeGame.value === 'ssq') base = 6 / 33
+  else if (activeGame.value === 'dlt') base = 5 / 35
   const w = Math.max(8, Math.min(100, ((rate || 0) / (base * 2)) * 100))
   return `${w}%`
 }
@@ -493,6 +550,9 @@ function positionLabel(idx) {
   if (activeGame.value === 'ssq') {
     return idx === 0 ? t('pailie.ssqRed') : t('pailie.ssqBlue')
   }
+  if (activeGame.value === 'dlt') {
+    return idx === 0 ? t('pailie.dltFront') : t('pailie.dltBack')
+  }
   if (activeGame.value === 'pl3' && pl3Mode.value !== 'direct' && digitRows.value.length === 1) {
     return t('pailie.pool')
   }
@@ -509,6 +569,11 @@ function ensureRows() {
   if (activeGame.value === 'ssq') {
     ssqRed.value = []
     ssqBlue.value = null
+    return
+  }
+  if (activeGame.value === 'dlt') {
+    dltFront.value = []
+    dltBack.value = []
     return
   }
   if (activeGame.value === 'pl3' && pl3Mode.value !== 'direct') {
@@ -530,6 +595,20 @@ function toggleSsqBlue(n) {
   ssqBlue.value = ssqBlue.value === n ? null : n
 }
 
+function toggleDltFront(n) {
+  const set = new Set(dltFront.value)
+  if (set.has(n)) set.delete(n)
+  else if (set.size < 5) set.add(n)
+  dltFront.value = [...set].sort((a, b) => a - b)
+}
+
+function toggleDltBack(n) {
+  const set = new Set(dltBack.value)
+  if (set.has(n)) set.delete(n)
+  else if (set.size < 2) set.add(n)
+  dltBack.value = [...set].sort((a, b) => a - b)
+}
+
 function toggleDigit(rowIdx, digit) {
   const row = [...selections.value[rowIdx]]
   const i = row.indexOf(digit)
@@ -548,6 +627,9 @@ function uniqueSorted(nums) {
 function countBets() {
   if (activeGame.value === 'ssq') {
     return ssqRed.value.length === 6 && ssqBlue.value ? 1 : 0
+  }
+  if (activeGame.value === 'dlt') {
+    return dltFront.value.length === 5 && dltBack.value.length === 2 ? 1 : 0
   }
   const rows = selections.value
   if (rows.some((r) => !r.length)) return 0
@@ -575,6 +657,11 @@ function displayFromSelection() {
     const reds = ssqRed.value.map(formatBall).join(' ')
     return `${reds} + ${formatBall(ssqBlue.value)}`
   }
+  if (activeGame.value === 'dlt') {
+    const front = dltFront.value.map(formatBall).join(' ')
+    const back = dltBack.value.map(formatBall).join(' ')
+    return `${front} + ${back}`
+  }
   if (activeGame.value === 'pl3' && pl3Mode.value !== 'direct') {
     return uniqueSorted(selections.value[0] || []).join(' ')
   }
@@ -587,6 +674,13 @@ function applyRecommend(rec) {
     const digits = rec.digits
     ssqRed.value = digits.slice(0, 6).map(Number)
     ssqBlue.value = Number(digits[6])
+    ElMessage.success(t('pailie.applied'))
+    return
+  }
+  if (activeGame.value === 'dlt' || rec.mode === 'dlt') {
+    const digits = rec.digits
+    dltFront.value = digits.slice(0, 5).map(Number)
+    dltBack.value = digits.slice(5, 7).map(Number)
     ElMessage.success(t('pailie.applied'))
     return
   }
@@ -631,6 +725,21 @@ function machinePick() {
     ssqBlue.value = 1 + Math.floor(Math.random() * 16)
     return
   }
+  if (activeGame.value === 'dlt') {
+    const front = []
+    while (front.length < 5) {
+      const n = 1 + Math.floor(Math.random() * 35)
+      if (!front.includes(n)) front.push(n)
+    }
+    const back = []
+    while (back.length < 2) {
+      const n = 1 + Math.floor(Math.random() * 12)
+      if (!back.includes(n)) back.push(n)
+    }
+    dltFront.value = front.sort((a, b) => a - b)
+    dltBack.value = back.sort((a, b) => a - b)
+    return
+  }
   if (activeGame.value === 'pl3' && pl3Mode.value !== 'direct') {
     const count = pl3Mode.value === 'group3' ? 2 : 3
     const pool = []
@@ -656,7 +765,11 @@ function addTicket() {
   if (!canAdd.value) return
   tickets.value.unshift({
     game: activeGame.value,
-    mode: activeGame.value === 'ssq' ? 'ssq' : (activeGame.value === 'pl3' ? pl3Mode.value : 'direct'),
+    mode: activeGame.value === 'ssq'
+      ? 'ssq'
+      : (activeGame.value === 'dlt'
+        ? 'dlt'
+        : (activeGame.value === 'pl3' ? pl3Mode.value : 'direct')),
     display: displayFromSelection(),
     bets: betCount.value,
     amount: betCount.value * 2,
@@ -671,6 +784,7 @@ function removeTicket(idx) {
 
 function ticketModeLabel(tk) {
   if (tk.mode === 'ssq' || tk.game === 'ssq') return t('pailie.modeSsq')
+  if (tk.mode === 'dlt' || tk.game === 'dlt') return t('pailie.modeDlt')
   if (tk.mode === 'group3') return t('pailie.modeGroup3')
   if (tk.mode === 'group6') return t('pailie.modeGroup6')
   return t('pailie.modeDirect')
@@ -1004,7 +1118,8 @@ onUnmounted(() => {
   gap: 4px;
 }
 .rec-nums--ssq,
-.rec-nums--qxc-wrap {
+.rec-nums--qxc-wrap,
+.rec-nums--dlt {
   flex-direction: column;
   flex-wrap: nowrap;
   align-items: flex-start;

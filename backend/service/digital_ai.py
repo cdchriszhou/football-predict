@@ -112,8 +112,12 @@ def fuse_ai_picks(
             if not validated:
                 continue
             if isinstance(validated, tuple) and len(validated) == 2 and isinstance(validated[0], list):
-                # ssq: (reds, blue)
-                key = tuple(validated[0] + [validated[1]])
+                # ssq: (reds, blue_int) 或 dlt: (fronts, backs_list)
+                second = validated[1]
+                if isinstance(second, list):
+                    key = tuple(validated[0] + second)
+                else:
+                    key = tuple(validated[0] + [second])
             else:
                 key = tuple(validated)
 

@@ -13,6 +13,7 @@ import httpx
 from utils.http_client import sporttery_proxy_attempts
 from utils.logger import logger
 from service.ssq_service import SSQ_GAME, fetch_ssq_history, get_ssq_recommendations
+from service.dlt_service import DLT_GAME, fetch_dlt_history, get_dlt_recommendations
 
 # ---------------------------------------------------------------------------
 # Game specs
@@ -73,6 +74,7 @@ GAME_SPECS: dict[str, dict] = {
     "pl5": PL5_GAME,
     "qxc": QXC_GAME,
     "ssq": SSQ_GAME,
+    "dlt": DLT_GAME,
 }
 _HISTORY_URL = "https://webapi.sporttery.cn/gateway/lottery/getHistoryPageListV1.qry"
 # 体彩网关 gameNo；七星彩常见为 04，失败时再试备选
@@ -101,12 +103,12 @@ _TREND_WEIGHT = 0.10  # 近窗相对全样本的趋势加成
 def get_games_catalog() -> dict[str, Any]:
     return {
         "slug": "pailie",
-        "title": "排列3 / 排列5 / 七星彩 / 双色球",
+        "title": "排列3 / 排列5 / 七星彩 / 双色球 / 大乐透",
         "disclaimer": (
             "本模块仅提供玩法说明、历史频率统计、概率参考与 AI 选号辅助，不提供购彩下单；"
             "历史频率与 AI 建议均不能保证未来开奖结果，请理性投注并到官方渠道购买。"
         ),
-        "games": [PL3_GAME, PL5_GAME, QXC_GAME, SSQ_GAME],
+        "games": [PL3_GAME, PL5_GAME, QXC_GAME, SSQ_GAME, DLT_GAME],
     }
 
 
@@ -308,6 +310,8 @@ async def _fetch_history(game_id: str, limit: int = 100) -> list[dict]:
         return []
     if game_id == "ssq":
         return await fetch_ssq_history(min(int(limit or 100), 100))
+    if game_id == "dlt":
+        return await fetch_dlt_history(min(int(limit or 100), 100))
 
     limit = max(1, min(int(limit or 100), 200))
     cache_key = f"{game_id}:{limit}"
@@ -399,7 +403,7 @@ async def get_prize_pools(history_limit: int = 30) -> dict[str, Any]:
         pools[game_id] = {
             "game": game_id,
             "name": spec["name"],
-            "has_floating_pool": game_id in ("pl5", "qxc", "ssq"),
+            "has_floating_pool": game_id in ("pl5", "qxc", "ssq", "dlt"),
             "pool_note": (
                 "固定奖玩法，官方奖池字段通常为 0 或空，以下为接口同步值。"
                 if game_id == "pl3"
@@ -759,6 +763,8 @@ async def get_recommendations(
 
     if game_id == "ssq":
         return await get_ssq_recommendations(window=window, use_ai=use_ai)
+    if game_id == "dlt":
+        return await get_dlt_recommendations(window=window, use_ai=use_ai)
 
     window = max(20, min(int(window or 100), 200))
     cache_key = f"rec:{game_id}:{window}:{int(bool(use_ai))}"

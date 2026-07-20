@@ -45,7 +45,7 @@ async def pailie_catalog(
 
 @router.get("/history")
 async def pailie_history(
-    game: str | None = Query(None, description="pl3 | pl5 | qxc | ssq，缺省返回全部"),
+    game: str | None = Query(None, description="pl3 | pl5 | qxc | ssq | dlt，缺省返回全部"),
     limit: int = Query(30, ge=1, le=50),
     _slug: str = Depends(_require_pailie_access),
     current_user: str = Depends(get_current_user),
@@ -60,14 +60,14 @@ async def pailie_pools(
     _slug: str = Depends(_require_pailie_access),
     current_user: str = Depends(get_current_user),
 ):
-    """实时同步排列3/5/七星彩/双色球最新奖池，并返回历史每期奖池。"""
+    """实时同步排列3/5/七星彩/双色球/大乐透最新奖池，并返回历史每期奖池。"""
     data = await get_prize_pools(limit)
     return success(data)
 
 
 @router.get("/recommend")
 async def pailie_recommend(
-    game: str = Query("pl3", description="pl3 | pl5 | qxc | ssq"),
+    game: str = Query("pl3", description="pl3 | pl5 | qxc | ssq | dlt"),
     window: int = Query(100, ge=20, le=200, description="统计近 N 期开奖"),
     use_ai: bool = Query(True, description="是否启用多模型 AI 精选（DeepSeek / 千问 / GLM，按已配置密钥启用）"),
     _slug: str = Depends(_require_pailie_access),

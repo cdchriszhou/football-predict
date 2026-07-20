@@ -55,7 +55,7 @@ export default {
       serieA: 'Серия A',
       bundesliga: 'Бундеслига',
       ligue1: 'Лига 1',
-      pailie: 'Pailie 3 / 5 / 7-Star / SSQ',
+      pailie: 'Pailie 3 / 5 / 7-Star / SSQ / DLT',
     },
   },
   header: {

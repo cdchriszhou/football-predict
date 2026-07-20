@@ -147,7 +147,7 @@ COMPETITIONS: dict[str, dict] = {
             "sporttery": False,
             "groups": False,
             "digital_lottery": True,
-            "games": ["pl3", "pl5", "qxc", "ssq"],
+            "games": ["pl3", "pl5", "qxc", "ssq", "dlt"],
         },
         "opening_date": "2004-01-01T00:00:00Z",
         "closing_date": None,
