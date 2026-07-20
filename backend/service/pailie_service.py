@@ -584,76 +584,66 @@ def _cold_pick(analysis: dict[str, Any]) -> list[int]:
 
 
 def _build_recommendations(game_id: str, draws: list[dict], analysis: dict[str, Any]) -> list[dict]:
+    """每种玩法固定输出 5 注直选参考号（去冗余）。"""
     alphabets = analysis["alphabets"]
     n_pos = len(alphabets)
     scores = analysis["position_scores"]
     directs = _pick_direct_numbers(scores, alphabets, count=5)
-    recs: list[dict] = []
 
-    for i, nums in enumerate(directs):
+    # 第 5 注尽量用冷号回补，增加多样性
+    cold_pick = _cold_pick(analysis)
+    used = {tuple(x) for x in directs}
+    if len(directs) >= 5 and tuple(cold_pick) not in used:
+        directs[4] = cold_pick
+    elif len(directs) < 5 and tuple(cold_pick) not in used:
+        directs.append(cold_pick)
+
+    recs: list[dict] = []
+    for i, nums in enumerate(directs[:5]):
         conf = sum(scores[p][nums[p]] for p in range(n_pos)) / n_pos
+        is_cold = nums == cold_pick
         recs.append({
-            "id": f"direct-{i + 1}",
+            "id": f"pick-{i + 1}",
             "mode": "direct",
             "source": "frequency",
-            "label": "主推直选" if i == 0 else f"备选直选 {i}",
+            "label": f"推荐 {i + 1}",
             "digits": nums,
             "display": " ".join(str(x) for x in nums),
             "confidence": round(conf, 4),
-            "reason": "各位历史出现率 + 遗漏 + 近窗趋势综合得分",
+            "reason": (
+                "冷号回补：各位遗漏偏大，作均衡参考"
+                if is_cold
+                else "各位历史出现率 + 遗漏 + 近窗趋势综合得分"
+            ),
             "bets": 1,
         })
-
-    cold_pick = _cold_pick(analysis)
-    if tuple(cold_pick) not in {tuple(r["digits"]) for r in recs}:
-        recs.append({
-            "id": "cold-direct",
-            "mode": "direct",
-            "source": "frequency",
-            "label": "冷号回补直选",
-            "digits": cold_pick,
-            "display": " ".join(str(x) for x in cold_pick),
-            "confidence": round(sum(scores[p][cold_pick[p]] for p in range(n_pos)) / n_pos, 4),
-            "reason": "各位遗漏期数偏大的号码，作均衡参考",
-            "bets": 1,
-        })
-
-    if game_id == "pl3":
-        hot = analysis["hot_digits"]
-        g3 = sorted(hot[:2])
-        if len(g3) >= 2:
-            recs.append({
-                "id": "group3-1",
-                "mode": "group3",
-                "source": "frequency",
-                "label": "热号组选3",
-                "digits": g3,
-                "display": " ".join(str(x) for x in g3),
-                "confidence": round(
-                    sum(next(r["score"] for r in analysis["overall"] if r["digit"] == d) for d in g3) / 2,
-                    4,
-                ),
-                "reason": "近期整体出现频率较高的两位号码",
-                "bets": 2,
-            })
-        g6 = sorted(hot[:3])
-        if len(g6) >= 3:
-            recs.append({
-                "id": "group6-1",
-                "mode": "group6",
-                "source": "frequency",
-                "label": "热号组选6",
-                "digits": g6,
-                "display": " ".join(str(x) for x in g6),
-                "confidence": round(
-                    sum(next(r["score"] for r in analysis["overall"] if r["digit"] == d) for d in g6) / 3,
-                    4,
-                ),
-                "reason": "近期整体出现频率较高的三位号码",
-                "bets": 1,
-            })
-
     return recs
+
+
+def _merge_recommendations(
+    freq_recs: list[dict],
+    ai_picks: list[dict],
+    limit: int = 5,
+) -> list[dict]:
+    """AI 精选优先去重合并，总数严格限制为 limit。"""
+    merged: list[dict] = []
+    seen: set[tuple[int, ...]] = set()
+    for rec in list(ai_picks) + list(freq_recs):
+        digits = rec.get("digits") or []
+        key = tuple(digits)
+        if not digits or key in seen:
+            continue
+        seen.add(key)
+        merged.append(rec)
+        if len(merged) >= limit:
+            break
+    for i, rec in enumerate(merged):
+        rec["id"] = f"pick-{i + 1}"
+        if rec.get("source") == "ai":
+            rec["label"] = f"推荐 {i + 1} · AI"
+        else:
+            rec["label"] = f"推荐 {i + 1}"
+    return merged
 
 
 def _validate_ai_digits(digits: list, alphabets: list[int]) -> list[int] | None:
@@ -677,7 +667,7 @@ async def _ai_refine_picks(
     draws: list[dict],
     base_recs: list[dict],
 ) -> list[dict]:
-    """可选 DeepSeek 精选：在频率候选上再给 1–3 注 AI 号。无密钥或失败则跳过。"""
+    """可选 DeepSeek 精选：最多返回 2 注，最终与频率结果合并为 5 注。"""
     api_key = os.getenv("DEEPSEEK_API_KEY", "")
     if not api_key:
         return []
@@ -707,7 +697,7 @@ async def _ai_refine_picks(
         "返回格式:\n"
         '{"picks":[{"digits":[...],"reason":"一句话","confidence":0.0到1.0}],'
         '"summary":"一句话策略说明"}\n'
-        "要求: picks 1~3 注；digits 长度与位数一致；七星彩末位可为0-14。"
+        "要求: picks 恰好 2 注；digits 长度与位数一致；七星彩末位可为0-14；尽量与候选不完全重复。"
     )
 
     try:
@@ -731,7 +721,7 @@ async def _ai_refine_picks(
         return []
 
     out: list[dict] = []
-    for i, item in enumerate(picks[:3]):
+    for i, item in enumerate(picks[:2]):
         if not isinstance(item, dict):
             continue
         digits = _validate_ai_digits(item.get("digits") or [], alphabets)
@@ -748,7 +738,7 @@ async def _ai_refine_picks(
             "id": f"ai-{i + 1}",
             "mode": "direct",
             "source": "ai",
-            "label": "AI 精选" if i == 0 else f"AI 备选 {i}",
+            "label": f"AI 精选 {i + 1}",
             "digits": digits,
             "display": " ".join(str(x) for x in digits),
             "confidence": round(conf_f, 4),
@@ -798,17 +788,14 @@ async def get_recommendations(
 
     alphabets = GAME_SPECS[game_id]["alphabets"]
     analysis = _analyze_draws(draws, alphabets)
-    recs = _build_recommendations(game_id, draws, analysis)
+    freq_recs = _build_recommendations(game_id, draws, analysis)
 
     ai_picks: list[dict] = []
     ai_enabled = bool(os.getenv("DEEPSEEK_API_KEY", "")) and use_ai
     if ai_enabled:
-        ai_picks = await _ai_refine_picks(game_id, analysis, draws, recs)
-        # AI 精选插到频率主推之后
-        if ai_picks:
-            head = [r for r in recs if r["id"] == "direct-1"]
-            rest = [r for r in recs if r["id"] != "direct-1"]
-            recs = head + ai_picks + rest
+        ai_picks = await _ai_refine_picks(game_id, analysis, draws, freq_recs)
+
+    recs = _merge_recommendations(freq_recs, ai_picks, limit=5)
 
     return {
         "reachable": True,
@@ -822,9 +809,10 @@ async def get_recommendations(
             "cold_weight": _COLD_WEIGHT,
             "trend_weight": _TREND_WEIGHT,
             "ai_enabled": bool(ai_picks),
+            "pick_limit": 5,
             "desc": (
-                "历史样本按位统计出现概率与遗漏，叠加近窗趋势；"
-                + ("已用 AI 结合统计结果精选参考号。" if ai_picks else "AI 未启用或暂不可用，仅展示频率推荐。")
+                "每种玩法固定推荐 5 注；基于历史出现概率、遗漏与近窗趋势"
+                + ("，并由 AI 精选前几注。" if ai_picks else "。")
             ),
         },
         "disclaimer": "历史频率与 AI 建议均不代表下期必然开出，请勿作为必中依据。",

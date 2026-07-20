@@ -112,7 +112,7 @@
             v-for="rec in recommendCards"
             :key="rec.id"
             class="rec-card"
-            :class="{ 'rec-card--primary': rec.id === 'direct-1' }"
+            :class="{ 'rec-card--primary': rec.id === 'pick-1' }"
           >
             <div class="rec-top">
               <span class="rec-label">
@@ -143,26 +143,29 @@
           </div>
         </div>
 
-        <div v-if="freqRows.length" class="freq-block">
-          <h4>{{ t('pailie.freqTitle') }}</h4>
-          <div v-for="(pos, pi) in freqRows" :key="pi" class="freq-pos">
-            <div class="freq-pos-label">{{ positionLabel(pi) }}</div>
-            <div class="freq-bars">
-              <div
-                v-for="item in pos"
-                :key="item.digit"
-                class="freq-item"
-                :title="t('pailie.freqTip', { count: item.count, rate: pct(item.rate), miss: item.miss })"
-              >
-                <span class="freq-digit" :class="item.tag">{{ item.digit }}</span>
-                <div class="freq-bar-track">
-                  <div class="freq-bar-fill" :style="{ width: barWidth(item.rate) }" />
+        <el-collapse v-if="freqRows.length" class="freq-collapse">
+          <el-collapse-item :title="t('pailie.freqTitle')" name="freq">
+            <div class="freq-block">
+              <div v-for="(pos, pi) in freqRows" :key="pi" class="freq-pos">
+                <div class="freq-pos-label">{{ positionLabel(pi) }}</div>
+                <div class="freq-bars">
+                  <div
+                    v-for="item in pos"
+                    :key="item.digit"
+                    class="freq-item"
+                    :title="t('pailie.freqTip', { count: item.count, rate: pct(item.rate), miss: item.miss })"
+                  >
+                    <span class="freq-digit" :class="item.tag">{{ item.digit }}</span>
+                    <div class="freq-bar-track">
+                      <div class="freq-bar-fill" :style="{ width: barWidth(item.rate) }" />
+                    </div>
+                    <span class="freq-meta">{{ pct(item.rate) }}</span>
+                  </div>
                 </div>
-                <span class="freq-meta">{{ pct(item.rate) }}</span>
               </div>
             </div>
-          </div>
-        </div>
+          </el-collapse-item>
+        </el-collapse>
       </section>
 
       <section class="panel rules-panel">
@@ -371,13 +374,6 @@ function isCold(d) {
 }
 
 function recLabel(rec) {
-  if (rec.source === 'ai') {
-    return rec.id === 'ai-1' ? t('pailie.recAi') : t('pailie.recAiAlt')
-  }
-  if (rec.id === 'direct-1') return t('pailie.recPrimary')
-  if (rec.mode === 'group3') return t('pailie.recGroup3')
-  if (rec.mode === 'group6') return t('pailie.recGroup6')
-  if (rec.id === 'cold-direct') return t('pailie.recCold')
   return rec.label || t('pailie.recAlt')
 }
 
@@ -460,7 +456,7 @@ function applyRecommend(rec) {
 }
 
 function applyTopRecommend() {
-  const top = recommendCards.value.find((r) => r.mode === 'direct') || recommendCards.value[0]
+  const top = recommendCards.value[0]
   if (top) applyRecommend(top)
 }
 
@@ -762,6 +758,16 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+.freq-collapse {
+  margin-top: 12px;
+  border: none;
+}
+.freq-collapse :deep(.el-collapse-item__header) {
+  font-size: 14px;
+  color: #606266;
+  height: 40px;
+  line-height: 40px;
 }
 .tag-row {
   display: flex;

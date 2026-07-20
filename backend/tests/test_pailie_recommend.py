@@ -33,10 +33,9 @@ def test_pick_direct_and_build_recs_pl3():
     assert len(picks) >= 1
     assert all(len(p) == 3 for p in picks)
     recs = _build_recommendations("pl3", draws, analysis)
-    assert any(r["mode"] == "direct" for r in recs)
-    assert any(r["id"] == "direct-1" for r in recs)
-    modes = {r["mode"] for r in recs}
-    assert "group3" in modes or "group6" in modes
+    assert len(recs) == 5
+    assert all(r["mode"] == "direct" for r in recs)
+    assert all(r["id"].startswith("pick-") for r in recs)
 
 
 def test_qxc_normalize_and_analyze():
@@ -55,9 +54,9 @@ def test_qxc_normalize_and_analyze():
     assert len(analysis["position_scores"]) == 7
     assert len(analysis["position_scores"][6]) == 15
     recs = _build_recommendations("qxc", draws, analysis)
-    assert any(r["id"] == "direct-1" for r in recs)
-    assert all(len(r["digits"]) == 7 for r in recs if r["mode"] == "direct")
-    assert all(0 <= r["digits"][6] <= 14 for r in recs if r["mode"] == "direct")
+    assert len(recs) == 5
+    assert all(len(r["digits"]) == 7 for r in recs)
+    assert all(0 <= r["digits"][6] <= 14 for r in recs)
 
 
 def test_parse_money_and_pool_fields():
