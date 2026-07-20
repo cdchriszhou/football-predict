@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import json
-import os
 import re
 import time
 from typing import Any
@@ -424,11 +423,15 @@ def _validate_ssq_ai(item: dict) -> tuple[list[int], int] | None:
 
 
 async def ai_refine_ssq(analysis: dict[str, Any], draws: list[dict], base_recs: list[dict]) -> list[dict]:
-    api_key = os.getenv("DEEPSEEK_API_KEY", "")
-    if not api_key:
+    """DeepSeek / 千问 / GLM 并行精选双色球，按共识融合。"""
+    from service.digital_ai import (
+        configured_digital_models,
+        fuse_ai_picks,
+        gather_digital_llm_json,
+    )
+
+    if not configured_digital_models():
         return []
-    from config import DEEPSEEK_API_URL
-    from llm.deepseek_client import _call_api, _parse_llm_json
 
     recent = [{"issue": d["issue"], "result": d["result"]} for d in draws[:12]]
     seed = [{"display": r["display"], "confidence": r["confidence"]} for r in base_recs[:5]]
@@ -443,50 +446,39 @@ async def ai_refine_ssq(analysis: dict[str, Any], draws: list[dict], base_recs: 
         '返回: {"picks":[{"red":[1,2,3,4,5,6],"blue":8,"reason":"一句话","confidence":0.7}],"summary":"..."}\n'
         "要求: picks 恰好 2 注；尽量与候选不完全重复。"
     )
-    try:
-        data = await _call_api(
-            api_key, DEEPSEEK_API_URL, "deepseek-chat", prompt,
-            temperature=0.4, max_tokens=800, json_mode=True,
-        )
-        content = (data or {}).get("choices", [{}])[0].get("message", {}).get("content", "")
-        parsed = _parse_llm_json(content) or {}
-    except Exception as e:
-        logger.warning("ssq AI refine failed: %s", e)
-        return []
 
-    picks = parsed.get("picks") if isinstance(parsed, dict) else None
-    if not isinstance(picks, list):
-        return []
-    out = []
-    for i, item in enumerate(picks[:2]):
-        if not isinstance(item, dict):
-            continue
-        validated = _validate_ssq_ai(item)
-        if not validated:
-            continue
+    model_results = await gather_digital_llm_json(prompt)
+
+    def extract_items(parsed: dict) -> list[dict]:
+        picks = parsed.get("picks")
+        return picks if isinstance(picks, list) else []
+
+    def build_rec(validated, conf, reason, _models):
         reds, blue = validated
-        try:
-            conf = max(0.0, min(1.0, float(item.get("confidence", 0.6))))
-        except (TypeError, ValueError):
-            conf = 0.6
-        reason = str(item.get("reason") or parsed.get("summary") or "AI 结合频率与走势精选").strip()[:120]
-        out.append({
-            "id": f"ai-{i + 1}",
+        return {
             "mode": "ssq",
-            "source": "ai",
-            "label": f"AI 精选 {i + 1}",
+            "label": "AI 精选",
             "digits": reds + [blue],
             "red": reds,
             "blue": blue,
             "display": " ".join(_fmt_ball(x) for x in reds) + " + " + _fmt_ball(blue),
-            "confidence": round(conf, 4),
+            "confidence": conf,
             "reason": reason,
             "bets": 1,
-        })
-    return out
+        }
+
+    return fuse_ai_picks(
+        model_results,
+        extract_items=extract_items,
+        validate_item=_validate_ssq_ai,
+        build_rec=build_rec,
+        limit=3,
+    )
 
 
 async def get_ssq_recommendations(window: int = 100, use_ai: bool = True) -> dict[str, Any]:
+    from service.digital_ai import configured_digital_models, model_display_name
+
     window = max(20, min(int(window or 100), 100))
     draws = await fetch_ssq_history(window)
     if not draws:
@@ -502,12 +494,14 @@ async def get_ssq_recommendations(window: int = 100, use_ai: bool = True) -> dic
             "hot_digits": [],
             "cold_digits": [],
             "ai_enabled": False,
+            "ai_models": [],
         }
 
     analysis = analyze_ssq(draws)
     freq_recs = build_ssq_recommendations(analysis)
     ai_picks: list[dict] = []
-    if use_ai and os.getenv("DEEPSEEK_API_KEY", ""):
+    configured = configured_digital_models()
+    if use_ai and configured:
         ai_picks = await ai_refine_ssq(analysis, draws, freq_recs)
 
     # merge to 5
@@ -523,7 +517,17 @@ async def get_ssq_recommendations(window: int = 100, use_ai: bool = True) -> dic
             break
     for i, rec in enumerate(merged):
         rec["id"] = f"pick-{i + 1}"
-        rec["label"] = f"推荐 {i + 1}" + (" · AI" if rec.get("source") == "ai" else "")
+        if rec.get("source") == "ai":
+            model_label = rec.get("model_label") or "AI"
+            rec["label"] = f"推荐 {i + 1} · {model_label}"
+        else:
+            rec["label"] = f"推荐 {i + 1}"
+
+    model_names = sorted({
+        model_display_name(m)
+        for r in ai_picks
+        for m in (r.get("models") or [])
+    })
 
     return {
         "reachable": True,
@@ -538,10 +542,15 @@ async def get_ssq_recommendations(window: int = 100, use_ai: bool = True) -> dic
             "cold_weight": _COLD_WEIGHT,
             "trend_weight": _TREND_WEIGHT,
             "ai_enabled": bool(ai_picks),
+            "ai_models": model_names,
             "pick_limit": 5,
             "desc": (
                 "双色球固定推荐 5 注；红蓝球分别统计历史出现概率、遗漏与近窗趋势"
-                + ("，并由 AI 精选前几注。" if ai_picks else "。")
+                + (
+                    f"，并由 {'+'.join(model_names)} 多模型精选前几注。"
+                    if ai_picks and model_names
+                    else ("，并由 AI 精选前几注。" if ai_picks else "。")
+                )
             ),
         },
         "disclaimer": "历史频率与 AI 建议均不代表下期必然开出，请勿作为必中依据。双色球为福利彩票玩法。",
@@ -555,4 +564,5 @@ async def get_ssq_recommendations(window: int = 100, use_ai: bool = True) -> dic
         "history_preview": draws[:15],
         "latest": draws[0] if draws else None,
         "ai_enabled": bool(ai_picks),
+        "ai_models": model_names,
     }

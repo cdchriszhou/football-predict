@@ -90,7 +90,11 @@
         <div class="ai-row">
           <el-switch v-model="useAi" @change="loadRecommend" />
           <span class="ai-label">{{ t('pailie.useAi') }}</span>
-          <el-tag v-if="recommend?.ai_enabled" size="small" type="success">{{ t('pailie.aiActive') }}</el-tag>
+          <el-tag v-if="recommend?.ai_enabled" size="small" type="success">
+            {{ recommend.ai_models?.length
+              ? t('pailie.aiActiveModels', { models: recommend.ai_models.join('+') })
+              : t('pailie.aiActive') }}
+          </el-tag>
           <el-tag v-else-if="useAi" size="small" type="info">{{ t('pailie.aiInactive') }}</el-tag>
         </div>
 
@@ -120,7 +124,9 @@
           >
             <div class="rec-top">
               <span class="rec-label">
-                <el-tag v-if="rec.source === 'ai'" size="small" type="warning" effect="plain" class="ai-tag">AI</el-tag>
+                <el-tag v-if="rec.source === 'ai'" size="small" type="warning" effect="plain" class="ai-tag">
+                  {{ rec.model_label || 'AI' }}
+                </el-tag>
                 {{ recLabel(rec) }}
               </span>
               <span class="rec-conf">{{ Math.round((rec.confidence || 0) * 100) }}%</span>

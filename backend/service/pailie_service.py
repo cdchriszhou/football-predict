@@ -648,7 +648,8 @@ def _merge_recommendations(
     for i, rec in enumerate(merged):
         rec["id"] = f"pick-{i + 1}"
         if rec.get("source") == "ai":
-            rec["label"] = f"推荐 {i + 1} · AI"
+            model_label = rec.get("model_label") or "AI"
+            rec["label"] = f"推荐 {i + 1} · {model_label}"
         else:
             rec["label"] = f"推荐 {i + 1}"
     return merged
@@ -675,13 +676,15 @@ async def _ai_refine_picks(
     draws: list[dict],
     base_recs: list[dict],
 ) -> list[dict]:
-    """可选 DeepSeek 精选：最多返回 2 注，最终与频率结果合并为 5 注。"""
-    api_key = os.getenv("DEEPSEEK_API_KEY", "")
-    if not api_key:
-        return []
+    """DeepSeek / 千问 / GLM 并行精选，按共识融合，最多返回 3 注。"""
+    from service.digital_ai import (
+        configured_digital_models,
+        fuse_ai_picks,
+        gather_digital_llm_json,
+    )
 
-    from config import DEEPSEEK_API_URL
-    from llm.deepseek_client import _call_api, _parse_llm_json
+    if not configured_digital_models():
+        return []
 
     spec = GAME_SPECS[game_id]
     alphabets = spec["alphabets"]
@@ -708,53 +711,30 @@ async def _ai_refine_picks(
         "要求: picks 恰好 2 注；digits 长度与位数一致；七星彩末位可为0-14；尽量与候选不完全重复。"
     )
 
-    try:
-        data = await _call_api(
-            api_key,
-            DEEPSEEK_API_URL,
-            "deepseek-chat",
-            prompt,
-            temperature=0.4,
-            max_tokens=800,
-            json_mode=True,
-        )
-        content = (data or {}).get("choices", [{}])[0].get("message", {}).get("content", "")
-        parsed = _parse_llm_json(content) or {}
-    except Exception as e:
-        logger.warning("pailie AI refine failed [%s]: %s", game_id, e)
-        return []
+    model_results = await gather_digital_llm_json(prompt)
 
-    picks = parsed.get("picks") if isinstance(parsed, dict) else None
-    if not isinstance(picks, list):
-        return []
+    def extract_items(parsed: dict) -> list[dict]:
+        picks = parsed.get("picks")
+        return picks if isinstance(picks, list) else []
 
-    out: list[dict] = []
-    for i, item in enumerate(picks[:2]):
-        if not isinstance(item, dict):
-            continue
-        digits = _validate_ai_digits(item.get("digits") or [], alphabets)
-        if not digits:
-            continue
-        conf = item.get("confidence")
-        try:
-            conf_f = float(conf)
-        except (TypeError, ValueError):
-            conf_f = 0.6
-        conf_f = max(0.0, min(1.0, conf_f))
-        reason = str(item.get("reason") or parsed.get("summary") or "AI 结合频率与走势精选").strip()[:120]
-        out.append({
-            "id": f"ai-{i + 1}",
+    def build_rec(digits, conf, reason, _models):
+        return {
             "mode": "direct",
-            "source": "ai",
-            "label": f"AI 精选 {i + 1}",
+            "label": "AI 精选",
             "digits": digits,
             "display": " ".join(str(x) for x in digits),
-            "confidence": round(conf_f, 4),
+            "confidence": conf,
             "reason": reason,
             "bets": 1,
-        })
-    return out
+        }
 
+    return fuse_ai_picks(
+        model_results,
+        extract_items=extract_items,
+        validate_item=lambda item: _validate_ai_digits(item.get("digits") or [], alphabets),
+        build_rec=build_rec,
+        limit=3,
+    )
 
 async def get_recommendations(
     game_id: str,
@@ -802,11 +782,19 @@ async def get_recommendations(
     freq_recs = _build_recommendations(game_id, draws, analysis)
 
     ai_picks: list[dict] = []
-    ai_enabled = bool(os.getenv("DEEPSEEK_API_KEY", "")) and use_ai
+    from service.digital_ai import configured_digital_models, model_display_name
+
+    configured = configured_digital_models()
+    ai_enabled = bool(configured) and use_ai
     if ai_enabled:
         ai_picks = await _ai_refine_picks(game_id, analysis, draws, freq_recs)
 
     recs = _merge_recommendations(freq_recs, ai_picks, limit=5)
+    model_names = sorted({
+        model_display_name(m)
+        for r in ai_picks
+        for m in (r.get("models") or [])
+    })
 
     return {
         "reachable": True,
@@ -820,10 +808,15 @@ async def get_recommendations(
             "cold_weight": _COLD_WEIGHT,
             "trend_weight": _TREND_WEIGHT,
             "ai_enabled": bool(ai_picks),
+            "ai_models": model_names,
             "pick_limit": 5,
             "desc": (
                 "每种玩法固定推荐 5 注；基于历史出现概率、遗漏与近窗趋势"
-                + ("，并由 AI 精选前几注。" if ai_picks else "。")
+                + (
+                    f"，并由 {'+'.join(model_names)} 多模型精选前几注。"
+                    if ai_picks and model_names
+                    else ("，并由 AI 精选前几注。" if ai_picks else "。")
+                )
             ),
         },
         "disclaimer": "历史频率与 AI 建议均不代表下期必然开出，请勿作为必中依据。",
@@ -835,4 +828,5 @@ async def get_recommendations(
         "history_preview": draws[:15],
         "latest": draws[0] if draws else None,
         "ai_enabled": bool(ai_picks),
+        "ai_models": model_names,
     }

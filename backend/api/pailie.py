@@ -69,7 +69,7 @@ async def pailie_pools(
 async def pailie_recommend(
     game: str = Query("pl3", description="pl3 | pl5 | qxc | ssq"),
     window: int = Query(100, ge=20, le=200, description="统计近 N 期开奖"),
-    use_ai: bool = Query(True, description="是否启用 AI 精选（需配置 DEEPSEEK_API_KEY）"),
+    use_ai: bool = Query(True, description="是否启用多模型 AI 精选（DeepSeek / 千问 / GLM，按已配置密钥启用）"),
     _slug: str = Depends(_require_pailie_access),
     current_user: str = Depends(get_current_user),
 ):
