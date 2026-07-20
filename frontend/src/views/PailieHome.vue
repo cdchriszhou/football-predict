@@ -1105,12 +1105,6 @@ onUnmounted(() => {
   color: #606266;
   line-height: 1.5;
 }
-.digit-tags {
-  margin-top: 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
 .freq-collapse {
   margin-top: 12px;
   border: none;
@@ -1120,37 +1114,6 @@ onUnmounted(() => {
   color: #606266;
   height: 40px;
   line-height: 40px;
-}
-.tag-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-.tag-label {
-  font-size: 13px;
-  color: #606266;
-  min-width: 64px;
-}
-.digit-chip {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 13px;
-  font-weight: 700;
-}
-.digit-chip.hot {
-  background: #ffebee;
-  color: #c62828;
-  border: 1px solid #ef9a9a;
-}
-.digit-chip.cold {
-  background: #e3f2fd;
-  color: #1565c0;
-  border: 1px solid #90caf9;
 }
 .freq-pos {
   margin-bottom: 12px;
