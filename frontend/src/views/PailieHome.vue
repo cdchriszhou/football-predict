@@ -24,6 +24,47 @@
       <el-tab-pane :label="t('pailie.qxc')" name="qxc" />
     </el-tabs>
 
+    <section class="panel pool-panel">
+      <div class="picker-head">
+        <div>
+          <h3>{{ t('pailie.poolTitle') }}</h3>
+          <p class="note">
+            {{ t('pailie.poolHint') }}
+            <template v-if="poolsUpdatedAt"> · {{ t('pailie.poolUpdated', { time: poolsUpdatedAt }) }}</template>
+          </p>
+        </div>
+        <el-button size="small" :loading="poolsLoading" @click="loadPools">{{ t('pailie.poolRefresh') }}</el-button>
+      </div>
+      <el-alert
+        v-if="poolsMessage"
+        type="warning"
+        :closable="false"
+        show-icon
+        class="history-alert"
+        :title="poolsMessage"
+      />
+      <div class="pool-grid">
+        <div
+          v-for="g in poolGameIds"
+          :key="g"
+          class="pool-card"
+          :class="{ 'pool-card--active': activeGame === g }"
+          @click="switchToGame(g)"
+        >
+          <div class="pool-name">{{ gameName(g) }}</div>
+          <div class="pool-amount">{{ formatPool(poolOf(g)?.latest?.pool_balance_text) }}</div>
+          <div class="pool-meta">
+            <span>{{ t('pailie.colIssue') }} {{ poolOf(g)?.latest?.issue || '—' }}</span>
+            <span>{{ poolOf(g)?.latest?.draw_time || '—' }}</span>
+          </div>
+          <div class="pool-sale">
+            {{ t('pailie.saleAmount') }}：{{ formatPool(poolOf(g)?.latest?.sale_amount_text) }}
+          </div>
+          <p class="pool-note">{{ poolOf(g)?.pool_note || '' }}</p>
+        </div>
+      </div>
+    </section>
+
     <div v-loading="loading" class="game-body">
       <section class="panel recommend-panel">
         <div class="picker-head">
@@ -203,10 +244,16 @@
           :title="historyMessage"
           class="history-alert"
         />
-        <el-table :data="historyRows" stripe size="small" empty-text="—">
-          <el-table-column prop="issue" :label="t('pailie.colIssue')" min-width="100" />
-          <el-table-column prop="result" :label="t('pailie.colResult')" min-width="120" />
-          <el-table-column prop="draw_time" :label="t('pailie.colTime')" min-width="120" />
+        <el-table :data="historyTableRows" stripe size="small" empty-text="—">
+          <el-table-column prop="issue" :label="t('pailie.colIssue')" min-width="90" />
+          <el-table-column prop="result" :label="t('pailie.colResult')" min-width="130" />
+          <el-table-column prop="draw_time" :label="t('pailie.colTime')" min-width="110" />
+          <el-table-column :label="t('pailie.colPool')" min-width="130">
+            <template #default="{ row }">{{ formatPool(row.pool_balance_text) }}</template>
+          </el-table-column>
+          <el-table-column :label="t('pailie.colSale')" min-width="120">
+            <template #default="{ row }">{{ formatPool(row.sale_amount_text) }}</template>
+          </el-table-column>
         </el-table>
       </section>
     </div>
@@ -214,16 +261,18 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
-import { getPailieCatalog, getPailieHistory, getPailieRecommend } from '@/api/pailie'
+import { getPailieCatalog, getPailieHistory, getPailiePools, getPailieRecommend } from '@/api/pailie'
 
 const { t } = useI18n()
 
 const loading = ref(false)
+const poolsLoading = ref(false)
 const catalog = ref(null)
 const history = ref({ history: {}, message: null, reachable: false })
+const poolsData = ref({ pools: {}, message: null, updated_at: null })
 const recommend = ref(null)
 const activeGame = ref('pl3')
 const pl3Mode = ref('direct')
@@ -231,6 +280,8 @@ const windowSize = ref(100)
 const useAi = ref(true)
 const selections = ref([[], [], []])
 const tickets = ref([])
+const poolGameIds = ['pl3', 'pl5', 'qxc']
+let poolTimer = null
 
 const currentGame = computed(() =>
   (catalog.value?.games || []).find((g) => g.id === activeGame.value) || null,
@@ -239,6 +290,21 @@ const currentGame = computed(() =>
 const digitRows = computed(() => selections.value)
 const historyRows = computed(() => history.value?.history?.[activeGame.value] || [])
 const historyMessage = computed(() => history.value?.message || '')
+const historyTableRows = computed(() => {
+  const fromPools = poolsData.value?.pools?.[activeGame.value]?.history
+  if (Array.isArray(fromPools) && fromPools.length) return fromPools
+  return historyRows.value
+})
+const poolsMessage = computed(() => poolsData.value?.message || '')
+const poolsUpdatedAt = computed(() => {
+  const raw = poolsData.value?.updated_at
+  if (!raw) return ''
+  try {
+    return new Date(raw).toLocaleString()
+  } catch {
+    return raw
+  }
+})
 const recommendCards = computed(() => recommend.value?.recommendations || [])
 const hotDigits = computed(() => recommend.value?.hot_digits || [])
 const coldDigits = computed(() => recommend.value?.cold_digits || [])
@@ -249,6 +315,27 @@ const freqRows = computed(() => {
   )
 })
 
+function poolOf(gameId) {
+  return poolsData.value?.pools?.[gameId] || null
+}
+
+function gameName(gameId) {
+  if (gameId === 'pl3') return t('pailie.pl3')
+  if (gameId === 'pl5') return t('pailie.pl5')
+  if (gameId === 'qxc') return t('pailie.qxc')
+  return gameId
+}
+
+function formatPool(text) {
+  if (text === 0 || text === '0') return '0'
+  return text || '—'
+}
+
+function switchToGame(gameId) {
+  if (activeGame.value === gameId) return
+  activeGame.value = gameId
+  onTabChange()
+}
 const modeLabel = computed(() => {
   if (activeGame.value !== 'pl3') return t('pailie.modeDirect')
   if (pl3Mode.value === 'group3') return t('pailie.modeGroup3')
@@ -437,6 +524,22 @@ function ticketModeLabel(tk) {
   return t('pailie.modeDirect')
 }
 
+async function loadPools() {
+  poolsLoading.value = true
+  try {
+    const res = await getPailiePools({ limit: 30 })
+    if (res?.code === 200) poolsData.value = res.data
+  } catch (e) {
+    poolsData.value = {
+      pools: {},
+      message: e?.message || t('pailie.loadFailed'),
+      updated_at: null,
+    }
+  } finally {
+    poolsLoading.value = false
+  }
+}
+
 async function loadRecommend() {
   try {
     const res = await getPailieRecommend({
@@ -468,8 +571,9 @@ async function refresh() {
   try {
     const [catRes, histRes] = await Promise.all([
       getPailieCatalog(),
-      getPailieHistory({ limit: 15 }),
+      getPailieHistory({ limit: 30 }),
       loadRecommend(),
+      loadPools(),
     ])
     if (catRes?.code === 200) catalog.value = catRes.data
     if (histRes?.code === 200) history.value = histRes.data
@@ -483,6 +587,13 @@ async function refresh() {
 onMounted(() => {
   ensureRows()
   refresh()
+  poolTimer = setInterval(() => {
+    loadPools()
+  }, 5 * 60 * 1000)
+})
+
+onUnmounted(() => {
+  if (poolTimer) clearInterval(poolTimer)
 })
 </script>
 
@@ -510,6 +621,55 @@ onMounted(() => {
 }
 .game-tabs {
   margin-bottom: 8px;
+}
+.pool-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+.pool-card {
+  border: 1px solid #ffe0e0;
+  border-radius: 12px;
+  padding: 14px;
+  background: linear-gradient(160deg, #fff8f6, #fff);
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.pool-card:hover,
+.pool-card--active {
+  border-color: #c62828;
+  box-shadow: 0 2px 10px rgba(198, 40, 40, 0.12);
+}
+.pool-name {
+  font-weight: 700;
+  color: #c62828;
+  margin-bottom: 6px;
+}
+.pool-amount {
+  font-size: 22px;
+  font-weight: 800;
+  color: #1a237e;
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
+}
+.pool-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 8px;
+  font-size: 12px;
+  color: #909399;
+}
+.pool-sale {
+  margin-top: 6px;
+  font-size: 12px;
+  color: #606266;
+}
+.pool-note {
+  margin: 8px 0 0;
+  font-size: 11px;
+  color: #909399;
+  line-height: 1.4;
 }
 .panel {
   background: #fff;

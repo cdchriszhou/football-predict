@@ -126,6 +126,62 @@ def _parse_digit_token(tok: str, max_val: int) -> int | None:
     return None
 
 
+def _parse_money(raw: Any) -> float | None:
+    """Parse amounts like '174,321,661.80' / 174321661.8 / '0'."""
+    if raw is None:
+        return None
+    if isinstance(raw, (int, float)):
+        return float(raw)
+    text = str(raw).strip()
+    if not text or text in ("-", "—", "null", "None"):
+        return None
+    text = text.replace(",", "").replace("￥", "").replace("¥", "").replace("元", "").strip()
+    try:
+        return float(text)
+    except ValueError:
+        m = re.search(r"[\d.]+", text)
+        if not m:
+            return None
+        try:
+            return float(m.group(0))
+        except ValueError:
+            return None
+
+
+def _format_money(val: float | None) -> str | None:
+    if val is None:
+        return None
+    if abs(val - round(val)) < 1e-9:
+        return f"{int(round(val)):,}"
+    return f"{val:,.2f}"
+
+
+def _parse_prize_levels(raw_list: Any) -> list[dict]:
+    if not isinstance(raw_list, list):
+        return []
+    out = []
+    for item in raw_list:
+        if not isinstance(item, dict):
+            continue
+        level = item.get("prizeLevel") or item.get("prize_level") or item.get("level")
+        stake_amount = _parse_money(item.get("stakeAmount") or item.get("stake_amount"))
+        stake_count = item.get("stakeCount") or item.get("stake_count")
+        total_prize = _parse_money(item.get("totalPrizeAmount") or item.get("total_prize_amount"))
+        try:
+            stake_count_n = int(str(stake_count).replace(",", "")) if stake_count not in (None, "") else None
+        except ValueError:
+            stake_count_n = None
+        out.append({
+            "level": level,
+            "stake_amount": stake_amount,
+            "stake_amount_text": _format_money(stake_amount),
+            "stake_count": stake_count_n,
+            "total_prize": total_prize,
+            "total_prize_text": _format_money(total_prize),
+        })
+    return out
+
+
 def _normalize_draw_row(raw: dict, game_id: str) -> dict[str, Any] | None:
     spec = GAME_SPECS.get(game_id)
     if not spec:
@@ -155,11 +211,9 @@ def _normalize_draw_row(raw: dict, game_id: str) -> dict[str, Any] | None:
 
     text = str(result).replace("+", " ").replace(",", " ").replace("|", " ").replace("-", " ")
     tokens = [t for t in text.split() if t]
-    # 紧凑串如 12345614 / 123456+14 已拆；若仍是单 token 且为长数字则按位拆前区
     if len(tokens) == 1 and tokens[0].isdigit() and len(tokens[0]) >= need:
         compact = tokens[0]
         if game_id == "qxc" and len(compact) >= 7:
-            # 末位可能是两位数 10-14
             front = compact[:6]
             back = compact[6:]
             tokens = list(front) + [back]
@@ -167,7 +221,7 @@ def _normalize_draw_row(raw: dict, game_id: str) -> dict[str, Any] | None:
             tokens = list(compact[:need])
 
     parsed: list[int] = []
-    for i, tok in enumerate(tokens):
+    for tok in tokens:
         if len(parsed) >= need:
             break
         max_val = alphabets[len(parsed)] - 1
@@ -181,13 +235,34 @@ def _normalize_draw_row(raw: dict, game_id: str) -> dict[str, Any] | None:
     if len(parsed) < need:
         return None
 
+    pool = _parse_money(
+        raw.get("poolBalanceAfterdraw")
+        or raw.get("poolBalanceAfterDraw")
+        or raw.get("pool_balance_afterdraw")
+        or raw.get("poolBalance")
+        or raw.get("pool_balance")
+    )
+    sale = _parse_money(
+        raw.get("totalSaleAmount")
+        or raw.get("total_sale_amount")
+        or raw.get("saleAmount")
+        or raw.get("sale_amount")
+    )
+    prize_levels = _parse_prize_levels(
+        raw.get("prizeLevelList") or raw.get("prize_level_list") or raw.get("prizeLevels")
+    )
+
     return {
         "issue": str(issue),
         "result": " ".join(str(x) for x in parsed),
         "digits": parsed,
         "draw_time": draw_time,
-        "sale_amount": raw.get("totalSaleAmount") or raw.get("saleAmount"),
-        "pool_balance": raw.get("poolBalanceAfterdraw") or raw.get("poolBalance"),
+        "sale_amount": sale,
+        "sale_amount_text": _format_money(sale),
+        "pool_balance": pool,
+        "pool_balance_text": _format_money(pool),
+        "prize_levels": prize_levels,
+        "has_floating_pool": game_id in ("pl5", "qxc"),
     }
 
 
@@ -292,6 +367,61 @@ async def get_draw_history(game_id: str | None = None, limit: int = 10) -> dict[
         "reachable": reachable,
         "history": history,
         "message": None if reachable else "暂时无法获取官方开奖数据，仍可使用选号与玩法说明。",
+    }
+
+
+async def get_prize_pools(history_limit: int = 30) -> dict[str, Any]:
+    """同步三种玩法最新奖池，并附带近期每期奖池明细。"""
+    history_limit = max(5, min(int(history_limit or 30), 50))
+    games = list(GAME_SPECS.keys())
+    rows_list = await asyncio.gather(*[_fetch_history(g, history_limit) for g in games])
+
+    pools: dict[str, Any] = {}
+    for game_id, rows in zip(games, rows_list):
+        spec = GAME_SPECS[game_id]
+        latest = rows[0] if rows else None
+        history = [
+            {
+                "issue": r["issue"],
+                "draw_time": r.get("draw_time"),
+                "result": r.get("result"),
+                "pool_balance": r.get("pool_balance"),
+                "pool_balance_text": r.get("pool_balance_text"),
+                "sale_amount": r.get("sale_amount"),
+                "sale_amount_text": r.get("sale_amount_text"),
+                "prize_levels": r.get("prize_levels") or [],
+            }
+            for r in rows
+        ]
+        pools[game_id] = {
+            "game": game_id,
+            "name": spec["name"],
+            "has_floating_pool": game_id in ("pl5", "qxc"),
+            "pool_note": (
+                "固定奖玩法，官方奖池字段通常为 0 或空，以下为接口同步值。"
+                if game_id == "pl3"
+                else "开奖后奖池余额（元），来自体彩官方开奖公告。"
+            ),
+            "latest": None if not latest else {
+                "issue": latest["issue"],
+                "draw_time": latest.get("draw_time"),
+                "result": latest.get("result"),
+                "pool_balance": latest.get("pool_balance"),
+                "pool_balance_text": latest.get("pool_balance_text"),
+                "sale_amount": latest.get("sale_amount"),
+                "sale_amount_text": latest.get("sale_amount_text"),
+                "prize_levels": latest.get("prize_levels") or [],
+            },
+            "history": history,
+            "reachable": bool(rows),
+        }
+
+    reachable = any(p["reachable"] for p in pools.values())
+    return {
+        "reachable": reachable,
+        "updated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "message": None if reachable else "暂时无法同步官方奖池数据，请稍后刷新。",
+        "pools": pools,
     }
 
 

@@ -60,6 +60,29 @@ def test_qxc_normalize_and_analyze():
     assert all(0 <= r["digits"][6] <= 14 for r in recs if r["mode"] == "direct")
 
 
+def test_parse_money_and_pool_fields():
+    from service.pailie_service import _parse_money
+
+    assert _parse_money("174,321,661.80") == 174321661.80
+    assert _parse_money("0") == 0.0
+    raw = {
+        "lotteryDrawNum": "23154",
+        "lotteryDrawResult": "4 3 3 5 0",
+        "lotteryDrawTime": "2023-06-13",
+        "poolBalanceAfterdraw": "174,321,661.80",
+        "totalSaleAmount": "20,526,970",
+        "prizeLevelList": [
+            {"prizeLevel": "一等奖", "stakeAmount": "100,000", "stakeCount": "52", "totalPrizeAmount": "5,200,000"},
+        ],
+    }
+    item = _normalize_draw_row(raw, "pl5")
+    assert item["pool_balance"] == 174321661.80
+    assert item["pool_balance_text"] == "174,321,661.80"
+    assert item["sale_amount"] == 20526970.0
+    assert item["prize_levels"][0]["level"] == "一等奖"
+    assert item["has_floating_pool"] is True
+
+
 def test_validate_ai_digits_qxc():
     alphabets = GAME_SPECS["qxc"]["alphabets"]
     assert _validate_ai_digits([1, 2, 3, 4, 5, 6, 14], alphabets) == [1, 2, 3, 4, 5, 6, 14]

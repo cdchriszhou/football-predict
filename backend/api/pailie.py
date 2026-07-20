@@ -4,7 +4,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.auth import get_current_user, get_db_user, verify_token
 from db import get_db
-from service.pailie_service import get_draw_history, get_games_catalog, get_recommendations
+from service.pailie_service import (
+    get_draw_history,
+    get_games_catalog,
+    get_prize_pools,
+    get_recommendations,
+)
 from service.user_access import check_competition_access
 from utils.response import success
 
@@ -40,12 +45,23 @@ async def pailie_catalog(
 
 @router.get("/history")
 async def pailie_history(
-    game: str | None = Query(None, description="pl3 | pl5，缺省返回两者"),
-    limit: int = Query(15, ge=1, le=50),
+    game: str | None = Query(None, description="pl3 | pl5 | qxc，缺省返回全部"),
+    limit: int = Query(30, ge=1, le=50),
     _slug: str = Depends(_require_pailie_access),
     current_user: str = Depends(get_current_user),
 ):
     data = await get_draw_history(game, limit)
+    return success(data)
+
+
+@router.get("/pools")
+async def pailie_pools(
+    limit: int = Query(30, ge=5, le=50, description="每种玩法返回近期期数"),
+    _slug: str = Depends(_require_pailie_access),
+    current_user: str = Depends(get_current_user),
+):
+    """实时同步排列3/5/七星彩最新奖池，并返回历史每期奖池。"""
+    data = await get_prize_pools(limit)
     return success(data)
 
 
