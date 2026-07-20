@@ -293,7 +293,7 @@ export default {
     colPool: '獎池(元)',
     colSale: '銷售額(元)',
     poolTitle: '獎金池即時同步',
-    poolHint: '同步官方開獎公告中的獎池餘額；排列3為固定獎，無浮動獎池；雙色球來自福彩，大樂透來自体彩。',
+    poolHint: '同步官方開獎公告中的獎池餘額；排列3為固定獎，無浮動獎池；雙色球來自福彩，大樂透來自體彩。',
     poolRefresh: '同步獎池',
     poolUpdated: '更新於 {time}',
     saleAmount: '銷售額',
