@@ -52,7 +52,7 @@
           @click="switchToGame(g)"
         >
           <div class="pool-name">{{ gameName(g) }}</div>
-          <div class="pool-amount">{{ formatPool(poolOf(g)?.latest?.pool_balance_text) }}</div>
+          <div class="pool-amount">{{ poolAmountDisplay(g) }}</div>
           <div class="pool-meta">
             <span>{{ t('pailie.colIssue') }} {{ poolOf(g)?.latest?.issue || '—' }}</span>
             <span>{{ poolOf(g)?.latest?.draw_time || '—' }}</span>
@@ -60,7 +60,10 @@
           <div class="pool-sale">
             {{ t('pailie.saleAmount') }}：{{ formatPool(poolOf(g)?.latest?.sale_amount_text) }}
           </div>
-          <p class="pool-note">{{ poolOf(g)?.pool_note || '' }}</p>
+          <div v-if="g === 'pl3'" class="pool-fixed">
+            {{ t('pailie.pl3FixedPrizes') }}
+          </div>
+          <p class="pool-note">{{ poolNoteDisplay(g) }}</p>
         </div>
       </div>
     </section>
@@ -251,8 +254,10 @@
           <el-table-column prop="issue" :label="t('pailie.colIssue')" min-width="90" />
           <el-table-column prop="result" :label="t('pailie.colResult')" min-width="130" />
           <el-table-column prop="draw_time" :label="t('pailie.colTime')" min-width="110" />
-          <el-table-column :label="t('pailie.colPool')" min-width="130">
-            <template #default="{ row }">{{ formatPool(row.pool_balance_text) }}</template>
+          <el-table-column :label="t('pailie.colPool')" min-width="140">
+            <template #default="{ row }">
+              {{ activeGame === 'pl3' ? t('pailie.noFloatingPool') : formatPool(row.pool_balance_text) }}
+            </template>
           </el-table-column>
           <el-table-column :label="t('pailie.colSale')" min-width="120">
             <template #default="{ row }">{{ formatPool(row.sale_amount_text) }}</template>
@@ -332,6 +337,20 @@ function gameName(gameId) {
 function formatPool(text) {
   if (text === 0 || text === '0') return '0'
   return text || '—'
+}
+
+function poolAmountDisplay(gameId) {
+  const latest = poolOf(gameId)?.latest
+  if (gameId === 'pl3') {
+    // 排列3 为固定奖，无浮动奖池；官方接口奖池字段常为 0
+    return t('pailie.noFloatingPool')
+  }
+  return formatPool(latest?.pool_balance_text)
+}
+
+function poolNoteDisplay(gameId) {
+  if (gameId === 'pl3') return t('pailie.pl3PoolExplain')
+  return poolOf(gameId)?.pool_note || ''
 }
 
 function switchToGame(gameId) {
@@ -660,6 +679,12 @@ onUnmounted(() => {
   margin-top: 6px;
   font-size: 12px;
   color: #606266;
+}
+.pool-fixed {
+  margin-top: 6px;
+  font-size: 12px;
+  color: #e65100;
+  font-weight: 600;
 }
 .pool-note {
   margin: 8px 0 0;
