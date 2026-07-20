@@ -183,17 +183,6 @@
           </div>
         </div>
 
-        <div v-if="hotDigits.length || coldDigits.length" class="digit-tags">
-          <div class="tag-row">
-            <span class="tag-label">{{ t('pailie.hotDigits') }}</span>
-            <span v-for="d in hotDigits" :key="'h' + d" class="digit-chip hot">{{ formatBall(d) }}</span>
-          </div>
-          <div class="tag-row">
-            <span class="tag-label">{{ t('pailie.coldDigits') }}</span>
-            <span v-for="d in coldDigits" :key="'c' + d" class="digit-chip cold">{{ formatBall(d) }}</span>
-          </div>
-        </div>
-
         <el-collapse v-if="freqRows.length" class="freq-collapse">
           <el-collapse-item :title="t('pailie.freqTitle')" name="freq">
             <div class="freq-block">
