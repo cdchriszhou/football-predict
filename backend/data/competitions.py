@@ -1,4 +1,4 @@
-"""Competition registry — World Cup +五大联赛."""
+"""Competition registry — World Cup +五大联赛 + 体彩数字彩."""
 
 from __future__ import annotations
 
@@ -135,6 +135,26 @@ COMPETITIONS: dict[str, dict] = {
         "timezone": "Europe/Paris",
         "timezone_label_key": "france",
         "order": 5,
+    },
+    "pailie": {
+        "slug": "pailie",
+        "name_key": "pailie",
+        "short_name": "排列3/5",
+        "type": "digital",
+        "features": {
+            "bracket": False,
+            "tournament": False,
+            "sporttery": False,
+            "groups": False,
+            "digital_lottery": True,
+            "games": ["pl3", "pl5"],
+        },
+        "opening_date": "2004-01-01T00:00:00Z",
+        "closing_date": None,
+        "theme_color": "#c62828",
+        "timezone": "Asia/Shanghai",
+        "timezone_label_key": "beijing",
+        "order": 6,
     },
 }
 

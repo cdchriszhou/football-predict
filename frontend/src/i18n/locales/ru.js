@@ -10,6 +10,7 @@ export default {
   },
   nav: {
     dashboard: 'Панель',
+    pailieHome: 'Pailie 3/5',
     matches: 'Все матчи',
     sportteryPlan: 'План Sporttery',
     teams: 'Команды',
@@ -21,10 +22,16 @@ export default {
   },
   competition: {
     homeTitle: 'Выберите турнир',
-    homeSubtitle: 'ЧМ и топ-5 лиг · единый AI-прогноз',
+    homeSubtitle: 'ЧМ · топ-5 лиг · Pailie 3/5',
     enter: 'Перейти',
+    enterDigital: 'Открыть',
     statMatches: '{n} матчей',
     statTeams: '{n} команд',
+    statGames: '{n} игр',
+    statDigital: 'Ежедневные тиражи',
+    badgeDigital: 'Лотерея',
+    digitalDraw: 'Тираж',
+    digitalDrawDaily: 'Раз в день',
     statusEnded: 'Завершён',
     statusLive: 'Идёт',
     statusUpcoming: 'Скоро',
@@ -38,6 +45,7 @@ export default {
       germany: 'Время Германии',
       france: 'Время Франции',
       usa: 'Время восточного побережья США',
+      beijing: 'Пекинское время',
       local: 'Местное время',
     },
     names: {
@@ -47,6 +55,7 @@ export default {
       serieA: 'Серия A',
       bundesliga: 'Бундеслига',
       ligue1: 'Лига 1',
+      pailie: 'Sporttery Pailie 3 / 5',
     },
   },
   header: {

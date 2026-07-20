@@ -17,36 +17,38 @@
     >
       <el-menu-item :index="basePath">
         <el-icon><HomeFilled /></el-icon>
-        <span>{{ t('nav.dashboard') }}</span>
+        <span>{{ isDigital ? t('nav.pailieHome') : t('nav.dashboard') }}</span>
       </el-menu-item>
-      <el-menu-item :index="`${basePath}/matches`">
-        <el-icon><TrophyBase /></el-icon>
-        <span>{{ t('nav.matches') }}</span>
-      </el-menu-item>
-      <el-menu-item v-if="features.sporttery !== false && authStore.canAccessSporttery" :index="`${basePath}/sporttery-plan`">
-        <el-icon><ShoppingCart /></el-icon>
-        <span>{{ t('nav.sportteryPlan') }}</span>
-      </el-menu-item>
-      <el-menu-item :index="`${basePath}/teams`">
-        <el-icon><Flag /></el-icon>
-        <span>{{ t('nav.teams') }}</span>
-      </el-menu-item>
-      <el-menu-item v-if="features.bracket" :index="`${basePath}/bracket`">
-        <el-icon><Share /></el-icon>
-        <span>{{ t('nav.bracket') }}</span>
-      </el-menu-item>
-      <el-menu-item v-if="features.tournament" :index="`${basePath}/tournament`">
-        <el-icon><Medal /></el-icon>
-        <span>{{ t('nav.tournament') }}</span>
-      </el-menu-item>
-      <el-menu-item :index="`${basePath}/predictions`">
-        <el-icon><TrendCharts /></el-icon>
-        <span>{{ t('nav.predictions') }}</span>
-      </el-menu-item>
-      <el-menu-item :index="`${basePath}/backtest`">
-        <el-icon><DataAnalysis /></el-icon>
-        <span>{{ t('nav.scoreBacktest') }}</span>
-      </el-menu-item>
+      <template v-if="!isDigital">
+        <el-menu-item :index="`${basePath}/matches`">
+          <el-icon><TrophyBase /></el-icon>
+          <span>{{ t('nav.matches') }}</span>
+        </el-menu-item>
+        <el-menu-item v-if="features.sporttery !== false && authStore.canAccessSporttery" :index="`${basePath}/sporttery-plan`">
+          <el-icon><ShoppingCart /></el-icon>
+          <span>{{ t('nav.sportteryPlan') }}</span>
+        </el-menu-item>
+        <el-menu-item :index="`${basePath}/teams`">
+          <el-icon><Flag /></el-icon>
+          <span>{{ t('nav.teams') }}</span>
+        </el-menu-item>
+        <el-menu-item v-if="features.bracket" :index="`${basePath}/bracket`">
+          <el-icon><Share /></el-icon>
+          <span>{{ t('nav.bracket') }}</span>
+        </el-menu-item>
+        <el-menu-item v-if="features.tournament" :index="`${basePath}/tournament`">
+          <el-icon><Medal /></el-icon>
+          <span>{{ t('nav.tournament') }}</span>
+        </el-menu-item>
+        <el-menu-item :index="`${basePath}/predictions`">
+          <el-icon><TrendCharts /></el-icon>
+          <span>{{ t('nav.predictions') }}</span>
+        </el-menu-item>
+        <el-menu-item :index="`${basePath}/backtest`">
+          <el-icon><DataAnalysis /></el-icon>
+          <span>{{ t('nav.scoreBacktest') }}</span>
+        </el-menu-item>
+      </template>
       <el-menu-item index="/">
         <el-icon><Switch /></el-icon>
         <span>{{ t('nav.switchCompetition') }}</span>
@@ -82,6 +84,11 @@ const route = useRoute()
 const slug = computed(() => route.params.slug || compStore.slug || 'worldcup-2026')
 const basePath = computed(() => `/competition/${slug.value}`)
 const features = computed(() => compStore.current?.features || compStore.features || {})
+const isDigital = computed(() =>
+  compStore.current?.type === 'digital'
+  || features.value.digital_lottery === true
+  || slug.value === 'pailie',
+)
 
 const activeMenu = computed(() => {
   const path = route.path

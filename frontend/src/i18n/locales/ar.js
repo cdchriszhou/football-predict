@@ -10,6 +10,7 @@ export default {
   },
   nav: {
     dashboard: 'لوحة التحكم',
+    pailieHome: 'Pailie 3/5',
     matches: 'جميع المباريات',
     sportteryPlan: 'خطة Sporttery',
     teams: 'الفرق',
@@ -21,10 +22,16 @@ export default {
   },
   competition: {
     homeTitle: 'اختر البطولة',
-    homeSubtitle: 'كأس العالم والدوريات الخمس · توقع ذكي موحّد',
+    homeSubtitle: 'كأس العالم · الدوريات الخمس · Pailie 3/5',
     enter: 'دخول',
+    enterDigital: 'فتح الألعاب',
     statMatches: '{n} مباراة',
     statTeams: '{n} فريق',
+    statGames: '{n} ألعاب',
+    statDigital: 'سحب يومي',
+    badgeDigital: 'يانصيب',
+    digitalDraw: 'دورة السحب',
+    digitalDrawDaily: 'مرة يوميًا',
     statusEnded: 'انتهى',
     statusLive: 'جارٍ',
     statusUpcoming: 'قريبًا',
@@ -38,6 +45,7 @@ export default {
       germany: 'توقيت ألمانيا',
       france: 'توقيت فرنسا',
       usa: 'توقيت الساحل الشرقي للولايات المتحدة',
+      beijing: 'توقيت بكين',
       local: 'التوقيت المحلي',
     },
     names: {
@@ -47,6 +55,7 @@ export default {
       serieA: 'الدوري الإيطالي',
       bundesliga: 'الدوري الألماني',
       ligue1: 'الدوري الفرنسي',
+      pailie: 'Sporttery Pailie 3 / 5',
     },
   },
   header: {

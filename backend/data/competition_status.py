@@ -31,6 +31,10 @@ def compute_season_status(comp: dict, stats: dict, now: datetime | None = None) 
     if closing and now > closing:
         return "ended"
 
+    # Digital lottery (排列3/5) runs daily year-round.
+    if comp.get("type") == "digital":
+        return "live"
+
     matches = int(stats.get("matches") or 0)
     upcoming = int(stats.get("upcoming") or 0)
     live = int(stats.get("live") or 0)

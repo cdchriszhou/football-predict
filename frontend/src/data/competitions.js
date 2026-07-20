@@ -72,6 +72,26 @@ export const FALLBACK_COMPETITIONS = [
     closing_date: '2026-05-16T23:59:59Z',
     stats: { matches: 0, teams: 0, upcoming: 0 },
   },
+  {
+    slug: 'pailie',
+    name_key: 'pailie',
+    short_name: '排列3/5',
+    type: 'digital',
+    theme_color: '#c62828',
+    timezone: 'Asia/Shanghai',
+    timezone_label_key: 'beijing',
+    opening_date: '2004-01-01T00:00:00Z',
+    closing_date: null,
+    features: {
+      bracket: false,
+      tournament: false,
+      sporttery: false,
+      groups: false,
+      digital_lottery: true,
+      games: ['pl3', 'pl5'],
+    },
+    stats: { matches: 0, teams: 0, upcoming: 0 },
+  },
 ]
 
 export function resolveSeasonStatus(item) {

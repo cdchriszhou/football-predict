@@ -7,6 +7,7 @@ export const COMPETITION_TIMEZONES = {
   'serie-a': { timezone: 'Europe/Rome', labelKey: 'italy' },
   'bundesliga': { timezone: 'Europe/Berlin', labelKey: 'germany' },
   'ligue-1': { timezone: 'Europe/Paris', labelKey: 'france' },
+  'pailie': { timezone: 'Asia/Shanghai', labelKey: 'beijing' },
 }
 
 export const TIMEZONE_FLAGS = {
@@ -16,6 +17,7 @@ export const TIMEZONE_FLAGS = {
   germany: '🇩🇪',
   france: '🇫🇷',
   usa: '🇺🇸',
+  beijing: '🇨🇳',
   local: '🌍',
 }
 

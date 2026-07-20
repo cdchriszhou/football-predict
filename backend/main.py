@@ -199,6 +199,7 @@ from api.tournament import router as tournament_router
 from api.data import router as data_router
 from api.competitions import router as competitions_router
 from api.sporttery import router as sporttery_router
+from api.pailie import router as pailie_router
 from api.system import router as system_router
 
 app.include_router(system_router, prefix="/api/v1/system", tags=["系统"])
@@ -209,6 +210,7 @@ app.include_router(teams_router, prefix="/api/v1/teams", tags=["球队"])
 app.include_router(predictions_router, prefix="/api/v1/predictions", tags=["预测"])
 app.include_router(odds_router, prefix="/api/v1/odds", tags=["盘口"])
 app.include_router(sporttery_router, prefix="/api/v1/sporttery", tags=["体彩方案"])
+app.include_router(pailie_router, prefix="/api/v1/pailie", tags=["排列3/5"])
 app.include_router(admin_router, prefix="/api/v1/admin", tags=["管理"])
 app.include_router(tournament_router, prefix="/api/v1/tournament", tags=["赛事预测"])
 app.include_router(data_router, prefix="/api/v1/data", tags=["数据"])

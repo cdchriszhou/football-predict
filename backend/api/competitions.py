@@ -153,6 +153,18 @@ async def get_competition_detail(
     if not ok:
         raise HTTPException(status_code=403, detail=msg)
 
+    if comp.get("type") == "digital":
+        stats = {"matches": 0, "teams": 0, "upcoming": 0, "live": 0, "finished": 0}
+        return success({
+            **{k: comp.get(k) for k in (
+                "slug", "name_key", "short_name", "type", "theme_color", "features",
+                "opening_date", "closing_date", "season_year",
+                "timezone", "timezone_label_key",
+            )},
+            "season_status": compute_season_status(comp, stats),
+            "stats": stats,
+        })
+
     # Match maintenance runs on a schedule; do not block page reads (SQLite lock / proxy timeout).
     season = season_label_for(comp)
     match_filters = [Match.competition_slug == slug]

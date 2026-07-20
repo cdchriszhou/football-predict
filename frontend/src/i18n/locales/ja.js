@@ -10,6 +10,7 @@ export default {
   },
   nav: {
     dashboard: 'ダッシュボード',
+    pailieHome: '配列3/5',
     matches: '全試合',
     sportteryPlan: '中国体彩方案',
     teams: 'チーム',
@@ -21,10 +22,16 @@ export default {
   },
   competition: {
     homeTitle: '大会を選択',
-    homeSubtitle: 'ワールドカップ・五大リーグ · 統一AI予測',
+    homeSubtitle: 'ワールドカップ・五大リーグ・配列3/5',
     enter: '予測へ',
+    enterDigital: '遊び方へ',
     statMatches: '{n} 試合',
     statTeams: '{n} チーム',
+    statGames: '{n} 種の遊び方',
+    statDigital: '毎日抽選',
+    badgeDigital: '体彩',
+    digitalDraw: '抽選周期',
+    digitalDrawDaily: '毎日1回',
     statusEnded: '終了',
     statusLive: '進行中',
     statusUpcoming: '未開催',
@@ -38,6 +45,7 @@ export default {
       germany: 'ドイツ時間',
       france: 'フランス時間',
       usa: '米国東部時間',
+      beijing: '北京時間',
       local: '現地時間',
     },
     names: {
@@ -47,6 +55,7 @@ export default {
       serieA: 'セリエA',
       bundesliga: 'ブンデスリーガ',
       ligue1: 'リーグ・アン',
+      pailie: '体彩 配列3 / 配列5',
     },
   },
   header: {

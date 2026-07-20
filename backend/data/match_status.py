@@ -1021,7 +1021,12 @@ async def sync_match_results_throttled(db: AsyncSession, slug: str) -> int:
 
 async def maintain_competition_matches(db: AsyncSession, slug: str) -> dict:
     """Migrate legacy statuses, backfill seasons, cleanup seeds, reconcile stale."""
+    from data.competitions import get_competition
     from data.league_standings import ensure_league_standings_stats
+
+    comp = get_competition(slug)
+    if comp and comp.get("type") == "digital":
+        return {"skipped": True, "reason": "digital_lottery"}
 
     legacy = await migrate_legacy_statuses(db)
     seasons = await backfill_match_seasons(db, slug)

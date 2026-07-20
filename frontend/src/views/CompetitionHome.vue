@@ -60,6 +60,7 @@
             {{ t('competition.statusEnded') }}
           </span>
           <span v-if="item.type === 'international'" class="comp-card-badge comp-card-badge--type">FIFA</span>
+          <span v-else-if="item.type === 'digital'" class="comp-card-badge comp-card-badge--type">{{ t('competition.badgeDigital') }}</span>
           <span v-if="!authStore.canAccessCompetition(item.slug)" class="comp-card-badge comp-card-badge--locked">
             {{ t('competition.locked') }}
           </span>
@@ -67,6 +68,7 @@
         <div class="comp-card-icon">
           <el-icon :size="36">
             <TrophyBase v-if="item.type === 'international'" />
+            <Ticket v-else-if="item.type === 'digital'" />
             <Medal v-else />
           </el-icon>
         </div>
@@ -77,16 +79,28 @@
             <span class="comp-time-label">{{ t('competition.timeBeijing') }}</span>
             <span class="comp-time-value">{{ cardBeijingTime(item) }}</span>
           </div>
-          <div class="comp-time-row">
+          <div v-if="item.type !== 'digital'" class="comp-time-row">
             <span class="comp-time-label">{{ localTimeLabel(item) }}</span>
             <span class="comp-time-value">{{ cardLocalTime(item) }}</span>
           </div>
+          <div v-else class="comp-time-row">
+            <span class="comp-time-label">{{ t('competition.digitalDraw') }}</span>
+            <span class="comp-time-value">{{ t('competition.digitalDrawDaily') }}</span>
+          </div>
         </div>
         <div class="comp-stats">
-          <span>{{ t('competition.statMatches', { n: item.stats?.matches ?? 0 }) }}</span>
-          <span>{{ t('competition.statTeams', { n: item.stats?.teams ?? 0 }) }}</span>
+          <template v-if="item.type === 'digital'">
+            <span>{{ t('competition.statGames', { n: item.features?.games?.length || 2 }) }}</span>
+            <span>{{ t('competition.statDigital') }}</span>
+          </template>
+          <template v-else>
+            <span>{{ t('competition.statMatches', { n: item.stats?.matches ?? 0 }) }}</span>
+            <span>{{ t('competition.statTeams', { n: item.stats?.teams ?? 0 }) }}</span>
+          </template>
         </div>
-        <el-button type="primary" class="enter-btn">{{ t('competition.enter') }}</el-button>
+        <el-button type="primary" class="enter-btn">
+          {{ item.type === 'digital' ? t('competition.enterDigital') : t('competition.enter') }}
+        </el-button>
       </div>
     </div>
 
@@ -150,7 +164,7 @@ import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import {
-  TrophyBase, Medal, UserFilled, ArrowDown, Key, SwitchButton, Lock,
+  TrophyBase, Medal, UserFilled, ArrowDown, Key, SwitchButton, Lock, Ticket,
 } from '@element-plus/icons-vue'
 import { useCompetitionStore } from '@/stores/competition'
 import { normalizeCompetition } from '@/data/competitions'

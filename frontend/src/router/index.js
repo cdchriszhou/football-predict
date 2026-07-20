@@ -177,6 +177,12 @@ router.beforeEach(async (to, from, next) => {
         return next({ name: 'CompetitionDashboard', params: { slug: to.params.slug } })
       }
     }
+    const isDigital = compStore.current?.type === 'digital'
+      || compStore.current?.features?.digital_lottery
+      || to.params.slug === 'pailie'
+    if (to.meta.footballOnly && isDigital) {
+      return next({ name: 'CompetitionDashboard', params: { slug: to.params.slug } })
+    }
   }
 
   if (to.params.slug) {
