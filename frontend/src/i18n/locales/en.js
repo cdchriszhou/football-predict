@@ -26,7 +26,7 @@ export default {
   },
   competition: {
     homeTitle: 'Choose Competition',
-    homeSubtitle: 'Top 5 leagues, Hong Kong racing & 2026 World Cup',
+    homeSubtitle: 'World Cup · Top 5 leagues · Hong Kong racing',
     enter: 'Enter',
     statMatches: '{n} matches',
     statTeams: '{n} teams',
@@ -90,8 +90,8 @@ export default {
     changeFailed: 'Change failed'
   },
   auth: {
-    loginTitle: 'Sporttery Football Score Predict',
-    loginSubtitle: 'Sign in to continue',
+    loginTitle: 'GoalSense',
+    loginSubtitle: 'World Cup · Top 5 Leagues · AI Score Insights',
     username: 'Username',
     password: 'Password',
     serverSettings: 'Server Settings',

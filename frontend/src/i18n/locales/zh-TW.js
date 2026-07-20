@@ -21,7 +21,7 @@ export default {
   },
   competition: {
     homeTitle: '選擇賽事',
-    homeSubtitle: '五大聯賽與 2026 世界盃 · 統一比分預測算法',
+    homeSubtitle: '世界盃、五大聯賽與香港跑馬 · 統一 AI 預測',
     enter: '進入預測',
     statMatches: '{n} 場比賽',
     statTeams: '{n} 支球隊',
@@ -76,8 +76,8 @@ export default {
     changeFailed: '修改失敗'
   },
   auth: {
-    loginTitle: '體彩足球比分預測',
-    loginSubtitle: '請登入以繼續',
+    loginTitle: '足智預測',
+    loginSubtitle: '世界盃 · 五大聯賽 · AI 比分分析',
     username: '用戶名',
     password: '密碼',
     serverSettings: '伺服器設定',

@@ -21,7 +21,7 @@ export default {
   },
   competition: {
     homeTitle: '大会を選択',
-    homeSubtitle: '五大リーグと2026 W杯 · 同一予測アルゴリズム',
+    homeSubtitle: 'ワールドカップ・五大リーグ・香港競馬 · 統一AI予測',
     enter: '予測へ',
     statMatches: '{n} 試合',
     statTeams: '{n} チーム',
@@ -75,8 +75,8 @@ export default {
     changeFailed: '変更に失敗しました'
   },
   auth: {
-    loginTitle: '体彩サッカースコア予測',
-    loginSubtitle: 'ログインしてください',
+    loginTitle: 'GoalSense',
+    loginSubtitle: 'ワールドカップ · 五大リーグ · AIスコア分析',
     username: 'ユーザー名',
     password: 'パスワード',
     serverSettings: 'サーバー設定',

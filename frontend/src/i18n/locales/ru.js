@@ -21,7 +21,7 @@ export default {
   },
   competition: {
     homeTitle: 'Выберите турнир',
-    homeSubtitle: 'Топ-5 лиг и ЧМ-2026 · единый алгоритм прогноза',
+    homeSubtitle: 'ЧМ, топ-5 лиг и скачки Гонконга · единый AI-прогноз',
     enter: 'Перейти',
     statMatches: '{n} матчей',
     statTeams: '{n} команд',
@@ -75,8 +75,8 @@ export default {
     changeFailed: 'Ошибка изменения'
   },
   auth: {
-    loginTitle: 'Прогноз счёта Sporttery',
-    loginSubtitle: 'Войдите для продолжения',
+    loginTitle: 'GoalSense',
+    loginSubtitle: 'ЧМ · Топ-5 лиг · AI-прогноз счёта',
     username: 'Имя пользователя',
     password: 'Пароль',
     serverSettings: 'Настройки сервера',

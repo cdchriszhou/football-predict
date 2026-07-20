@@ -26,7 +26,7 @@ export default {
   },
   competition: {
     homeTitle: '选择赛事',
-    homeSubtitle: '五大联赛、香港跑马与 2026 世界杯 · 统一预测算法',
+    homeSubtitle: '世界杯、五大联赛与香港跑马 · 统一 AI 预测',
     enter: '进入预测',
     statMatches: '{n} 场比赛',
     statTeams: '{n} 支球队',
@@ -90,8 +90,8 @@ export default {
     changeFailed: '修改失败'
   },
   auth: {
-    loginTitle: '2026美加墨世界杯之夏',
-    loginSubtitle: '请登录以继续',
+    loginTitle: '足智预测',
+    loginSubtitle: '世界杯 · 五大联赛 · AI 比分分析',
     username: '用户名',
     password: '密码',
     serverSettings: '服务器设置',

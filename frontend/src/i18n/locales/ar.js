@@ -21,7 +21,7 @@ export default {
   },
   competition: {
     homeTitle: 'اختر البطولة',
-    homeSubtitle: 'الدوريات الخمسة وكأس العالم 2026 · نفس خوارزمية التوقع',
+    homeSubtitle: 'كأس العالم والدوريات الخمس وسباق هونغ كونغ · توقع ذكي موحّد',
     enter: 'دخول',
     statMatches: '{n} مباراة',
     statTeams: '{n} فريق',
@@ -75,8 +75,8 @@ export default {
     changeFailed: 'فشل التغيير'
   },
   auth: {
-    loginTitle: 'توقعات نتائج كرة القدم Sporttery',
-    loginSubtitle: 'سجّل الدخول للمتابعة',
+    loginTitle: 'GoalSense',
+    loginSubtitle: 'كأس العالم · الدوريات الخمس · تحليل ذكي للنتائج',
     username: 'اسم المستخدم',
     password: 'كلمة المرور',
     serverSettings: 'إعدادات الخادم',
