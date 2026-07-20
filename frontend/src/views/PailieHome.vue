@@ -926,7 +926,7 @@ onUnmounted(() => {
 .rec-nums {
   display: flex;
   flex-wrap: nowrap;
-  justify-content: center;
+  justify-content: flex-start;
   align-items: center;
   gap: 6px;
   margin: 14px 0 12px;
@@ -938,13 +938,14 @@ onUnmounted(() => {
 .rec-nums--ssq {
   flex-direction: column;
   flex-wrap: nowrap;
+  align-items: flex-start;
   gap: 8px;
   min-height: 72px;
 }
 .rec-nums-row {
   display: flex;
   flex-wrap: wrap;
-  justify-content: center;
+  justify-content: flex-start;
   align-items: center;
   gap: 5px;
 }
