@@ -132,7 +132,11 @@ pip install -r "$BACKEND_DIR/requirements.txt" -q
 log "Python dependencies up to date"
 
 # Kill old process on backend port
-fuser -k ${BACKEND_PORT}/tcp 2>/dev/null || true
+if [ "$(uname)" = "Linux" ]; then
+	fuser -k ${BACKEND_PORT}/tcp 2>/dev/null || true
+else
+	lsof -ti tcp:${BACKEND_PORT} | xargs kill 2>/dev/null || true
+fi
 sleep 1
 
 cd "$BACKEND_DIR"
@@ -157,7 +161,11 @@ log "Backend health OK"
 echo "[2/2] Starting frontend server (port $FRONTEND_PORT)..."
 
 # Kill old process on frontend port
-fuser -k ${FRONTEND_PORT}/tcp 2>/dev/null || true
+if [ "$(uname)" = "Linux" ]; then
+	fuser -k ${FRONTEND_PORT}/tcp 2>/dev/null || true
+else
+	lsof -ti tcp:${FRONTEND_PORT} | xargs kill 2>/dev/null || true
+fi
 sleep 1
 
 cd "$FRONTEND_DIR"

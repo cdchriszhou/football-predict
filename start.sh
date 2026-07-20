@@ -95,7 +95,7 @@ echo "[1/4] Setting up backend..."
 ensure_python_venv "$BACKEND_DIR"
 log "Python venv ready"
 
-pip install -r "$BACKEND_DIR/requirements.txt" -q
+pip install -r "$BACKEND_DIR/requirements.txt" 2>&1 | tail -3
 log "Python dependencies up to date"
 
 # Playwright browser (skip if already installed)
@@ -119,7 +119,11 @@ cd "$BACKEND_DIR"
 source "$BACKEND_DIR/venv/bin/activate"
 
 # Kill existing process on backend port
-fuser -k ${BACKEND_PORT}/tcp 2>/dev/null || true
+if [ "$(uname)" = "Linux" ]; then
+	fuser -k ${BACKEND_PORT}/tcp 2>/dev/null || true
+else
+	lsof -ti tcp:${BACKEND_PORT} | xargs kill 2>/dev/null || true
+fi
 sleep 1
 
 nohup python3 -m uvicorn main:app --host 0.0.0.0 --port $BACKEND_PORT \
@@ -145,7 +149,11 @@ echo "[4/4] Starting frontend (port $FRONTEND_PORT)..."
 cd "$FRONTEND_DIR"
 
 # Kill existing process on frontend port
-fuser -k ${FRONTEND_PORT}/tcp 2>/dev/null || true
+if [ "$(uname)" = "Linux" ]; then
+	fuser -k ${FRONTEND_PORT}/tcp 2>/dev/null || true
+else
+	lsof -ti tcp:${FRONTEND_PORT} | xargs kill 2>/dev/null || true
+fi
 sleep 1
 
 nohup npm run dev -- --host 0.0.0.0 > "$DIR/frontend.log" 2>&1 &

@@ -33,7 +33,12 @@ stop_by_pid "$DIR/.backend.pid"  "Backend API"
 stop_by_pid "$DIR/.frontend.pid" "Frontend server"
 
 # Fallback: release ports
-fuser -k ${BACKEND_PORT}/tcp  2>/dev/null && echo "  Released port $BACKEND_PORT"
-fuser -k ${FRONTEND_PORT}/tcp 2>/dev/null && echo "  Released port $FRONTEND_PORT"
+if [ "$(uname)" = "Linux" ]; then
+	fuser -k ${BACKEND_PORT}/tcp  2>/dev/null && echo "  Released port $BACKEND_PORT"
+	fuser -k ${FRONTEND_PORT}/tcp 2>/dev/null && echo "  Released port $FRONTEND_PORT"
+else
+	lsof -ti tcp:${BACKEND_PORT} | xargs kill 2>/dev/null && echo "  Released port $BACKEND_PORT"
+	lsof -ti tcp:${FRONTEND_PORT} | xargs kill 2>/dev/null && echo "  Released port $FRONTEND_PORT"
+fi
 
 echo "  Done."

@@ -201,7 +201,7 @@ DEFAULT_CONFIG: ScorePickConfig = {
     "UPSET_DRAW_DEEP_FAV_LIMIT": 55.0,
     "UPSET_AWAY_HOME_SCORE_ODD": 9.0,
     "UPSET_SAME_DIR_ODD_CAP": 14.0,
-    "UPSET_MIN_ODD_WARNING": 20.0,
+    "UPSET_MIN_ODD_WARNING": 25.0,
 
     # Context thresholds
     "DEEP_HANDICAP_THRESHOLD": -1.5,
@@ -221,13 +221,13 @@ DEFAULT_CONFIG: ScorePickConfig = {
     "UPSET_DRAW_DEEP_FAV_LIMIT": 55.0,
     "UPSET_AWAY_HOME_SCORE_ODD": 9.0,
     "UPSET_SAME_DIR_ODD_CAP": 14.0,
-    "UPSET_MIN_ODD_WARNING": 20.0,
-    "UPSET_DRAW_RATE_THRESHOLD": 22.0,
+    "UPSET_MIN_ODD_WARNING": 25.0,
+    "UPSET_DRAW_RATE_THRESHOLD": 18.0,
     "UPSET_MINNOW_HOME_ZERO_ZERO_ODD": 12.0,
     "UPSET_DRAW_LOSE_RATE_CAP": 9.5,
-    "UPSET_AWAY_WIN_ODD_CAP": 14.0,
+    "UPSET_AWAY_WIN_ODD_CAP": 18.0,
     "UPSET_CLUSTER_MIN_WIN_RATE": 52.0,
-    "UPSET_CONCESSION_ODD_CAP": 16.0,
+    "UPSET_CONCESSION_ODD_CAP": 22.0,
 
     # Secondary pick logic
     "SECONDARY_TIE_TREAT_AS_DIFFERENT": True,
@@ -240,15 +240,15 @@ DEFAULT_CONFIG: ScorePickConfig = {
     "OPEN_GAME_TOTAL_GAP_CAP": 12.0,
 
     # Validation thresholds
-    "MIN_TRIPLE_DIRECTION_COVERAGE": 2,
+    "MIN_TRIPLE_DIRECTION_COVERAGE": 3,
     "UPSET_ODD_WARN_CAP": 20.0,
 
     # New: Scorer weights for weighted ensemble pipeline
     "POISSON_SCORER_WEIGHT": 0.50,
-    "MARKET_CRS_SCORER_WEIGHT": 0.30,
+    "MARKET_CRS_SCORER_WEIGHT": 0.35,
     "CONTEXT_SCORER_WEIGHT": 0.15,
     "RESILIENCE_SCORER_WEIGHT": 0.05,
-    "PIPELINE_USE_NEW_ENSEMBLE": False,
+    "PIPELINE_USE_NEW_ENSEMBLE": True,
     "AGGREGATOR_MIN_WEIGHT": 0.001,
 
     # New: Knockout stage parameters
@@ -258,9 +258,8 @@ DEFAULT_CONFIG: ScorePickConfig = {
         "1/8决赛": {"goal_reduction": 0.90, "draw_boost": 3.0, "et_base": 0.12},
         "1/4决赛": {"goal_reduction": 0.88, "draw_boost": 3.5, "et_base": 0.14},
         "半决赛":  {"goal_reduction": 0.85, "draw_boost": 3.0, "et_base": 0.16},
-        "决赛":    {"goal_reduction": 0.83, "draw_boost": 3.0, "et_base": 0.18},
-        "季军赛":  {"goal_reduction": 0.88, "draw_boost": 3.0, "et_base": 0.14},
-        "季军赛":  {"goal_reduction": 0.95, "draw_boost": 2.5, "et_base": 0.08},
+        "决赛":    {"goal_reduction": 0.90, "draw_boost": 2.8, "et_base": 0.14},
+        "季军赛":  {"goal_reduction": 0.90, "draw_boost": 2.8, "et_base": 0.10},
     },
 }
 

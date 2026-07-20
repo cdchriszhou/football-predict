@@ -34,7 +34,25 @@ stop_by_pid "$DIR/.backend.pid"  "Backend"
 stop_by_pid "$DIR/.frontend.pid" "Frontend"
 
 # Fallback: kill any remaining processes on these ports
-fuser -k ${BACKEND_PORT}/tcp  2>/dev/null && echo "  Backend port $BACKEND_PORT released"
-fuser -k ${FRONTEND_PORT}/tcp 2>/dev/null && echo "  Frontend port $FRONTEND_PORT released"
+kill_port() {
+    local port="$1"
+    local name="$2"
+    local pids
+    if [ "$(uname)" = "Linux" ]; then
+        fuser -k "${port}/tcp" 2>/dev/null && echo "  ${name} port ${port} released"
+    else
+        # macOS / BSD — use lsof
+        pids=$(lsof -ti tcp:${port} 2>/dev/null)
+        if [ -n "$pids" ]; then
+            echo "$pids" | xargs kill 2>/dev/null
+            sleep 1
+            echo "$pids" | xargs kill -9 2>/dev/null
+            echo "  ${name} port ${port} released"
+        fi
+    fi
+}
+
+kill_port ${BACKEND_PORT}  "Backend"
+kill_port ${FRONTEND_PORT} "Frontend"
 
 echo "  Done."

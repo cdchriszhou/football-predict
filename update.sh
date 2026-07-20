@@ -78,13 +78,23 @@ if [ -f "$DEPLOY_DIR/stop-prod.sh" ]; then
     bash "$DEPLOY_DIR/stop-prod.sh" 2>&1 | sed 's/^/  /'
 else
     warn "No stop-prod.sh found — stopping via port"
-    fuser -k 8888/tcp 2>/dev/null && echo "  Released port 8888" || true
-    fuser -k 4173/tcp 2>/dev/null && echo "  Released port 4173" || true
+    if [ "$(uname)" = "Linux" ]; then
+        fuser -k 8888/tcp 2>/dev/null && echo "  Released port 8888" || true
+        fuser -k 4173/tcp 2>/dev/null && echo "  Released port 4173" || true
+    else
+        lsof -ti tcp:8888 | xargs kill 2>/dev/null && echo "  Released port 8888" || true
+        lsof -ti tcp:4173 | xargs kill 2>/dev/null && echo "  Released port 4173" || true
+    fi
 fi
 
 # Extra safety: kill any remaining uvicorn/node on deploy ports
-fuser -k 8888/tcp 2>/dev/null || true
-fuser -k 4173/tcp 2>/dev/null || true
+if [ "$(uname)" = "Linux" ]; then
+    fuser -k 8888/tcp 2>/dev/null || true
+    fuser -k 4173/tcp 2>/dev/null || true
+else
+    lsof -ti tcp:8888 | xargs kill 2>/dev/null || true
+    lsof -ti tcp:4173 | xargs kill 2>/dev/null || true
+fi
 sleep 2
 log "Services stopped"
 

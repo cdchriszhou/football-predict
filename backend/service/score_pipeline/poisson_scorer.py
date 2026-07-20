@@ -114,14 +114,14 @@ class PoissonModelScorer(BaseScorer):
                         prob *= 1.08
 
                 total = ga + gb
-                # Relaxed penalty factors (was 0.45/0.65 — too aggressive)
+                # Relaxed penalty factors — allow high-scoring finals
                 if total > 7:
-                    prob *= 0.65
-                elif total > 5:
                     prob *= 0.80
+                elif total > 5:
+                    prob *= 0.90
 
                 if abs(margin := ga - gb) >= 5:
-                    prob *= 0.65
+                    prob *= 0.80
 
                 # Over/under alignment
                 if over_under <= 2.5 and total >= 4:
@@ -149,11 +149,10 @@ class PoissonModelScorer(BaseScorer):
     # ── Model-Internal Adjustments (additive weights) ────────────────────
 
     def _apply_favourite_shutout_bias(self, dist: dict[str, float], inp: ScorerInput) -> dict[str, float]:
-        """Favourite clean-sheet bias: mild boost to shutout wins, mild dampen of draws.
+        """Favourite clean-sheet bias: mild boost to shutout wins.
 
-        Uses gentler factors (1.18/0.85 vs old 1.35/0.72) to preserve Poisson model's
-        natural draw probability — the old aggressive factors were suppressing draws
-        too heavily, causing the system to almost never predict draws.
+        Removed draw dampening (was 0.85) — it contradicted the draw preservation
+        logic and caused systematic under-prediction of draws (2% vs actual 28%).
         """
         margin = inp.expected_a - inp.expected_b
         result = dict(dist)
@@ -165,8 +164,6 @@ class PoissonModelScorer(BaseScorer):
                     continue
                 if ga > gb and gb == 0:
                     result[s] = p * 1.18
-                elif ga == gb:
-                    result[s] = p * 0.85
         elif margin <= -0.85:
             for s, p in dist.items():
                 try:
@@ -175,8 +172,6 @@ class PoissonModelScorer(BaseScorer):
                     continue
                 if gb > ga and ga == 0:
                     result[s] = p * 1.18
-                elif ga == gb:
-                    result[s] = p * 0.85
         return result
 
     def _apply_rout_boost(self, dist: dict[str, float], inp: ScorerInput) -> dict[str, float]:

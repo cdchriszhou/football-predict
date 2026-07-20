@@ -310,8 +310,8 @@ async def get_recent_results(
 ):
     """Recently finished matches with scores (for dashboard)."""
     comp_slug = resolve_competition(competition)
-    await _ensure_results_synced(db, comp_slug)
     await _ensure_knockout_display_ready(db, comp_slug)
+    await _ensure_results_synced(db, comp_slug)
     cutoff = china_now().replace(tzinfo=None) - timedelta(hours=hours)
     filters = [
         Match.competition_slug == comp_slug,
@@ -351,8 +351,8 @@ async def get_today_matches(
     current_user: str = Depends(get_current_user),
 ):
     comp_slug = resolve_competition(competition)
-    await _ensure_results_synced(db, comp_slug)
     await _ensure_knockout_display_ready(db, comp_slug)
+    await _ensure_results_synced(db, comp_slug)
     today_start, today_end = beijing_day_bounds_naive()
     # Wider DB window so canonical kickoff (may differ from stale match_time) still matches today.
     query_start = today_start - timedelta(days=1)
