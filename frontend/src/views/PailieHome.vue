@@ -112,23 +112,30 @@
 
         <div v-if="recommendCards.length" class="rec-grid">
           <div
-            v-for="rec in recommendCards"
+            v-for="(rec, idx) in recommendCards"
             :key="rec.id"
             class="rec-card"
-            :class="{ 'rec-card--primary': rec.id === 'pick-1' }"
+            :class="{ 'rec-card--primary': idx === 0 }"
           >
             <div class="rec-top">
               <span class="rec-label">
-                <el-tag v-if="rec.source === 'ai'" size="small" type="warning" class="ai-tag">AI</el-tag>
+                <el-tag v-if="rec.source === 'ai'" size="small" type="warning" effect="plain" class="ai-tag">AI</el-tag>
                 {{ recLabel(rec) }}
               </span>
-              <span class="rec-conf">{{ t('pailie.confidence', { n: Math.round((rec.confidence || 0) * 100) }) }}</span>
+              <span class="rec-conf">{{ Math.round((rec.confidence || 0) * 100) }}%</span>
             </div>
-            <div class="rec-nums">{{ rec.display }}</div>
+            <div class="rec-nums" :class="{ 'rec-nums--qxc': recDigits(rec).length > 5 }">
+              <span
+                v-for="(d, di) in recDigits(rec)"
+                :key="di"
+                class="rec-ball"
+                :class="{ 'rec-ball--special': activeGame === 'qxc' && di === 6 }"
+              >{{ d }}</span>
+            </div>
             <p class="rec-reason">{{ rec.reason }}</p>
             <div class="rec-actions">
-              <el-button size="small" @click="applyRecommend(rec)">{{ t('pailie.applyPick') }}</el-button>
-              <el-button size="small" type="primary" @click="addRecommendTicket(rec)">
+              <el-button size="small" class="rec-btn" @click="applyRecommend(rec)">{{ t('pailie.applyPick') }}</el-button>
+              <el-button size="small" type="primary" class="rec-btn" @click="addRecommendTicket(rec)">
                 {{ t('pailie.addTicket') }}
               </el-button>
             </div>
@@ -394,6 +401,16 @@ function isCold(d) {
 
 function recLabel(rec) {
   return rec.label || t('pailie.recAlt')
+}
+
+function recDigits(rec) {
+  if (Array.isArray(rec?.digits) && rec.digits.length) return rec.digits
+  const text = String(rec?.display || '').trim()
+  if (!text) return []
+  return text.split(/\s+/).map((x) => {
+    const n = Number(x)
+    return Number.isFinite(n) ? n : x
+  })
 }
 
 function positionLabel(idx) {
@@ -714,22 +731,38 @@ onUnmounted(() => {
   margin: 0 0 12px;
   font-size: 13px;
 }
-.play-grid,
-.rec-grid {
+.play-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 12px;
 }
-.play-card,
-.rec-card {
+.rec-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+  align-items: stretch;
+}
+.play-card {
   border: 1px solid #f0f0f0;
   border-radius: 10px;
   padding: 12px;
   background: #fafafa;
 }
+.rec-card {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 210px;
+  border: 1px solid #eceff1;
+  border-radius: 12px;
+  padding: 14px 12px;
+  background: #fff;
+  box-sizing: border-box;
+}
 .rec-card--primary {
   border-color: #ef9a9a;
-  background: linear-gradient(160deg, #fff8f6, #fff);
+  background: linear-gradient(165deg, #fff8f6 0%, #ffffff 55%);
+  box-shadow: 0 2px 8px rgba(198, 40, 40, 0.08);
 }
 .play-name,
 .rec-label {
@@ -741,31 +774,97 @@ onUnmounted(() => {
   justify-content: space-between;
   gap: 8px;
   align-items: center;
+  min-height: 24px;
+}
+.rec-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .rec-conf {
+  flex-shrink: 0;
   font-size: 12px;
   color: #e65100;
-  font-weight: 600;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
 }
 .rec-nums {
-  margin: 10px 0 6px;
-  font-size: 22px;
+  display: flex;
+  flex-wrap: nowrap;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
+  margin: 14px 0 12px;
+  min-height: 36px;
+}
+.rec-nums--qxc {
+  gap: 4px;
+}
+.rec-ball {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
   font-weight: 700;
-  letter-spacing: 0.12em;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  color: #1a237e;
+  color: #fff;
+  background: linear-gradient(145deg, #3949ab, #1a237e);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+.rec-ball--special {
+  background: linear-gradient(145deg, #ef5350, #c62828);
+  width: 32px;
+  height: 32px;
 }
 .rec-reason {
-  margin: 0 0 10px;
+  margin: 0;
   font-size: 12px;
   color: #606266;
   line-height: 1.45;
-  min-height: 34px;
+  height: 2.9em;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
 }
 .rec-actions {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: 8px;
-  flex-wrap: wrap;
+  margin-top: auto;
+  padding-top: 12px;
+}
+.rec-btn {
+  width: 100%;
+  margin: 0 !important;
+}
+@media (max-width: 1100px) {
+  .rec-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@media (max-width: 720px) {
+  .rec-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .rec-ball {
+    width: 28px;
+    height: 28px;
+    font-size: 13px;
+  }
+}
+@media (max-width: 420px) {
+  .rec-grid {
+    grid-template-columns: 1fr;
+  }
 }
 .play-prize {
   margin: 4px 0 8px;
