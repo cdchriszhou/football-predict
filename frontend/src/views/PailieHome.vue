@@ -143,15 +143,27 @@
               </div>
             </div>
             <div
-              v-else
-              class="rec-nums"
-              :class="{ 'rec-nums--qxc': recDigits(rec).length > 5 }"
+              v-else-if="activeGame === 'qxc'"
+              class="rec-nums rec-nums--qxc-wrap"
             >
+              <div class="rec-nums-row">
+                <span
+                  v-for="(d, di) in recDigits(rec).slice(0, 5)"
+                  :key="'q' + di"
+                  class="rec-ball"
+                >{{ formatBall(d) }}</span>
+              </div>
+              <div class="rec-nums-row rec-nums-row--second">
+                <span class="rec-ball">{{ formatBall(recDigits(rec)[5]) }}</span>
+                <span class="rec-plus">+</span>
+                <span class="rec-ball rec-ball--special">{{ formatBall(recDigits(rec)[6]) }}</span>
+              </div>
+            </div>
+            <div v-else class="rec-nums">
               <span
                 v-for="(d, di) in recDigits(rec)"
                 :key="di"
                 class="rec-ball"
-                :class="{ 'rec-ball--special': activeGame === 'qxc' && di === 6 }"
               >{{ formatBall(d) }}</span>
             </div>
             <p class="rec-reason">{{ rec.reason }}</p>
@@ -935,7 +947,8 @@ onUnmounted(() => {
 .rec-nums--qxc {
   gap: 4px;
 }
-.rec-nums--ssq {
+.rec-nums--ssq,
+.rec-nums--qxc-wrap {
   flex-direction: column;
   flex-wrap: nowrap;
   align-items: flex-start;
