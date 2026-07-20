@@ -320,6 +320,7 @@ export default {
     useAi: '多模型 AI 精选',
     aiActive: 'AI 已生成',
     aiActiveModels: 'AI 已生成（{models}）',
+    aiEnhancing: '多模型精选中…',
     aiInactive: 'AI 未返回（可用频率推荐）',
     confidence: '参考度 {n}%',
     applyPick: '填入选号',

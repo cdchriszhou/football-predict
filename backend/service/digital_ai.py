@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import time
 from typing import Any, Callable
 
 from llm.deepseek_client import _call_api, _parse_llm_json, create_llm_client
@@ -13,6 +14,26 @@ MODEL_LABELS = {
     "qwen": "Qwen",
     "glm": "GLM",
 }
+
+# 推荐结果短缓存：切 Tab 回访可秒开；AI 结果尤其贵
+_REC_CACHE: dict[str, tuple[float, dict[str, Any]]] = {}
+_REC_CACHE_TTL_SEC = 180
+
+
+def rec_cache_get(key: str) -> dict[str, Any] | None:
+    hit = _REC_CACHE.get(key)
+    if not hit:
+        return None
+    ts, payload = hit
+    if time.monotonic() - ts > _REC_CACHE_TTL_SEC:
+        _REC_CACHE.pop(key, None)
+        return None
+    # 返回浅拷贝，避免调用方改写缓存
+    return dict(payload)
+
+
+def rec_cache_set(key: str, payload: dict[str, Any]) -> None:
+    _REC_CACHE[key] = (time.monotonic(), dict(payload))
 
 
 def configured_digital_models() -> list[str]:
@@ -25,25 +46,31 @@ def model_display_name(model_id: str) -> str:
     return MODEL_LABELS.get(model_id, model_id)
 
 
-async def _call_one_model(model_id: str, prompt: str) -> dict[str, Any] | None:
+async def _call_one_model(model_id: str, prompt: str, timeout_sec: float = 12.0) -> dict[str, Any] | None:
     client = create_llm_client(model_id)
     if not getattr(client, "api_key", ""):
         return None
     try:
-        data = await _call_api(
-            client.api_key,
-            client.base_url,
-            client.model_name(),
-            prompt,
-            temperature=0.4,
-            max_tokens=800,
-            json_mode=True,
+        data = await asyncio.wait_for(
+            _call_api(
+                client.api_key,
+                client.base_url,
+                client.model_name(),
+                prompt,
+                temperature=0.4,
+                max_tokens=800,
+                json_mode=True,
+            ),
+            timeout=timeout_sec,
         )
         content = (data or {}).get("choices", [{}])[0].get("message", {}).get("content", "")
         parsed = _parse_llm_json(content)
         if not isinstance(parsed, dict):
             return None
         return {"model": model_id, "parsed": parsed}
+    except asyncio.TimeoutError:
+        logger.warning("digital AI timeout [%s] after %.0fs", model_id, timeout_sec)
+        return None
     except Exception as e:
         logger.warning("digital AI call failed [%s]: %s", model_id, e)
         return None

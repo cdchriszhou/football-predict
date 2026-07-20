@@ -315,6 +315,7 @@ export default {
     useAi: 'Multi-model AI picks',
     aiActive: 'AI ready',
     aiActiveModels: 'AI ready ({models})',
+    aiEnhancing: 'Enhancing with AI…',
     aiInactive: 'AI unavailable (frequency still works)',
     confidence: 'Score {n}%',
     applyPick: 'Fill picker',

@@ -253,6 +253,7 @@ export default {
     useAi: '多模型 AI 精選',
     aiActive: 'AI 已生成',
     aiActiveModels: 'AI 已生成（{models}）',
+    aiEnhancing: '多模型精選中…',
     aiInactive: 'AI 未返回（可用頻率推薦）',
     confidence: '參考度 {n}%',
     applyPick: '填入選號',

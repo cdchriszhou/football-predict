@@ -740,6 +740,8 @@ async def get_recommendations(
     window: int = 100,
     use_ai: bool = True,
 ) -> dict[str, Any]:
+    from service.digital_ai import rec_cache_get, rec_cache_set
+
     if game_id not in GAME_SPECS:
         return {
             "reachable": False,
@@ -759,6 +761,12 @@ async def get_recommendations(
         return await get_ssq_recommendations(window=window, use_ai=use_ai)
 
     window = max(20, min(int(window or 100), 200))
+    cache_key = f"rec:{game_id}:{window}:{int(bool(use_ai))}"
+    cached = rec_cache_get(cache_key)
+    if cached:
+        cached["cached"] = True
+        return cached
+
     draws = await _fetch_history(game_id, window)
     if not draws:
         return {
@@ -795,7 +803,7 @@ async def get_recommendations(
         for m in (r.get("models") or [])
     })
 
-    return {
+    payload = {
         "reachable": True,
         "message": None,
         "game": game_id,
@@ -828,4 +836,7 @@ async def get_recommendations(
         "latest": draws[0] if draws else None,
         "ai_enabled": bool(ai_picks),
         "ai_models": model_names,
+        "cached": False,
     }
+    rec_cache_set(cache_key, payload)
+    return payload

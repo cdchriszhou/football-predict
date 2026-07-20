@@ -69,8 +69,8 @@
       </div>
     </section>
 
-    <div v-loading="loading" class="game-body">
-      <section class="panel recommend-panel">
+    <div class="game-body">
+      <section class="panel recommend-panel" v-loading="recommendLoading">
         <div class="picker-head">
           <div>
             <h3>{{ t('pailie.recommendTitle') }}</h3>
@@ -90,7 +90,8 @@
         <div class="ai-row">
           <el-switch v-model="useAi" @change="loadRecommend" />
           <span class="ai-label">{{ t('pailie.useAi') }}</span>
-          <el-tag v-if="recommend?.ai_enabled" size="small" type="success">
+          <el-tag v-if="aiEnhancing" size="small" type="warning">{{ t('pailie.aiEnhancing') }}</el-tag>
+          <el-tag v-else-if="recommend?.ai_enabled" size="small" type="success">
             {{ recommend.ai_models?.length
               ? t('pailie.aiActiveModels', { models: recommend.ai_models.join('+') })
               : t('pailie.aiActive') }}
@@ -354,6 +355,8 @@ const { t } = useI18n()
 
 const loading = ref(false)
 const poolsLoading = ref(false)
+const recommendLoading = ref(false)
+const aiEnhancing = ref(false)
 const catalog = ref(null)
 const history = ref({ history: {}, message: null, reachable: false })
 const poolsData = ref({ pools: {}, message: null, updated_at: null })
@@ -368,6 +371,12 @@ const poolGameIds = ['pl3', 'pl5', 'qxc', 'ssq']
 const ssqRed = ref([])
 const ssqBlue = ref(null)
 let poolTimer = null
+let recommendSeq = 0
+const recommendCache = new Map()
+
+function recommendCacheKey(game, win, ai) {
+  return `${game}:${win}:${ai ? 1 : 0}`
+}
 
 const currentGame = computed(() =>
   (catalog.value?.games || []).find((g) => g.id === activeGame.value) || null,
@@ -695,25 +704,77 @@ async function loadPools() {
 }
 
 async function loadRecommend() {
+  const game = activeGame.value
+  const win = windowSize.value
+  const wantAi = useAi.value
+  const seq = ++recommendSeq
+  const fullKey = recommendCacheKey(game, win, wantAi)
+  const freqKey = recommendCacheKey(game, win, false)
+
+  // 回访直接用缓存，避免切 Tab 再等 AI
+  if (recommendCache.has(fullKey)) {
+    recommend.value = recommendCache.get(fullKey)
+    aiEnhancing.value = false
+    recommendLoading.value = false
+    return
+  }
+
+  // 有频率缓存时先展示，再后台补 AI
+  if (recommendCache.has(freqKey)) {
+    recommend.value = recommendCache.get(freqKey)
+  }
+
+  const needPanelLoading = !recommend.value || recommend.value.game !== game
+  if (needPanelLoading) recommendLoading.value = true
+
   try {
-    const res = await getPailieRecommend({
-      game: activeGame.value,
-      window: windowSize.value,
-      use_ai: useAi.value,
+    const freqRes = await getPailieRecommend({
+      game,
+      window: win,
+      use_ai: false,
     })
-    if (res?.code === 200) recommend.value = res.data
+    if (seq !== recommendSeq || activeGame.value !== game) return
+    if (freqRes?.code === 200) {
+      recommend.value = freqRes.data
+      recommendCache.set(freqKey, freqRes.data)
+    }
   } catch (e) {
+    if (seq !== recommendSeq || activeGame.value !== game) return
     recommend.value = {
       reachable: false,
       message: e?.message || t('pailie.loadFailed'),
       recommendations: [],
+      game,
     }
+  } finally {
+    if (seq === recommendSeq) recommendLoading.value = false
+  }
+
+  if (!wantAi || seq !== recommendSeq || activeGame.value !== game) return
+
+  aiEnhancing.value = true
+  try {
+    const aiRes = await getPailieRecommend({
+      game,
+      window: win,
+      use_ai: true,
+    })
+    if (seq !== recommendSeq || activeGame.value !== game) return
+    if (aiRes?.code === 200) {
+      recommend.value = aiRes.data
+      recommendCache.set(fullKey, aiRes.data)
+    }
+  } catch {
+    // 频率结果已展示，AI 失败可忽略
+  } finally {
+    if (seq === recommendSeq) aiEnhancing.value = false
   }
 }
 
 async function onTabChange() {
   ensureRows()
-  await loadRecommend()
+  // 不阻塞 Tab 切换：频率先出，AI 后台增强
+  loadRecommend()
 }
 
 watch(pl3Mode, () => {

@@ -476,9 +476,20 @@ async def ai_refine_ssq(analysis: dict[str, Any], draws: list[dict], base_recs: 
 
 
 async def get_ssq_recommendations(window: int = 100, use_ai: bool = True) -> dict[str, Any]:
-    from service.digital_ai import configured_digital_models, model_display_name
+    from service.digital_ai import (
+        configured_digital_models,
+        model_display_name,
+        rec_cache_get,
+        rec_cache_set,
+    )
 
     window = max(20, min(int(window or 100), 100))
+    cache_key = f"rec:ssq:{window}:{int(bool(use_ai))}"
+    cached = rec_cache_get(cache_key)
+    if cached:
+        cached["cached"] = True
+        return cached
+
     draws = await fetch_ssq_history(window)
     if not draws:
         return {
@@ -528,7 +539,7 @@ async def get_ssq_recommendations(window: int = 100, use_ai: bool = True) -> dic
         for m in (r.get("models") or [])
     })
 
-    return {
+    payload = {
         "reachable": True,
         "message": None,
         "game": "ssq",
@@ -564,4 +575,7 @@ async def get_ssq_recommendations(window: int = 100, use_ai: bool = True) -> dic
         "latest": draws[0] if draws else None,
         "ai_enabled": bool(ai_picks),
         "ai_models": model_names,
+        "cached": False,
     }
+    rec_cache_set(cache_key, payload)
+    return payload
