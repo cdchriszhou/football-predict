@@ -445,6 +445,7 @@ export default {
     noFinished: '暂无已完赛场次或缺少 CRS 比分赔率（请确认赛果已同步且含体彩 CRS 数据）',
     groupSummary: '{label} — 首推 {primary}/{total}（{primaryRate}%）· 三选 {triple}/{total}（{tripleRate}%）',
     colDate: '日期',
+    colMatch: '对阵',
     colActual: '实际',
     colPrimary: '首推',
     colSecondary: '次推',
