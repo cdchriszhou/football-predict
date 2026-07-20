@@ -21,7 +21,7 @@ export default {
   },
   competition: {
     homeTitle: '大会を選択',
-    homeSubtitle: 'ワールドカップ・五大リーグ・香港競馬 · 統一AI予測',
+    homeSubtitle: 'ワールドカップ・五大リーグ · 統一AI予測',
     enter: '予測へ',
     statMatches: '{n} 試合',
     statTeams: '{n} チーム',

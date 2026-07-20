@@ -72,19 +72,6 @@ export const FALLBACK_COMPETITIONS = [
     closing_date: '2026-05-16T23:59:59Z',
     stats: { matches: 0, teams: 0, upcoming: 0 },
   },
-  {
-    slug: 'hong-kong-racing',
-    name_key: 'hkRacing',
-    short_name: '香港跑马',
-    type: 'racing',
-    features: { racing: true, bracket: false, tournament: false, sporttery: false, groups: false },
-    theme_color: '#006B54',
-    timezone: 'Asia/Hong_Kong',
-    timezone_label_key: 'hk',
-    opening_date: '2025-09-01T00:00:00Z',
-    closing_date: '2026-07-31T23:59:59Z',
-    stats: { matches: 0, teams: 0, upcoming: 0 },
-  },
 ]
 
 export function resolveSeasonStatus(item) {
@@ -115,10 +102,4 @@ export function findCompetitionMeta(slug, list = []) {
   if (fromList) return normalizeCompetition(fromList)
   const fallback = FALLBACK_COMPETITIONS.find((c) => c.slug === slug)
   return fallback ? normalizeCompetition(fallback) : null
-}
-
-export function isRacingCompetition(slug, current = null, list = []) {
-  if (current?.type === 'racing' && current.slug === slug) return true
-  const meta = findCompetitionMeta(slug, list)
-  return meta?.type === 'racing'
 }

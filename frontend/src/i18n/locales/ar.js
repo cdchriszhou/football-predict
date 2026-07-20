@@ -21,7 +21,7 @@ export default {
   },
   competition: {
     homeTitle: 'اختر البطولة',
-    homeSubtitle: 'كأس العالم والدوريات الخمس وسباق هونغ كونغ · توقع ذكي موحّد',
+    homeSubtitle: 'كأس العالم والدوريات الخمس · توقع ذكي موحّد',
     enter: 'دخول',
     statMatches: '{n} مباراة',
     statTeams: '{n} فريق',

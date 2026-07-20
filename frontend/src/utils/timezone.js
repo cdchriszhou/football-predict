@@ -7,7 +7,6 @@ export const COMPETITION_TIMEZONES = {
   'serie-a': { timezone: 'Europe/Rome', labelKey: 'italy' },
   'bundesliga': { timezone: 'Europe/Berlin', labelKey: 'germany' },
   'ligue-1': { timezone: 'Europe/Paris', labelKey: 'france' },
-  'hong-kong-racing': { timezone: 'Asia/Hong_Kong', labelKey: 'hk' },
 }
 
 export const TIMEZONE_FLAGS = {
@@ -17,7 +16,6 @@ export const TIMEZONE_FLAGS = {
   germany: '🇩🇪',
   france: '🇫🇷',
   usa: '🇺🇸',
-  hk: '🇭🇰',
   local: '🌍',
 }
 

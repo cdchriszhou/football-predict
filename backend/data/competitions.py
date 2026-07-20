@@ -136,26 +136,6 @@ COMPETITIONS: dict[str, dict] = {
         "timezone_label_key": "france",
         "order": 5,
     },
-    "hong-kong-racing": {
-        "slug": "hong-kong-racing",
-        "name_key": "hkRacing",
-        "short_name": "香港跑马",
-        "type": "racing",
-        "sporttery_league_hints": ["香港", "跑马", "赛马", "HKJC"],
-        "features": {
-            "racing": True,
-            "bracket": False,
-            "tournament": False,
-            "sporttery": False,
-            "groups": False,
-        },
-        "opening_date": "2025-09-01T00:00:00Z",
-        "closing_date": "2026-07-31T23:59:59Z",
-        "theme_color": "#006B54",
-        "timezone": "Asia/Hong_Kong",
-        "timezone_label_key": "hk",
-        "order": 6,
-    },
 }
 
 DEFAULT_COMPETITION = "worldcup-2026"

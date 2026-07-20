@@ -13,7 +13,6 @@ from data.status_constants import MATCH_FINISHED, MATCH_LIVE, MATCH_UPCOMING
 from data.league_seed import ensure_league_data
 from db import get_db
 from db.models import Match, Team
-from service.hkjc_sync import get_hkjc_competition_stats
 from service.user_access import check_competition_access
 from utils.response import success
 from utils.logger import logger
@@ -24,23 +23,6 @@ _security = HTTPBearer()
 # Avoid running heavy match maintenance on every competitions list poll.
 _MAINTAIN_LIST_INTERVAL_SEC = 300
 _last_maintain_all_at: float = 0
-
-
-async def _racing_stats(db: AsyncSession, slug: str, *, light: bool = False) -> dict | None:
-    if slug != "hong-kong-racing":
-        return None
-    try:
-        return await get_hkjc_competition_stats(db, light=light)
-    except Exception as e:
-        logger.warning(f"HKJC competition stats failed: {e}")
-        return {
-            "matches": 0,
-            "teams": 0,
-            "upcoming": 0,
-            "live": 0,
-            "finished": 0,
-            "meetings": 0,
-        }
 
 
 async def _stats_by_slug(db: AsyncSession) -> tuple[dict, dict]:
@@ -97,15 +79,13 @@ async def _ensure_league_data_if_empty(db: AsyncSession) -> None:
 
 
 async def _maintain_all_competitions_throttled(db: AsyncSession) -> None:
-    """Run match maintenance at most once per interval; skip racing (no football matches)."""
+    """Run match maintenance at most once per interval."""
     global _last_maintain_all_at
     now = time.monotonic()
     if now - _last_maintain_all_at < _MAINTAIN_LIST_INTERVAL_SEC:
         return
     _last_maintain_all_at = now
     for comp in list_competitions():
-        if comp.get("type") == "racing":
-            continue
         try:
             await maintain_competition_matches(db, comp["slug"])
         except Exception as e:
@@ -131,7 +111,7 @@ async def get_competitions(
     for comp in list_competitions():
         slug = comp["slug"]
         ms = match_stats.get(slug, {})
-        stats = await _racing_stats(db, slug, light=True) or {
+        stats = {
             "matches": ms.get("matches", 0),
             "teams": team_stats.get(slug, 0),
             "upcoming": ms.get("upcoming", 0),
@@ -204,8 +184,7 @@ async def get_competition_detail(
         )
     )).scalar() or 0
 
-    # light=True: cache-only counts — avoid list_horses() / HKJC network on page entry
-    stats = await _racing_stats(db, slug, light=True) or {
+    stats = {
         "matches": match_count,
         "teams": team_count,
         "upcoming": upcoming,

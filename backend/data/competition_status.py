@@ -48,6 +48,4 @@ def compute_season_status(comp: dict, stats: dict, now: datetime | None = None) 
         return "live"
     if comp.get("type") == "club" and not opening and not closing:
         return "live"
-    if comp.get("type") == "racing" and opening and now >= opening:
-        return "live"
     return "upcoming"

@@ -60,9 +60,6 @@
             {{ t('competition.statusEnded') }}
           </span>
           <span v-if="item.type === 'international'" class="comp-card-badge comp-card-badge--type">FIFA</span>
-          <span v-else-if="item.type === 'racing'" class="comp-card-badge comp-card-badge--racing">
-            {{ t('competition.badgeRacing') }}
-          </span>
           <span v-if="!authStore.canAccessCompetition(item.slug)" class="comp-card-badge comp-card-badge--locked">
             {{ t('competition.locked') }}
           </span>
@@ -70,8 +67,6 @@
         <div class="comp-card-icon">
           <el-icon :size="36">
             <TrophyBase v-if="item.type === 'international'" />
-            <Medal v-else-if="item.type === 'club'" />
-            <Flag v-else-if="item.type === 'racing'" />
             <Medal v-else />
           </el-icon>
         </div>
@@ -88,14 +83,8 @@
           </div>
         </div>
         <div class="comp-stats">
-          <template v-if="item.type === 'racing'">
-            <span>{{ t('competition.statRaces', { n: item.stats?.matches ?? 0 }) }}</span>
-            <span>{{ t('competition.statHorses', { n: item.stats?.teams ?? 0 }) }}</span>
-          </template>
-          <template v-else>
-            <span>{{ t('competition.statMatches', { n: item.stats?.matches ?? 0 }) }}</span>
-            <span>{{ t('competition.statTeams', { n: item.stats?.teams ?? 0 }) }}</span>
-          </template>
+          <span>{{ t('competition.statMatches', { n: item.stats?.matches ?? 0 }) }}</span>
+          <span>{{ t('competition.statTeams', { n: item.stats?.teams ?? 0 }) }}</span>
         </div>
         <el-button type="primary" class="enter-btn">{{ t('competition.enter') }}</el-button>
       </div>
@@ -161,7 +150,7 @@ import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import {
-  TrophyBase, Medal, Flag, UserFilled, ArrowDown, Key, SwitchButton, Lock,
+  TrophyBase, Medal, UserFilled, ArrowDown, Key, SwitchButton, Lock,
 } from '@element-plus/icons-vue'
 import { useCompetitionStore } from '@/stores/competition'
 import { normalizeCompetition } from '@/data/competitions'
@@ -419,10 +408,6 @@ onUnmounted(() => {
 .comp-card-badge--locked {
   color: #fff;
   background: #e6a23c;
-}
-.comp-card-badge--racing {
-  color: #fff;
-  background: #006b54;
 }
 .comp-card-icon {
   color: var(--accent);

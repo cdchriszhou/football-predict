@@ -1,14 +1,20 @@
 import { defineStore } from 'pinia'
 import { getCompetitions, getCompetitionDetail } from '@/api/competitions'
-import { FALLBACK_COMPETITIONS, findCompetitionMeta, isRacingCompetition, normalizeCompetition } from '@/data/competitions'
+import { FALLBACK_COMPETITIONS, findCompetitionMeta, normalizeCompetition } from '@/data/competitions'
 
 const STORAGE_KEY = 'worldcup_competition_slug'
+const REMOVED_SLUGS = new Set(['hong-kong-racing'])
+
+function sanitizeSlug(slug) {
+  if (!slug || REMOVED_SLUGS.has(slug)) return 'worldcup-2026'
+  return slug
+}
 
 export const useCompetitionStore = defineStore('competition', {
   state: () => ({
     list: [],
     current: null,
-    slug: localStorage.getItem(STORAGE_KEY) || 'worldcup-2026',
+    slug: sanitizeSlug(localStorage.getItem(STORAGE_KEY)),
     loading: false,
     listFromFallback: false,
     listError: '',
@@ -18,13 +24,12 @@ export const useCompetitionStore = defineStore('competition', {
     features: (state) => state.current?.features || {},
     isWorldCup: (state) => state.slug === 'worldcup-2026',
     basePath: (state) => `/competition/${state.slug}`,
-    isRacing: (state) => isRacingCompetition(state.slug, state.current, state.list),
   },
 
   actions: {
     setSlug(slug) {
-      this.slug = slug
-      localStorage.setItem(STORAGE_KEY, slug)
+      this.slug = sanitizeSlug(slug)
+      localStorage.setItem(STORAGE_KEY, this.slug)
     },
 
     async fetchList() {

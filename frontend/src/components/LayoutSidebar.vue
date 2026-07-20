@@ -15,62 +15,38 @@
       active-text-color="#fff"
       class="sidebar-menu"
     >
-      <template v-if="isRacing">
-        <el-menu-item :index="basePath">
-          <el-icon><HomeFilled /></el-icon>
-          <span>{{ t('nav.dashboard') }}</span>
-        </el-menu-item>
-        <el-menu-item :index="`${basePath}/meetings`">
-          <el-icon><Calendar /></el-icon>
-          <span>{{ t('nav.hkjcMeetings') }}</span>
-        </el-menu-item>
-        <el-menu-item :index="`${basePath}/purchase-advice`">
-          <el-icon><ShoppingCart /></el-icon>
-          <span>{{ t('nav.hkjcPurchaseAdvice') }}</span>
-        </el-menu-item>
-        <el-menu-item :index="`${basePath}/horses`">
-          <el-icon><Flag /></el-icon>
-          <span>{{ t('nav.hkjcHorses') }}</span>
-        </el-menu-item>
-        <el-menu-item :index="`${basePath}/backtest`">
-          <el-icon><TrendCharts /></el-icon>
-          <span>{{ t('nav.hkjcBacktest') }}</span>
-        </el-menu-item>
-      </template>
-      <template v-else>
-        <el-menu-item :index="basePath">
-          <el-icon><HomeFilled /></el-icon>
-          <span>{{ t('nav.dashboard') }}</span>
-        </el-menu-item>
-        <el-menu-item :index="`${basePath}/matches`">
-          <el-icon><TrophyBase /></el-icon>
-          <span>{{ t('nav.matches') }}</span>
-        </el-menu-item>
-        <el-menu-item v-if="features.sporttery !== false && authStore.canAccessSporttery" :index="`${basePath}/sporttery-plan`">
-          <el-icon><ShoppingCart /></el-icon>
-          <span>{{ t('nav.sportteryPlan') }}</span>
-        </el-menu-item>
-        <el-menu-item :index="`${basePath}/teams`">
-          <el-icon><Flag /></el-icon>
-          <span>{{ t('nav.teams') }}</span>
-        </el-menu-item>
-        <el-menu-item v-if="features.bracket" :index="`${basePath}/bracket`">
-          <el-icon><Share /></el-icon>
-          <span>{{ t('nav.bracket') }}</span>
-        </el-menu-item>
-        <el-menu-item v-if="features.tournament" :index="`${basePath}/tournament`">
-          <el-icon><Medal /></el-icon>
-          <span>{{ t('nav.tournament') }}</span>
-        </el-menu-item>
-        <el-menu-item :index="`${basePath}/predictions`">
-          <el-icon><TrendCharts /></el-icon>
-          <span>{{ t('nav.predictions') }}</span>
-        </el-menu-item>
-        <el-menu-item :index="`${basePath}/backtest`">
-          <el-icon><DataAnalysis /></el-icon>
-          <span>{{ t('nav.scoreBacktest') }}</span>
-        </el-menu-item>
-      </template>
+      <el-menu-item :index="basePath">
+        <el-icon><HomeFilled /></el-icon>
+        <span>{{ t('nav.dashboard') }}</span>
+      </el-menu-item>
+      <el-menu-item :index="`${basePath}/matches`">
+        <el-icon><TrophyBase /></el-icon>
+        <span>{{ t('nav.matches') }}</span>
+      </el-menu-item>
+      <el-menu-item v-if="features.sporttery !== false && authStore.canAccessSporttery" :index="`${basePath}/sporttery-plan`">
+        <el-icon><ShoppingCart /></el-icon>
+        <span>{{ t('nav.sportteryPlan') }}</span>
+      </el-menu-item>
+      <el-menu-item :index="`${basePath}/teams`">
+        <el-icon><Flag /></el-icon>
+        <span>{{ t('nav.teams') }}</span>
+      </el-menu-item>
+      <el-menu-item v-if="features.bracket" :index="`${basePath}/bracket`">
+        <el-icon><Share /></el-icon>
+        <span>{{ t('nav.bracket') }}</span>
+      </el-menu-item>
+      <el-menu-item v-if="features.tournament" :index="`${basePath}/tournament`">
+        <el-icon><Medal /></el-icon>
+        <span>{{ t('nav.tournament') }}</span>
+      </el-menu-item>
+      <el-menu-item :index="`${basePath}/predictions`">
+        <el-icon><TrendCharts /></el-icon>
+        <span>{{ t('nav.predictions') }}</span>
+      </el-menu-item>
+      <el-menu-item :index="`${basePath}/backtest`">
+        <el-icon><DataAnalysis /></el-icon>
+        <span>{{ t('nav.scoreBacktest') }}</span>
+      </el-menu-item>
       <el-menu-item index="/">
         <el-icon><Switch /></el-icon>
         <span>{{ t('nav.switchCompetition') }}</span>
@@ -87,7 +63,7 @@
 import { computed, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { Calendar, Close, DataAnalysis, Medal, ShoppingCart, Switch } from '@element-plus/icons-vue'
+import { Close, DataAnalysis, Medal, ShoppingCart, Switch } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
 import { useCompetitionStore } from '@/stores/competition'
 
@@ -106,20 +82,18 @@ const route = useRoute()
 const slug = computed(() => route.params.slug || compStore.slug || 'worldcup-2026')
 const basePath = computed(() => `/competition/${slug.value}`)
 const features = computed(() => compStore.current?.features || compStore.features || {})
-const isRacing = computed(() => compStore.isRacing)
 
 const activeMenu = computed(() => {
   const path = route.path
   if (path === '/admin') return '/admin'
-  if (path.startsWith(`${basePath.value}/purchase-advice`)) return `${basePath.value}/purchase-advice`
-  if (path.startsWith(`${basePath.value}/meetings`)) return `${basePath.value}/meetings`
-  if (path.startsWith(`${basePath.value}/races`)) return `${basePath.value}/meetings`
-  if (path.startsWith(`${basePath.value}/horses`)) return `${basePath.value}/horses`
   if (path.startsWith(`${basePath.value}/backtest`)) return `${basePath.value}/backtest`
   if (path.startsWith(`${basePath.value}/matches`)) return `${basePath.value}/matches`
   if (path.startsWith(`${basePath.value}/teams`)) return `${basePath.value}/teams`
+  if (path.startsWith(`${basePath.value}/bracket`)) return `${basePath.value}/bracket`
+  if (path.startsWith(`${basePath.value}/tournament`)) return `${basePath.value}/tournament`
+  if (path.startsWith(`${basePath.value}/predictions`)) return `${basePath.value}/predictions`
   if (path.startsWith(`${basePath.value}/sporttery-plan`)) return `${basePath.value}/sporttery-plan`
-  if (path === basePath.value) return basePath.value
+  if (path === basePath.value || path === `${basePath.value}/`) return basePath.value
   return path
 })
 

@@ -154,25 +154,3 @@ class CrawlerLog(Base):
     error_message = Column(Text)
     start_time = Column(DateTime, default=datetime.now)
     end_time = Column(DateTime)
-
-
-class HkjcMeetingCache(Base):
-    __tablename__ = "hkjc_meeting_cache"
-
-    id = Column(String(32), primary_key=True, comment="赛事日 ID")
-    meeting_date = Column(String(10), nullable=False, index=True)
-    venue_code = Column(String(8), nullable=False, index=True)
-    payload = Column(Text, nullable=False, comment="赛事 JSON")
-    source = Column(String(32), default="hkjc_graphql")
-    synced_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-
-
-class HkjcRaceResult(Base):
-    __tablename__ = "hkjc_race_results"
-
-    id = Column(String(48), primary_key=True, comment="date-venue-raceNo")
-    meeting_date = Column(String(10), nullable=False, index=True)
-    venue_code = Column(String(8), nullable=False, index=True)
-    race_no = Column(Integer, nullable=False)
-    payload = Column(Text, nullable=False, comment="赛果 JSON")
-    synced_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

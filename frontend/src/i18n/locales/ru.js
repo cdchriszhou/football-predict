@@ -21,7 +21,7 @@ export default {
   },
   competition: {
     homeTitle: 'Выберите турнир',
-    homeSubtitle: 'ЧМ, топ-5 лиг и скачки Гонконга · единый AI-прогноз',
+    homeSubtitle: 'ЧМ и топ-5 лиг · единый AI-прогноз',
     enter: 'Перейти',
     statMatches: '{n} матчей',
     statTeams: '{n} команд',

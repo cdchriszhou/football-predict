@@ -57,36 +57,6 @@ const competitionRoutes = [
     meta: { titleKey: 'route.predictions', footballOnly: true }
   },
   {
-    path: 'purchase-advice',
-    name: 'HkjcPurchaseAdvice',
-    component: () => import('../views/racing/HkjcPurchaseAdvice.vue'),
-    meta: { titleKey: 'route.hkjcPurchaseAdvice', racingOnly: true }
-  },
-  {
-    path: 'meetings',
-    name: 'HkjcMeetings',
-    component: () => import('../views/racing/HkjcMeetingList.vue'),
-    meta: { titleKey: 'route.hkjcMeetings', racingOnly: true }
-  },
-  {
-    path: 'meetings/:meetingId',
-    name: 'HkjcMeetingDetail',
-    component: () => import('../views/racing/HkjcMeetingDetail.vue'),
-    meta: { titleKey: 'route.hkjcMeetingDetail', racingOnly: true }
-  },
-  {
-    path: 'races/:id',
-    name: 'HkjcRaceDetail',
-    component: () => import('../views/racing/HkjcRaceDetail.vue'),
-    meta: { titleKey: 'route.hkjcRaceDetail', racingOnly: true }
-  },
-  {
-    path: 'horses',
-    name: 'HkjcHorses',
-    component: () => import('../views/racing/HkjcHorseList.vue'),
-    meta: { titleKey: 'route.hkjcHorses', racingOnly: true }
-  },
-  {
     path: 'backtest',
     name: 'ModelBacktest',
     component: () => import('../views/BacktestEntry.vue'),
@@ -206,13 +176,6 @@ router.beforeEach(async (to, from, next) => {
       if (!features[to.meta.feature]) {
         return next({ name: 'CompetitionDashboard', params: { slug: to.params.slug } })
       }
-    }
-    const isRacing = compStore.isRacing
-    if (to.meta.racingOnly && !isRacing) {
-      return next({ name: 'CompetitionDashboard', params: { slug: to.params.slug } })
-    }
-    if (to.meta.footballOnly && isRacing) {
-      return next({ name: 'CompetitionDashboard', params: { slug: to.params.slug } })
     }
   }
 

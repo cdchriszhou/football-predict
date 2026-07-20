@@ -87,8 +87,6 @@ async def _maintain_matches():
             if IS_SQLITE:
                 async with write_lock:
                     for comp in list_competitions():
-                        if comp.get("type") == "racing":
-                            continue
                         try:
                             await maintain_competition_matches(db, comp["slug"])
                         except Exception as e:
@@ -97,8 +95,6 @@ async def _maintain_matches():
                     await _commit_with_retry(db)
             else:
                 for comp in list_competitions():
-                    if comp.get("type") == "racing":
-                        continue
                     try:
                         await maintain_competition_matches(db, comp["slug"])
                     except Exception as e:

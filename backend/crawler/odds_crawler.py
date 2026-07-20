@@ -70,8 +70,6 @@ def _parse_closing_date(comp: dict) -> datetime | None:
 
 
 def _competition_supports_odds(comp: dict) -> bool:
-    if comp.get("type") == "racing":
-        return False
     if comp.get("odds_api_sport_key"):
         return True
     return bool((comp.get("features") or {}).get("sporttery"))

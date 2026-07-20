@@ -21,7 +21,7 @@ export default {
   },
   competition: {
     homeTitle: '選擇賽事',
-    homeSubtitle: '世界盃、五大聯賽與香港跑馬 · 統一 AI 預測',
+    homeSubtitle: '世界盃與五大聯賽 · 統一 AI 預測',
     enter: '進入預測',
     statMatches: '{n} 場比賽',
     statTeams: '{n} 支球隊',
@@ -47,7 +47,6 @@ export default {
       serieA: '意大利甲級聯賽',
       bundesliga: '德國甲級聯賽',
       ligue1: '法國甲級聯賽',
-      hkRacing: '香港跑馬場',
     },
   },
   header: {
