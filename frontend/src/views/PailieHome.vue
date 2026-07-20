@@ -22,6 +22,7 @@
       <el-tab-pane :label="t('pailie.pl3')" name="pl3" />
       <el-tab-pane :label="t('pailie.pl5')" name="pl5" />
       <el-tab-pane :label="t('pailie.qxc')" name="qxc" />
+      <el-tab-pane :label="t('pailie.ssq')" name="ssq" />
     </el-tabs>
 
     <section class="panel pool-panel">
@@ -129,8 +130,12 @@
                 v-for="(d, di) in recDigits(rec)"
                 :key="di"
                 class="rec-ball"
-                :class="{ 'rec-ball--special': activeGame === 'qxc' && di === 6 }"
-              >{{ d }}</span>
+                :class="{
+                  'rec-ball--red': activeGame === 'ssq' && di < 6,
+                  'rec-ball--special': activeGame === 'qxc' && di === 6,
+                  'rec-ball--blue': activeGame === 'ssq' && di === 6,
+                }"
+              >{{ formatBall(d) }}</span>
             </div>
             <p class="rec-reason">{{ rec.reason }}</p>
             <div class="rec-actions">
@@ -145,11 +150,11 @@
         <div v-if="hotDigits.length || coldDigits.length" class="digit-tags">
           <div class="tag-row">
             <span class="tag-label">{{ t('pailie.hotDigits') }}</span>
-            <span v-for="d in hotDigits" :key="'h' + d" class="digit-chip hot">{{ d }}</span>
+            <span v-for="d in hotDigits" :key="'h' + d" class="digit-chip hot">{{ formatBall(d) }}</span>
           </div>
           <div class="tag-row">
             <span class="tag-label">{{ t('pailie.coldDigits') }}</span>
-            <span v-for="d in coldDigits" :key="'c' + d" class="digit-chip cold">{{ d }}</span>
+            <span v-for="d in coldDigits" :key="'c' + d" class="digit-chip cold">{{ formatBall(d) }}</span>
           </div>
         </div>
 
@@ -165,7 +170,7 @@
                     class="freq-item"
                     :title="t('pailie.freqTip', { count: item.count, rate: pct(item.rate), miss: item.miss })"
                   >
-                    <span class="freq-digit" :class="item.tag">{{ item.digit }}</span>
+                    <span class="freq-digit" :class="item.tag">{{ formatBall(item.digit) }}</span>
                     <div class="freq-bar-track">
                       <div class="freq-bar-fill" :style="{ width: barWidth(item.rate) }" />
                     </div>
@@ -202,7 +207,36 @@
           </el-radio-group>
         </div>
 
-        <div class="digit-rows">
+        <template v-if="activeGame === 'ssq'">
+          <div class="ssq-zone">
+            <div class="ssq-zone-title">{{ t('pailie.ssqRed') }} <span class="ssq-count">{{ ssqRed.length }}/6</span></div>
+            <div class="digit-row ssq-row">
+              <button
+                v-for="n in 33"
+                :key="'r' + n"
+                type="button"
+                class="digit-btn ssq-btn"
+                :class="{ active: ssqRed.includes(n), hot: isHot(n), cold: isCold(n) }"
+                @click="toggleSsqRed(n)"
+              >{{ formatBall(n) }}</button>
+            </div>
+          </div>
+          <div class="ssq-zone">
+            <div class="ssq-zone-title">{{ t('pailie.ssqBlue') }} <span class="ssq-count">{{ ssqBlue ? 1 : 0 }}/1</span></div>
+            <div class="digit-row ssq-row">
+              <button
+                v-for="n in 16"
+                :key="'b' + n"
+                type="button"
+                class="digit-btn ssq-btn ssq-btn--blue"
+                :class="{ active: ssqBlue === n }"
+                @click="toggleSsqBlue(n)"
+              >{{ formatBall(n) }}</button>
+            </div>
+          </div>
+        </template>
+
+        <div v-else class="digit-rows">
           <div v-for="(row, ri) in digitRows" :key="ri" class="digit-row">
             <span class="pos-label">{{ positionLabel(ri) }}</span>
             <button
@@ -237,7 +271,7 @@
 
         <div v-if="tickets.length" class="ticket-list">
           <div v-for="(tk, idx) in tickets" :key="idx" class="ticket-item">
-            <span class="tk-game">{{ tk.game === 'pl3' ? t('pailie.pl3') : t('pailie.pl5') }}</span>
+            <span class="tk-game">{{ gameName(tk.game) }}</span>
             <span class="tk-mode">{{ ticketModeLabel(tk) }}</span>
             <span class="tk-nums">{{ tk.display }}</span>
             <span class="tk-bets">{{ t('pailie.betCount', { n: tk.bets }) }}</span>
@@ -259,7 +293,7 @@
         />
         <el-table :data="historyTableRows" stripe size="small" empty-text="—">
           <el-table-column prop="issue" :label="t('pailie.colIssue')" min-width="90" />
-          <el-table-column prop="result" :label="t('pailie.colResult')" min-width="130" />
+          <el-table-column prop="result" :label="t('pailie.colResult')" min-width="180" />
           <el-table-column prop="draw_time" :label="t('pailie.colTime')" min-width="110" />
           <el-table-column :label="t('pailie.colPool')" min-width="140">
             <template #default="{ row }">
@@ -295,7 +329,9 @@ const windowSize = ref(100)
 const useAi = ref(true)
 const selections = ref([[], [], []])
 const tickets = ref([])
-const poolGameIds = ['pl3', 'pl5', 'qxc']
+const poolGameIds = ['pl3', 'pl5', 'qxc', 'ssq']
+const ssqRed = ref([])
+const ssqBlue = ref(null)
 let poolTimer = null
 
 const currentGame = computed(() =>
@@ -338,7 +374,14 @@ function gameName(gameId) {
   if (gameId === 'pl3') return t('pailie.pl3')
   if (gameId === 'pl5') return t('pailie.pl5')
   if (gameId === 'qxc') return t('pailie.qxc')
+  if (gameId === 'ssq') return t('pailie.ssq')
   return gameId
+}
+
+function formatBall(n) {
+  const num = Number(n)
+  if (!Number.isFinite(num)) return n
+  return activeGame.value === 'ssq' ? String(num).padStart(2, '0') : String(num)
 }
 
 function formatPool(text) {
@@ -386,7 +429,7 @@ function pct(rate) {
 }
 
 function barWidth(rate) {
-  const base = 1 / 10
+  const base = activeGame.value === 'ssq' ? 6 / 33 : 1 / 10
   const w = Math.max(8, Math.min(100, ((rate || 0) / (base * 2)) * 100))
   return `${w}%`
 }
@@ -414,6 +457,9 @@ function recDigits(rec) {
 }
 
 function positionLabel(idx) {
+  if (activeGame.value === 'ssq') {
+    return idx === 0 ? t('pailie.ssqRed') : t('pailie.ssqBlue')
+  }
   if (activeGame.value === 'pl3' && pl3Mode.value !== 'direct' && digitRows.value.length === 1) {
     return t('pailie.pool')
   }
@@ -427,12 +473,28 @@ function positionLabel(idx) {
 }
 
 function ensureRows() {
+  if (activeGame.value === 'ssq') {
+    ssqRed.value = []
+    ssqBlue.value = null
+    return
+  }
   if (activeGame.value === 'pl3' && pl3Mode.value !== 'direct') {
     selections.value = [[]]
     return
   }
   const n = activeGame.value === 'qxc' ? 7 : activeGame.value === 'pl5' ? 5 : 3
   selections.value = Array.from({ length: n }, () => [])
+}
+
+function toggleSsqRed(n) {
+  const set = new Set(ssqRed.value)
+  if (set.has(n)) set.delete(n)
+  else if (set.size < 6) set.add(n)
+  ssqRed.value = [...set].sort((a, b) => a - b)
+}
+
+function toggleSsqBlue(n) {
+  ssqBlue.value = ssqBlue.value === n ? null : n
 }
 
 function toggleDigit(rowIdx, digit) {
@@ -451,6 +513,9 @@ function uniqueSorted(nums) {
 }
 
 function countBets() {
+  if (activeGame.value === 'ssq') {
+    return ssqRed.value.length === 6 && ssqBlue.value ? 1 : 0
+  }
   const rows = selections.value
   if (rows.some((r) => !r.length)) return 0
   if (activeGame.value === 'pl5' || pl3Mode.value === 'direct') {
@@ -473,6 +538,10 @@ const betCount = computed(() => countBets())
 const canAdd = computed(() => betCount.value > 0)
 
 function displayFromSelection() {
+  if (activeGame.value === 'ssq') {
+    const reds = ssqRed.value.map(formatBall).join(' ')
+    return `${reds} + ${formatBall(ssqBlue.value)}`
+  }
   if (activeGame.value === 'pl3' && pl3Mode.value !== 'direct') {
     return uniqueSorted(selections.value[0] || []).join(' ')
   }
@@ -481,6 +550,13 @@ function displayFromSelection() {
 
 function applyRecommend(rec) {
   if (!rec?.digits?.length) return
+  if (activeGame.value === 'ssq' || rec.mode === 'ssq') {
+    const digits = rec.digits
+    ssqRed.value = digits.slice(0, 6).map(Number)
+    ssqBlue.value = Number(digits[6])
+    ElMessage.success(t('pailie.applied'))
+    return
+  }
   if (rec.mode === 'group3' || rec.mode === 'group6') {
     pl3Mode.value = rec.mode
     selections.value = [[...rec.digits].sort((a, b) => a - b)]
@@ -512,6 +588,16 @@ function addRecommendTicket(rec) {
 }
 
 function machinePick() {
+  if (activeGame.value === 'ssq') {
+    const pool = []
+    while (pool.length < 6) {
+      const n = 1 + Math.floor(Math.random() * 33)
+      if (!pool.includes(n)) pool.push(n)
+    }
+    ssqRed.value = pool.sort((a, b) => a - b)
+    ssqBlue.value = 1 + Math.floor(Math.random() * 16)
+    return
+  }
   if (activeGame.value === 'pl3' && pl3Mode.value !== 'direct') {
     const count = pl3Mode.value === 'group3' ? 2 : 3
     const pool = []
@@ -537,7 +623,7 @@ function addTicket() {
   if (!canAdd.value) return
   tickets.value.unshift({
     game: activeGame.value,
-    mode: activeGame.value === 'pl3' ? pl3Mode.value : 'direct',
+    mode: activeGame.value === 'ssq' ? 'ssq' : (activeGame.value === 'pl3' ? pl3Mode.value : 'direct'),
     display: displayFromSelection(),
     bets: betCount.value,
     amount: betCount.value * 2,
@@ -551,6 +637,7 @@ function removeTicket(idx) {
 }
 
 function ticketModeLabel(tk) {
+  if (tk.mode === 'ssq' || tk.game === 'ssq') return t('pailie.modeSsq')
   if (tk.mode === 'group3') return t('pailie.modeGroup3')
   if (tk.mode === 'group6') return t('pailie.modeGroup6')
   return t('pailie.modeDirect')
@@ -654,9 +741,35 @@ onUnmounted(() => {
 .game-tabs {
   margin-bottom: 8px;
 }
+.ssq-zone {
+  margin-bottom: 14px;
+}
+.ssq-zone-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #303133;
+  margin-bottom: 8px;
+}
+.ssq-count {
+  color: #909399;
+  font-weight: 500;
+  margin-left: 6px;
+}
+.ssq-row {
+  gap: 6px;
+}
+.ssq-btn {
+  width: 34px;
+  height: 34px;
+  font-size: 12px;
+}
+.ssq-btn--blue.active {
+  background: #1565c0;
+  border-color: #1565c0;
+}
 .pool-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 12px;
 }
 .pool-card {
@@ -823,6 +936,12 @@ onUnmounted(() => {
   background: linear-gradient(145deg, #ef5350, #c62828);
   width: 32px;
   height: 32px;
+}
+.rec-ball--red {
+  background: linear-gradient(145deg, #ef5350, #c62828);
+}
+.rec-ball--blue {
+  background: linear-gradient(145deg, #42a5f5, #1565c0) !important;
 }
 .rec-reason {
   margin: 0;

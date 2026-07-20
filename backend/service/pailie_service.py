@@ -13,6 +13,7 @@ import httpx
 
 from utils.http_client import sporttery_proxy_attempts
 from utils.logger import logger
+from service.ssq_service import SSQ_GAME, fetch_ssq_history, get_ssq_recommendations
 
 # ---------------------------------------------------------------------------
 # Game specs
@@ -72,8 +73,8 @@ GAME_SPECS: dict[str, dict] = {
     "pl3": PL3_GAME,
     "pl5": PL5_GAME,
     "qxc": QXC_GAME,
+    "ssq": SSQ_GAME,
 }
-
 _HISTORY_URL = "https://webapi.sporttery.cn/gateway/lottery/getHistoryPageListV1.qry"
 # 体彩网关 gameNo；七星彩常见为 04，失败时再试备选
 _GAME_NOS: dict[str, tuple[str, ...]] = {
@@ -101,12 +102,12 @@ _TREND_WEIGHT = 0.10  # 近窗相对全样本的趋势加成
 def get_games_catalog() -> dict[str, Any]:
     return {
         "slug": "pailie",
-        "title": "体彩排列3 / 排列5 / 七星彩",
+        "title": "排列3 / 排列5 / 七星彩 / 双色球",
         "disclaimer": (
             "本模块仅提供玩法说明、历史频率统计、概率参考与 AI 选号辅助，不提供购彩下单；"
             "历史频率与 AI 建议均不能保证未来开奖结果，请理性投注并到官方渠道购买。"
         ),
-        "games": [PL3_GAME, PL5_GAME, QXC_GAME],
+        "games": [PL3_GAME, PL5_GAME, QXC_GAME, SSQ_GAME],
     }
 
 
@@ -306,6 +307,9 @@ async def _fetch_history_page(
 async def _fetch_history(game_id: str, limit: int = 100) -> list[dict]:
     if game_id not in GAME_SPECS:
         return []
+    if game_id == "ssq":
+        return await fetch_ssq_history(min(int(limit or 100), 100))
+
     limit = max(1, min(int(limit or 100), 200))
     cache_key = f"{game_id}:{limit}"
     now = time.monotonic()
@@ -371,7 +375,7 @@ async def get_draw_history(game_id: str | None = None, limit: int = 10) -> dict[
 
 
 async def get_prize_pools(history_limit: int = 30) -> dict[str, Any]:
-    """同步三种玩法最新奖池，并附带近期每期奖池明细。"""
+    """同步各玩法最新奖池，并附带近期每期奖池明细。"""
     history_limit = max(5, min(int(history_limit or 30), 50))
     games = list(GAME_SPECS.keys())
     rows_list = await asyncio.gather(*[_fetch_history(g, history_limit) for g in games])
@@ -396,11 +400,15 @@ async def get_prize_pools(history_limit: int = 30) -> dict[str, Any]:
         pools[game_id] = {
             "game": game_id,
             "name": spec["name"],
-            "has_floating_pool": game_id in ("pl5", "qxc"),
+            "has_floating_pool": game_id in ("pl5", "qxc", "ssq"),
             "pool_note": (
                 "固定奖玩法，官方奖池字段通常为 0 或空，以下为接口同步值。"
                 if game_id == "pl3"
-                else "开奖后奖池余额（元），来自体彩官方开奖公告。"
+                else (
+                    "开奖后奖池余额（元），来自福利彩票官方开奖公告。"
+                    if game_id == "ssq"
+                    else "开奖后奖池余额（元），来自体彩官方开奖公告。"
+                )
             ),
             "latest": None if not latest else {
                 "issue": latest["issue"],
@@ -767,6 +775,9 @@ async def get_recommendations(
             "cold_digits": [],
             "ai_enabled": False,
         }
+
+    if game_id == "ssq":
+        return await get_ssq_recommendations(window=window, use_ai=use_ai)
 
     window = max(20, min(int(window or 100), 200))
     draws = await _fetch_history(game_id, window)
