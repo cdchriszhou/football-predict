@@ -739,7 +739,9 @@ async def compute_score_backtest(
         g["triple_hit_rate"] = round(g["triple_hits"] / ev * 100, 1)
         group_list.append(g)
     if prefer_date:
-        group_list.sort(key=lambda x: x["label"], reverse=True)
+        # Sort by ISO date key (dYYYY-MM-DD), NOT Chinese labels — "7月8日" > "7月20日"
+        # lexicographically and wrongly surfaces mid-July as the newest group.
+        group_list.sort(key=lambda x: x["group_key"], reverse=True)
     else:
         group_list.sort(key=lambda x: (x.get("matchday") or 99, x["label"]))
 

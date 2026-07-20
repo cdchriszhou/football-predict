@@ -139,6 +139,33 @@ def test_ghana_panama_kickoff_is_june18_beijing():
     assert kickoff.hour == 7
 
 
+def test_worldcup_groups_sort_by_iso_date_not_chinese_label():
+    """Chinese labels like 7月8日 sort after 7月20日 lexicographically — must use ISO keys."""
+    from service.score_backtest import _backtest_group_key_label
+
+    rows = [
+        {"match_time": "2026-07-08T00:00:00", "stage": "1/8决赛", "matchday": None},
+        {"match_time": "2026-07-12T05:00:00", "stage": "1/4决赛", "matchday": None},
+        {"match_time": "2026-07-20T03:00:00", "stage": "决赛", "matchday": None},
+        {"match_time": "2026-07-15T02:00:00", "stage": "半决赛", "matchday": None},
+    ]
+    groups: dict[str, dict] = {}
+    for row in rows:
+        key, label = _backtest_group_key_label(row, prefer_date=True)
+        groups[key] = {"group_key": key, "label": label, "matchday": None}
+    group_list = list(groups.values())
+    # Reproduce the bug path then the fix
+    wrong = sorted(group_list, key=lambda x: x["label"], reverse=True)
+    assert wrong[0]["group_key"] == "d2026-07-08"
+    fixed = sorted(group_list, key=lambda x: x["group_key"], reverse=True)
+    assert [g["group_key"] for g in fixed] == [
+        "d2026-07-20",
+        "d2026-07-15",
+        "d2026-07-12",
+        "d2026-07-08",
+    ]
+
+
 def test_july_knockout_groups_use_beijing_date():
     from service.score_backtest import _resolve_backtest_kickoff, _backtest_group_key_label
 
