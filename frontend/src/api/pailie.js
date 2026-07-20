@@ -7,3 +7,7 @@ export function getPailieCatalog() {
 export function getPailieHistory(params = {}) {
   return api.get('/pailie/history', { params })
 }
+
+export function getPailieRecommend(params = {}) {
+  return api.get('/pailie/recommend', { params })
+}

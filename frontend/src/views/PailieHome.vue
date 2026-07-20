@@ -24,6 +24,96 @@
     </el-tabs>
 
     <div v-loading="loading" class="game-body">
+      <section class="panel recommend-panel">
+        <div class="picker-head">
+          <div>
+            <h3>{{ t('pailie.recommendTitle') }}</h3>
+            <p class="note">
+              {{ recommend?.method?.desc || t('pailie.recommendHint') }}
+              <template v-if="recommend?.sample_size">
+                · {{ t('pailie.sampleSize', { n: recommend.sample_size }) }}
+              </template>
+            </p>
+          </div>
+          <el-radio-group v-model="windowSize" size="small" @change="loadRecommend">
+            <el-radio-button :value="30">30{{ t('pailie.periods') }}</el-radio-button>
+            <el-radio-button :value="60">60{{ t('pailie.periods') }}</el-radio-button>
+            <el-radio-button :value="100">100{{ t('pailie.periods') }}</el-radio-button>
+          </el-radio-group>
+        </div>
+
+        <el-alert
+          v-if="recommend?.disclaimer"
+          type="info"
+          :closable="false"
+          show-icon
+          class="history-alert"
+          :title="recommend.disclaimer"
+        />
+        <el-alert
+          v-else-if="recommend && !recommend.reachable"
+          type="warning"
+          :closable="false"
+          show-icon
+          class="history-alert"
+          :title="recommend.message || t('pailie.recommendEmpty')"
+        />
+
+        <div v-if="recommendCards.length" class="rec-grid">
+          <div
+            v-for="rec in recommendCards"
+            :key="rec.id"
+            class="rec-card"
+            :class="{ 'rec-card--primary': rec.id === 'direct-1' }"
+          >
+            <div class="rec-top">
+              <span class="rec-label">{{ recLabel(rec) }}</span>
+              <span class="rec-conf">{{ t('pailie.confidence', { n: Math.round((rec.confidence || 0) * 100) }) }}</span>
+            </div>
+            <div class="rec-nums">{{ rec.display }}</div>
+            <p class="rec-reason">{{ rec.reason }}</p>
+            <div class="rec-actions">
+              <el-button size="small" @click="applyRecommend(rec)">{{ t('pailie.applyPick') }}</el-button>
+              <el-button size="small" type="primary" @click="addRecommendTicket(rec)">
+                {{ t('pailie.addTicket') }}
+              </el-button>
+            </div>
+          </div>
+        </div>
+
+        <div v-if="hotDigits.length || coldDigits.length" class="digit-tags">
+          <div class="tag-row">
+            <span class="tag-label">{{ t('pailie.hotDigits') }}</span>
+            <span v-for="d in hotDigits" :key="'h' + d" class="digit-chip hot">{{ d }}</span>
+          </div>
+          <div class="tag-row">
+            <span class="tag-label">{{ t('pailie.coldDigits') }}</span>
+            <span v-for="d in coldDigits" :key="'c' + d" class="digit-chip cold">{{ d }}</span>
+          </div>
+        </div>
+
+        <div v-if="freqRows.length" class="freq-block">
+          <h4>{{ t('pailie.freqTitle') }}</h4>
+          <div v-for="(pos, pi) in freqRows" :key="pi" class="freq-pos">
+            <div class="freq-pos-label">{{ positionLabel(pi) }}</div>
+            <div class="freq-bars">
+              <div
+                v-for="item in pos"
+                :key="item.digit"
+                class="freq-item"
+                :title="t('pailie.freqTip', { count: item.count, rate: pct(item.rate), miss: item.miss })"
+              >
+                <span class="freq-digit" :class="item.tag">{{ item.digit }}</span>
+                <div class="freq-bar-track">
+                  <div class="freq-bar-fill" :style="{ width: barWidth(item.rate) }" />
+                </div>
+                <span class="freq-meta">{{ pct(item.rate) }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <section class="panel rules-panel">
         <h3>{{ t('pailie.rulesTitle') }}</h3>
         <p class="note">{{ currentGame?.note }}</p>
@@ -54,7 +144,7 @@
               :key="n - 1"
               type="button"
               class="digit-btn"
-              :class="{ active: row.includes(n - 1) }"
+              :class="{ active: row.includes(n - 1), hot: isHot(n - 1), cold: isCold(n - 1) }"
               @click="toggleDigit(ri, n - 1)"
             >
               {{ n - 1 }}
@@ -63,6 +153,9 @@
         </div>
 
         <div class="picker-actions">
+          <el-button type="success" plain :disabled="!recommendCards.length" @click="applyTopRecommend">
+            {{ t('pailie.applyTop') }}
+          </el-button>
           <el-button @click="machinePick">{{ t('pailie.machinePick') }}</el-button>
           <el-button @click="clearPick">{{ t('pailie.clear') }}</el-button>
           <el-button type="primary" :disabled="!canAdd" @click="addTicket">
@@ -112,15 +205,17 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
-import { getPailieCatalog, getPailieHistory } from '@/api/pailie'
+import { getPailieCatalog, getPailieHistory, getPailieRecommend } from '@/api/pailie'
 
 const { t } = useI18n()
 
 const loading = ref(false)
 const catalog = ref(null)
 const history = ref({ history: {}, message: null, reachable: false })
+const recommend = ref(null)
 const activeGame = ref('pl3')
 const pl3Mode = ref('direct')
+const windowSize = ref(100)
 const selections = ref([[], [], []])
 const tickets = ref([])
 
@@ -129,9 +224,17 @@ const currentGame = computed(() =>
 )
 
 const digitRows = computed(() => selections.value)
-
 const historyRows = computed(() => history.value?.history?.[activeGame.value] || [])
 const historyMessage = computed(() => history.value?.message || '')
+const recommendCards = computed(() => recommend.value?.recommendations || [])
+const hotDigits = computed(() => recommend.value?.hot_digits || [])
+const coldDigits = computed(() => recommend.value?.cold_digits || [])
+const freqRows = computed(() => {
+  const stats = recommend.value?.position_stats || []
+  return stats.map((pos) =>
+    [...pos].sort((a, b) => a.digit - b.digit),
+  )
+})
 
 const modeLabel = computed(() => {
   if (activeGame.value !== 'pl3') return t('pailie.modeDirect')
@@ -140,8 +243,34 @@ const modeLabel = computed(() => {
   return t('pailie.modeDirect')
 })
 
+function pct(rate) {
+  return `${Math.round((rate || 0) * 1000) / 10}%`
+}
+
+function barWidth(rate) {
+  const base = 1 / 10
+  const w = Math.max(8, Math.min(100, ((rate || 0) / (base * 2)) * 100))
+  return `${w}%`
+}
+
+function isHot(d) {
+  return hotDigits.value.includes(d)
+}
+
+function isCold(d) {
+  return coldDigits.value.includes(d)
+}
+
+function recLabel(rec) {
+  if (rec.id === 'direct-1') return t('pailie.recPrimary')
+  if (rec.mode === 'group3') return t('pailie.recGroup3')
+  if (rec.mode === 'group6') return t('pailie.recGroup6')
+  if (rec.id === 'cold-direct') return t('pailie.recCold')
+  return rec.label || t('pailie.recAlt')
+}
+
 function positionLabel(idx) {
-  if (activeGame.value === 'pl3' && pl3Mode.value !== 'direct') {
+  if (activeGame.value === 'pl3' && pl3Mode.value !== 'direct' && digitRows.value.length === 1) {
     return t('pailie.pool')
   }
   if (activeGame.value === 'pl5') {
@@ -203,6 +332,38 @@ function displayFromSelection() {
   return selections.value.map((r) => (r.length === 1 ? String(r[0]) : `[${r.join(',')}]`)).join(' · ')
 }
 
+function applyRecommend(rec) {
+  if (!rec?.digits?.length) return
+  if (rec.mode === 'group3' || rec.mode === 'group6') {
+    pl3Mode.value = rec.mode
+    selections.value = [[...rec.digits].sort((a, b) => a - b)]
+  } else {
+    pl3Mode.value = 'direct'
+    selections.value = rec.digits.map((d) => [d])
+  }
+  ElMessage.success(t('pailie.applied'))
+}
+
+function applyTopRecommend() {
+  const top = recommendCards.value.find((r) => r.mode === 'direct') || recommendCards.value[0]
+  if (top) applyRecommend(top)
+}
+
+function addRecommendTicket(rec) {
+  if (!rec?.digits?.length) return
+  const mode = rec.mode || 'direct'
+  const bets = rec.bets || 1
+  tickets.value.unshift({
+    game: activeGame.value,
+    mode,
+    display: rec.display,
+    bets,
+    amount: bets * 2,
+    fromRecommend: true,
+  })
+  ElMessage.success(t('pailie.ticketAdded'))
+}
+
 function machinePick() {
   if (activeGame.value === 'pl3' && pl3Mode.value !== 'direct') {
     const count = pl3Mode.value === 'group3' ? 2 : 3
@@ -246,8 +407,25 @@ function ticketModeLabel(tk) {
   return t('pailie.modeDirect')
 }
 
-function onTabChange() {
+async function loadRecommend() {
+  try {
+    const res = await getPailieRecommend({
+      game: activeGame.value,
+      window: windowSize.value,
+    })
+    if (res?.code === 200) recommend.value = res.data
+  } catch (e) {
+    recommend.value = {
+      reachable: false,
+      message: e?.message || t('pailie.loadFailed'),
+      recommendations: [],
+    }
+  }
+}
+
+async function onTabChange() {
   ensureRows()
+  await loadRecommend()
 }
 
 watch(pl3Mode, () => {
@@ -259,7 +437,8 @@ async function refresh() {
   try {
     const [catRes, histRes] = await Promise.all([
       getPailieCatalog(),
-      getPailieHistory({ limit: 10 }),
+      getPailieHistory({ limit: 15 }),
+      loadRecommend(),
     ])
     if (catRes?.code === 200) catalog.value = catRes.data
     if (histRes?.code === 200) history.value = histRes.data
@@ -313,25 +492,68 @@ onMounted(() => {
   font-size: 16px;
   color: #303133;
 }
+.panel h4 {
+  margin: 16px 0 10px;
+  font-size: 14px;
+  color: #606266;
+}
 .note {
   color: #606266;
   margin: 0 0 12px;
   font-size: 13px;
 }
-.play-grid {
+.play-grid,
+.rec-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 12px;
 }
-.play-card {
+.play-card,
+.rec-card {
   border: 1px solid #f0f0f0;
   border-radius: 10px;
   padding: 12px;
   background: #fafafa;
 }
-.play-name {
+.rec-card--primary {
+  border-color: #ef9a9a;
+  background: linear-gradient(160deg, #fff8f6, #fff);
+}
+.play-name,
+.rec-label {
   font-weight: 700;
   color: #c62828;
+}
+.rec-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: center;
+}
+.rec-conf {
+  font-size: 12px;
+  color: #e65100;
+  font-weight: 600;
+}
+.rec-nums {
+  margin: 10px 0 6px;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  color: #1a237e;
+}
+.rec-reason {
+  margin: 0 0 10px;
+  font-size: 12px;
+  color: #606266;
+  line-height: 1.45;
+  min-height: 34px;
+}
+.rec-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 .play-prize {
   margin: 4px 0 8px;
@@ -343,6 +565,86 @@ onMounted(() => {
   font-size: 12px;
   color: #606266;
   line-height: 1.5;
+}
+.digit-tags {
+  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.tag-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.tag-label {
+  font-size: 13px;
+  color: #606266;
+  min-width: 64px;
+}
+.digit-chip {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 700;
+}
+.digit-chip.hot {
+  background: #ffebee;
+  color: #c62828;
+  border: 1px solid #ef9a9a;
+}
+.digit-chip.cold {
+  background: #e3f2fd;
+  color: #1565c0;
+  border: 1px solid #90caf9;
+}
+.freq-pos {
+  margin-bottom: 12px;
+}
+.freq-pos-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #303133;
+  margin-bottom: 6px;
+}
+.freq-bars {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 6px 10px;
+}
+.freq-item {
+  display: grid;
+  grid-template-columns: 18px 1fr 40px;
+  gap: 6px;
+  align-items: center;
+}
+.freq-digit {
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+}
+.freq-digit.hot { color: #c62828; }
+.freq-digit.cold { color: #1565c0; }
+.freq-bar-track {
+  height: 6px;
+  border-radius: 999px;
+  background: #eceff1;
+  overflow: hidden;
+}
+.freq-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #ef9a9a, #c62828);
+}
+.freq-meta {
+  font-size: 11px;
+  color: #909399;
+  text-align: right;
 }
 .picker-head {
   display: flex;
@@ -375,6 +677,14 @@ onMounted(() => {
   font-weight: 600;
   color: #303133;
   transition: all 0.15s;
+}
+.digit-btn.hot:not(.active) {
+  border-color: #ef9a9a;
+  color: #c62828;
+}
+.digit-btn.cold:not(.active) {
+  border-color: #90caf9;
+  color: #1565c0;
 }
 .digit-btn:hover {
   border-color: #c62828;
@@ -433,6 +743,9 @@ onMounted(() => {
   .digit-btn {
     width: 32px;
     height: 32px;
+  }
+  .freq-bars {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 </style>
