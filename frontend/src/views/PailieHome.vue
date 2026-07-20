@@ -125,16 +125,32 @@
               </span>
               <span class="rec-conf">{{ Math.round((rec.confidence || 0) * 100) }}%</span>
             </div>
-            <div class="rec-nums" :class="{ 'rec-nums--qxc': recDigits(rec).length > 5 }">
+            <div
+              v-if="activeGame === 'ssq'"
+              class="rec-nums rec-nums--ssq"
+            >
+              <div class="rec-nums-row">
+                <span
+                  v-for="(d, di) in recDigits(rec).slice(0, 6)"
+                  :key="'r' + di"
+                  class="rec-ball rec-ball--red"
+                >{{ formatBall(d) }}</span>
+              </div>
+              <div class="rec-nums-row rec-nums-row--blue">
+                <span class="rec-plus">+</span>
+                <span class="rec-ball rec-ball--blue">{{ formatBall(recDigits(rec)[6]) }}</span>
+              </div>
+            </div>
+            <div
+              v-else
+              class="rec-nums"
+              :class="{ 'rec-nums--qxc': recDigits(rec).length > 5 }"
+            >
               <span
                 v-for="(d, di) in recDigits(rec)"
                 :key="di"
                 class="rec-ball"
-                :class="{
-                  'rec-ball--red': activeGame === 'ssq' && di < 6,
-                  'rec-ball--special': activeGame === 'qxc' && di === 6,
-                  'rec-ball--blue': activeGame === 'ssq' && di === 6,
-                }"
+                :class="{ 'rec-ball--special': activeGame === 'qxc' && di === 6 }"
               >{{ formatBall(d) }}</span>
             </div>
             <p class="rec-reason">{{ rec.reason }}</p>
@@ -918,6 +934,28 @@ onUnmounted(() => {
 .rec-nums--qxc {
   gap: 4px;
 }
+.rec-nums--ssq {
+  flex-direction: column;
+  flex-wrap: nowrap;
+  gap: 8px;
+  min-height: 72px;
+}
+.rec-nums-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 5px;
+}
+.rec-nums-row--blue {
+  gap: 6px;
+}
+.rec-plus {
+  font-size: 14px;
+  font-weight: 700;
+  color: #909399;
+  line-height: 1;
+}
 .rec-ball {
   width: 30px;
   height: 30px;
@@ -941,7 +979,7 @@ onUnmounted(() => {
   background: linear-gradient(145deg, #ef5350, #c62828);
 }
 .rec-ball--blue {
-  background: linear-gradient(145deg, #42a5f5, #1565c0) !important;
+  background: linear-gradient(145deg, #42a5f5, #1565c0);
 }
 .rec-reason {
   margin: 0;
