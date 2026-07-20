@@ -51,10 +51,11 @@ async def pailie_history(
 
 @router.get("/recommend")
 async def pailie_recommend(
-    game: str = Query("pl3", description="pl3 | pl5"),
+    game: str = Query("pl3", description="pl3 | pl5 | qxc"),
     window: int = Query(100, ge=20, le=200, description="统计近 N 期开奖"),
+    use_ai: bool = Query(True, description="是否启用 AI 精选（需配置 DEEPSEEK_API_KEY）"),
     _slug: str = Depends(_require_pailie_access),
     current_user: str = Depends(get_current_user),
 ):
-    data = await get_recommendations(game, window)
+    data = await get_recommendations(game, window, use_ai=use_ai)
     return success(data)

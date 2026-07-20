@@ -75,7 +75,7 @@ export const FALLBACK_COMPETITIONS = [
   {
     slug: 'pailie',
     name_key: 'pailie',
-    short_name: '排列3/5',
+    short_name: '排列/七星',
     type: 'digital',
     theme_color: '#c62828',
     timezone: 'Asia/Shanghai',
@@ -88,7 +88,7 @@ export const FALLBACK_COMPETITIONS = [
       sporttery: false,
       groups: false,
       digital_lottery: true,
-      games: ['pl3', 'pl5'],
+      games: ['pl3', 'pl5', 'qxc'],
     },
     stats: { matches: 0, teams: 0, upcoming: 0 },
   },

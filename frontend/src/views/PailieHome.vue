@@ -21,6 +21,7 @@
     <el-tabs v-model="activeGame" class="game-tabs" @tab-change="onTabChange">
       <el-tab-pane :label="t('pailie.pl3')" name="pl3" />
       <el-tab-pane :label="t('pailie.pl5')" name="pl5" />
+      <el-tab-pane :label="t('pailie.qxc')" name="qxc" />
     </el-tabs>
 
     <div v-loading="loading" class="game-body">
@@ -40,6 +41,12 @@
             <el-radio-button :value="60">60{{ t('pailie.periods') }}</el-radio-button>
             <el-radio-button :value="100">100{{ t('pailie.periods') }}</el-radio-button>
           </el-radio-group>
+        </div>
+        <div class="ai-row">
+          <el-switch v-model="useAi" @change="loadRecommend" />
+          <span class="ai-label">{{ t('pailie.useAi') }}</span>
+          <el-tag v-if="recommend?.ai_enabled" size="small" type="success">{{ t('pailie.aiActive') }}</el-tag>
+          <el-tag v-else-if="useAi" size="small" type="info">{{ t('pailie.aiInactive') }}</el-tag>
         </div>
 
         <el-alert
@@ -67,7 +74,10 @@
             :class="{ 'rec-card--primary': rec.id === 'direct-1' }"
           >
             <div class="rec-top">
-              <span class="rec-label">{{ recLabel(rec) }}</span>
+              <span class="rec-label">
+                <el-tag v-if="rec.source === 'ai'" size="small" type="warning" class="ai-tag">AI</el-tag>
+                {{ recLabel(rec) }}
+              </span>
               <span class="rec-conf">{{ t('pailie.confidence', { n: Math.round((rec.confidence || 0) * 100) }) }}</span>
             </div>
             <div class="rec-nums">{{ rec.display }}</div>
@@ -120,7 +130,9 @@
         <div class="play-grid">
           <div v-for="pt in currentGame?.play_types || []" :key="pt.id" class="play-card">
             <div class="play-name">{{ pt.name }}</div>
-            <div class="play-prize">{{ t('pailie.prizeFixed', { n: pt.prize }) }}</div>
+            <div class="play-prize">
+              {{ pt.prize_label || t('pailie.prizeFixed', { n: pt.prize }) }}
+            </div>
             <p>{{ pt.desc }}</p>
           </div>
         </div>
@@ -140,7 +152,7 @@
           <div v-for="(row, ri) in digitRows" :key="ri" class="digit-row">
             <span class="pos-label">{{ positionLabel(ri) }}</span>
             <button
-              v-for="n in 10"
+              v-for="n in alphabetSize(ri)"
               :key="n - 1"
               type="button"
               class="digit-btn"
@@ -216,6 +228,7 @@ const recommend = ref(null)
 const activeGame = ref('pl3')
 const pl3Mode = ref('direct')
 const windowSize = ref(100)
+const useAi = ref(true)
 const selections = ref([[], [], []])
 const tickets = ref([])
 
@@ -243,6 +256,15 @@ const modeLabel = computed(() => {
   return t('pailie.modeDirect')
 })
 
+function alphabetSize(posIdx) {
+  const fromApi = recommend.value?.alphabets?.[posIdx]
+  if (fromApi) return fromApi
+  const fromCatalog = currentGame.value?.alphabets?.[posIdx]
+  if (fromCatalog) return fromCatalog
+  if (activeGame.value === 'qxc' && posIdx === 6) return 15
+  return 10
+}
+
 function pct(rate) {
   return `${Math.round((rate || 0) * 1000) / 10}%`
 }
@@ -262,6 +284,9 @@ function isCold(d) {
 }
 
 function recLabel(rec) {
+  if (rec.source === 'ai') {
+    return rec.id === 'ai-1' ? t('pailie.recAi') : t('pailie.recAiAlt')
+  }
   if (rec.id === 'direct-1') return t('pailie.recPrimary')
   if (rec.mode === 'group3') return t('pailie.recGroup3')
   if (rec.mode === 'group6') return t('pailie.recGroup6')
@@ -272,6 +297,9 @@ function recLabel(rec) {
 function positionLabel(idx) {
   if (activeGame.value === 'pl3' && pl3Mode.value !== 'direct' && digitRows.value.length === 1) {
     return t('pailie.pool')
+  }
+  if (activeGame.value === 'qxc') {
+    return t(`pailie.pos7.${idx}`)
   }
   if (activeGame.value === 'pl5') {
     return t(`pailie.pos5.${idx}`)
@@ -284,7 +312,7 @@ function ensureRows() {
     selections.value = [[]]
     return
   }
-  const n = activeGame.value === 'pl5' ? 5 : 3
+  const n = activeGame.value === 'qxc' ? 7 : activeGame.value === 'pl5' ? 5 : 3
   selections.value = Array.from({ length: n }, () => [])
 }
 
@@ -376,8 +404,10 @@ function machinePick() {
     selections.value = [pool]
     return
   }
-  const n = activeGame.value === 'pl5' ? 5 : 3
-  selections.value = Array.from({ length: n }, () => [Math.floor(Math.random() * 10)])
+  const n = activeGame.value === 'qxc' ? 7 : activeGame.value === 'pl5' ? 5 : 3
+  selections.value = Array.from({ length: n }, (_, i) => [
+    Math.floor(Math.random() * alphabetSize(i)),
+  ])
 }
 
 function clearPick() {
@@ -412,6 +442,7 @@ async function loadRecommend() {
     const res = await getPailieRecommend({
       game: activeGame.value,
       window: windowSize.value,
+      use_ai: useAi.value,
     })
     if (res?.code === 200) recommend.value = res.data
   } catch (e) {
@@ -653,6 +684,21 @@ onMounted(() => {
   gap: 12px;
   flex-wrap: wrap;
   margin-bottom: 12px;
+}
+.ai-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 12px;
+  flex-wrap: wrap;
+}
+.ai-label {
+  font-size: 13px;
+  color: #606266;
+}
+.ai-tag {
+  margin-right: 6px;
+  vertical-align: middle;
 }
 .digit-row {
   display: flex;

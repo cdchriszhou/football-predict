@@ -139,7 +139,7 @@ COMPETITIONS: dict[str, dict] = {
     "pailie": {
         "slug": "pailie",
         "name_key": "pailie",
-        "short_name": "排列3/5",
+        "short_name": "排列/七星",
         "type": "digital",
         "features": {
             "bracket": False,
@@ -147,7 +147,7 @@ COMPETITIONS: dict[str, dict] = {
             "sporttery": False,
             "groups": False,
             "digital_lottery": True,
-            "games": ["pl3", "pl5"],
+            "games": ["pl3", "pl5", "qxc"],
         },
         "opening_date": "2004-01-01T00:00:00Z",
         "closing_date": None,
