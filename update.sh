@@ -352,9 +352,17 @@ echo "    API docs: http://localhost:8888/docs"
 echo "  Production .env: set APP_ENV=production; optional CORS_ORIGINS for split ports"
 echo "=============================================="
 
-# Self-update update.sh from new deployment (safe — at end of script)
-if [ -f "$DEPLOY_DIR/update.sh" ] && ! cmp -s "$DEPLOY_DIR/update.sh" "/mnt/update.sh"; then
-    cp "$DEPLOY_DIR/update.sh" "/mnt/update.sh"
-    chmod +x "/mnt/update.sh"
-    log "Update script self-updated"
+# Self-update /mnt/update.sh from new deployment.
+# IMPORTANT: never truncate/overwrite the *running* script inode (cp in-place).
+# Bash would keep reading the same fd and hit a mid-file syntax error after exit banners.
+# Write to a sibling file, then atomic mv so this process keeps the old inode.
+if [ -f "$DEPLOY_DIR/update.sh" ]; then
+    RUNNING_UPDATE="/mnt/update.sh"
+    NEXT_UPDATE="/mnt/update.sh.next"
+    if ! cmp -s "$DEPLOY_DIR/update.sh" "$RUNNING_UPDATE" 2>/dev/null; then
+        cp "$DEPLOY_DIR/update.sh" "$NEXT_UPDATE"
+        chmod +x "$NEXT_UPDATE"
+        mv -f "$NEXT_UPDATE" "$RUNNING_UPDATE"
+        log "Update script self-updated"
+    fi
 fi
