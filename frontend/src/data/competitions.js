@@ -88,7 +88,7 @@ export const FALLBACK_COMPETITIONS = [
       sporttery: false,
       groups: false,
       digital_lottery: true,
-      games: ['pl3', 'pl5', 'qxc', 'ssq', 'dlt'],
+      games: ['pl3', 'pl5', 'qxc', 'ssq', 'dlt', 'fc3d'],
     },
     stats: { matches: 0, teams: 0, upcoming: 0 },
   },

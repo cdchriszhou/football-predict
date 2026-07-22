@@ -1,4 +1,4 @@
-"""体彩排列3 / 排列5 / 七星彩 — 开奖拉取、频率推荐与可选 AI 精选。"""
+"""体彩排列3 / 排列5 / 七星彩 + 福彩双色球/3D + 大乐透 — 开奖拉取、频率推荐与可选 AI 精选。"""
 
 from __future__ import annotations
 
@@ -12,8 +12,9 @@ import httpx
 
 from utils.http_client import sporttery_proxy_attempts
 from utils.logger import logger
-from service.ssq_service import SSQ_GAME, fetch_ssq_history, get_ssq_recommendations
-from service.dlt_service import DLT_GAME, fetch_dlt_history, get_dlt_recommendations
+from service.ssq_service import SSQ_GAME, clear_ssq_history_cache, fetch_ssq_history, get_ssq_recommendations
+from service.dlt_service import DLT_GAME, clear_dlt_history_cache, fetch_dlt_history, get_dlt_recommendations
+from service.fc3d_service import FC3D_GAME, clear_fc3d_history_cache, fetch_fc3d_history
 
 # ---------------------------------------------------------------------------
 # Game specs
@@ -75,7 +76,11 @@ GAME_SPECS: dict[str, dict] = {
     "qxc": QXC_GAME,
     "ssq": SSQ_GAME,
     "dlt": DLT_GAME,
+    "fc3d": FC3D_GAME,
 }
+
+# 跟踪各玩法最近已知期号，用于开奖后自动作废推荐缓存
+_LATEST_ISSUE: dict[str, str] = {}
 _HISTORY_URL = "https://webapi.sporttery.cn/gateway/lottery/getHistoryPageListV1.qry"
 # 体彩网关 gameNo；七星彩常见为 04，失败时再试备选
 _GAME_NOS: dict[str, tuple[str, ...]] = {
@@ -103,13 +108,50 @@ _TREND_WEIGHT = 0.10  # 近窗相对全样本的趋势加成
 def get_games_catalog() -> dict[str, Any]:
     return {
         "slug": "pailie",
-        "title": "排列3 / 排列5 / 七星彩 / 双色球 / 大乐透",
+        "title": "排列3 / 排列5 / 七星彩 / 双色球 / 大乐透 / 福彩3D",
         "disclaimer": (
             "本模块仅提供玩法说明、历史频率统计、概率参考与 AI 选号辅助，不提供购彩下单；"
             "历史频率与 AI 建议均不能保证未来开奖结果，请理性投注并到官方渠道购买。"
         ),
-        "games": [PL3_GAME, PL5_GAME, QXC_GAME, SSQ_GAME, DLT_GAME],
+        "games": [PL3_GAME, PL5_GAME, QXC_GAME, SSQ_GAME, DLT_GAME, FC3D_GAME],
     }
+
+
+def clear_digital_history_cache(game_id: str | None = None) -> None:
+    """清空开奖历史内存缓存。"""
+    if game_id is None:
+        _CACHE.clear()
+        clear_ssq_history_cache()
+        clear_dlt_history_cache()
+        clear_fc3d_history_cache()
+        return
+    for key in list(_CACHE.keys()):
+        if key.startswith(f"{game_id}:"):
+            _CACHE.pop(key, None)
+    if game_id == "ssq":
+        clear_ssq_history_cache()
+    elif game_id == "dlt":
+        clear_dlt_history_cache()
+    elif game_id == "fc3d":
+        clear_fc3d_history_cache()
+
+
+def _note_latest_issue(game_id: str, draws: list[dict]) -> bool:
+    """若最新期号变化则作废该玩法推荐缓存，返回是否发生开奖更新。"""
+    if not draws:
+        return False
+    issue = str(draws[0].get("issue") or "")
+    if not issue:
+        return False
+    prev = _LATEST_ISSUE.get(game_id)
+    _LATEST_ISSUE[game_id] = issue
+    if prev is not None and prev != issue:
+        from service.digital_ai import rec_cache_invalidate
+
+        rec_cache_invalidate(game_id)
+        logger.info("digital draw updated [%s]: %s -> %s, recommend cache cleared", game_id, prev, issue)
+        return True
+    return False
 
 
 def _parse_digit_token(tok: str, max_val: int) -> int | None:
@@ -305,20 +347,33 @@ async def _fetch_history_page(
     return out
 
 
-async def _fetch_history(game_id: str, limit: int = 100) -> list[dict]:
+async def _fetch_history(game_id: str, limit: int = 100, *, force_refresh: bool = False) -> list[dict]:
     if game_id not in GAME_SPECS:
         return []
     if game_id == "ssq":
-        return await fetch_ssq_history(min(int(limit or 100), 100))
+        rows = await fetch_ssq_history(min(int(limit or 100), 100), force_refresh=force_refresh)
+        _note_latest_issue(game_id, rows)
+        return rows
     if game_id == "dlt":
-        return await fetch_dlt_history(min(int(limit or 100), 100))
+        rows = await fetch_dlt_history(min(int(limit or 100), 100), force_refresh=force_refresh)
+        _note_latest_issue(game_id, rows)
+        return rows
+    if game_id == "fc3d":
+        rows = await fetch_fc3d_history(min(int(limit or 100), 100), force_refresh=force_refresh)
+        _note_latest_issue(game_id, rows)
+        return rows
 
     limit = max(1, min(int(limit or 100), 200))
     cache_key = f"{game_id}:{limit}"
     now = time.monotonic()
-    cached = _CACHE.get(cache_key)
-    if cached and now - cached[0] < _CACHE_TTL_SEC:
-        return list(cached[1])
+    if force_refresh:
+        _CACHE.pop(cache_key, None)
+    else:
+        cached = _CACHE.get(cache_key)
+        if cached and now - cached[0] < _CACHE_TTL_SEC:
+            rows = list(cached[1])
+            _note_latest_issue(game_id, rows)
+            return rows
 
     page_size = min(50, limit)
     pages_needed = (limit + page_size - 1) // page_size
@@ -352,6 +407,7 @@ async def _fetch_history(game_id: str, limit: int = 100) -> list[dict]:
                             break
                 if collected:
                     _CACHE[cache_key] = (time.monotonic(), list(collected))
+                    _note_latest_issue(game_id, collected)
                     return collected
             except Exception as e:
                 last_err = e
@@ -361,13 +417,24 @@ async def _fetch_history(game_id: str, limit: int = 100) -> list[dict]:
     if last_err:
         logger.warning("digital history exhausted [%s]: %s", game_id, last_err)
     _CACHE[cache_key] = (time.monotonic(), list(collected))
+    _note_latest_issue(game_id, collected)
     return collected
 
 
-async def get_draw_history(game_id: str | None = None, limit: int = 10) -> dict[str, Any]:
+async def get_draw_history(
+    game_id: str | None = None,
+    limit: int = 10,
+    *,
+    force_refresh: bool = False,
+) -> dict[str, Any]:
     games = [game_id] if game_id in GAME_SPECS else list(GAME_SPECS.keys())
     limit = max(1, min(int(limit or 10), 50))
-    results = await asyncio.gather(*[_fetch_history(g, limit) for g in games])
+    if force_refresh:
+        for g in games:
+            clear_digital_history_cache(g)
+            from service.digital_ai import rec_cache_invalidate
+            rec_cache_invalidate(g)
+    results = await asyncio.gather(*[_fetch_history(g, limit, force_refresh=force_refresh) for g in games])
     history = {g: rows for g, rows in zip(games, results)}
     reachable = any(bool(v) for v in history.values())
     return {
@@ -377,14 +444,24 @@ async def get_draw_history(game_id: str | None = None, limit: int = 10) -> dict[
     }
 
 
-async def get_prize_pools(history_limit: int = 30) -> dict[str, Any]:
+async def get_prize_pools(history_limit: int = 30, *, force_refresh: bool = False) -> dict[str, Any]:
     """同步各玩法最新奖池，并附带近期每期奖池明细。"""
     history_limit = max(5, min(int(history_limit or 30), 50))
     games = list(GAME_SPECS.keys())
-    rows_list = await asyncio.gather(*[_fetch_history(g, history_limit) for g in games])
+    prev_issues = {g: _LATEST_ISSUE.get(g) for g in games}
+    if force_refresh:
+        clear_digital_history_cache()
+    rows_list = await asyncio.gather(
+        *[_fetch_history(g, history_limit, force_refresh=force_refresh) for g in games]
+    )
 
     pools: dict[str, Any] = {}
+    refreshed_games: list[str] = []
     for game_id, rows in zip(games, rows_list):
+        latest_issue = str(rows[0]["issue"]) if rows else None
+        prev = prev_issues.get(game_id)
+        if latest_issue and prev and prev != latest_issue:
+            refreshed_games.append(game_id)
         spec = GAME_SPECS[game_id]
         latest = rows[0] if rows else None
         history = [
@@ -400,19 +477,17 @@ async def get_prize_pools(history_limit: int = 30) -> dict[str, Any]:
             }
             for r in rows
         ]
+        if game_id in ("pl3", "fc3d"):
+            pool_note = "固定奖玩法，官方奖池字段通常为 0 或空，以下为接口同步值。"
+        elif game_id == "ssq":
+            pool_note = "开奖后奖池余额（元），来自福利彩票官方开奖公告。"
+        else:
+            pool_note = "开奖后奖池余额（元），来自体彩官方开奖公告。"
         pools[game_id] = {
             "game": game_id,
             "name": spec["name"],
             "has_floating_pool": game_id in ("pl5", "qxc", "ssq", "dlt"),
-            "pool_note": (
-                "固定奖玩法，官方奖池字段通常为 0 或空，以下为接口同步值。"
-                if game_id == "pl3"
-                else (
-                    "开奖后奖池余额（元），来自福利彩票官方开奖公告。"
-                    if game_id == "ssq"
-                    else "开奖后奖池余额（元），来自体彩官方开奖公告。"
-                )
-            ),
+            "pool_note": pool_note,
             "latest": None if not latest else {
                 "issue": latest["issue"],
                 "draw_time": latest.get("draw_time"),
@@ -433,6 +508,7 @@ async def get_prize_pools(history_limit: int = 30) -> dict[str, Any]:
         "updated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "message": None if reachable else "暂时无法同步官方奖池数据，请稍后刷新。",
         "pools": pools,
+        "refreshed_games": refreshed_games,
     }
 
 
@@ -701,8 +777,8 @@ async def _ai_refine_picks(
     seed = [{"display": r["display"], "confidence": r["confidence"]} for r in base_recs[:5] if r["mode"] == "direct"]
 
     prompt = (
-        f"你是体彩{spec['name']}选号分析助手。根据历史频率与遗漏给出购彩参考号，"
-        "不要声称必中。严格输出 JSON。\n"
+        f"你是{'福利彩票' if game_id == 'fc3d' else '体彩'}{spec['name']}选号分析助手。根据历史频率与遗漏给出购彩参考号，"
+        "不要声称必中。严格输出 JSON。字母表内全部合法号码均可选用（含样本期内从未出现的号码）。\n"
         f"玩法: {game_id}, 各位取值上限(含): {[a - 1 for a in alphabets]}\n"
         f"样本期数: {analysis['sample_size']}\n"
         f"各位Top统计: {json.dumps(top_by_pos, ensure_ascii=False)}\n"
@@ -743,8 +819,10 @@ async def get_recommendations(
     game_id: str,
     window: int = 100,
     use_ai: bool = True,
+    *,
+    force_refresh: bool = False,
 ) -> dict[str, Any]:
-    from service.digital_ai import rec_cache_get, rec_cache_set
+    from service.digital_ai import rec_cache_get, rec_cache_invalidate, rec_cache_set
 
     if game_id not in GAME_SPECS:
         return {
@@ -761,19 +839,24 @@ async def get_recommendations(
             "ai_enabled": False,
         }
 
+    if force_refresh:
+        clear_digital_history_cache(game_id)
+        rec_cache_invalidate(game_id)
+
     if game_id == "ssq":
-        return await get_ssq_recommendations(window=window, use_ai=use_ai)
+        return await get_ssq_recommendations(window=window, use_ai=use_ai, force_refresh=force_refresh)
     if game_id == "dlt":
-        return await get_dlt_recommendations(window=window, use_ai=use_ai)
+        return await get_dlt_recommendations(window=window, use_ai=use_ai, force_refresh=force_refresh)
 
     window = max(20, min(int(window or 100), 200))
     cache_key = f"rec:{game_id}:{window}:{int(bool(use_ai))}"
-    cached = rec_cache_get(cache_key)
-    if cached:
-        cached["cached"] = True
-        return cached
+    if not force_refresh:
+        cached = rec_cache_get(cache_key)
+        if cached:
+            cached["cached"] = True
+            return cached
 
-    draws = await _fetch_history(game_id, window)
+    draws = await _fetch_history(game_id, window, force_refresh=force_refresh)
     if not draws:
         return {
             "reachable": False,
@@ -824,7 +907,8 @@ async def get_recommendations(
             "ai_models": model_names,
             "pick_limit": 5,
             "desc": (
-                "每种玩法固定推荐 5 注；基于历史出现概率、遗漏与近窗趋势"
+                "每种玩法固定推荐 5 注；字母表内全部号码参与评分（含样本期内从未出现的冷号），"
+                "基于历史出现概率、遗漏与近窗趋势"
                 + (
                     f"，并由 {'+'.join(model_names)} 多模型精选前几注。"
                     if ai_picks and model_names

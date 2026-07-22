@@ -55,6 +55,10 @@ _COLD_WEIGHT = 0.25
 _TREND_WEIGHT = 0.10
 
 
+def clear_ssq_history_cache() -> None:
+    _CACHE.clear()
+
+
 def _parse_money(raw: Any) -> float | None:
     if raw is None:
         return None
@@ -143,13 +147,16 @@ def _normalize_ssq_row(raw: dict) -> dict[str, Any] | None:
     }
 
 
-async def fetch_ssq_history(limit: int = 100) -> list[dict]:
+async def fetch_ssq_history(limit: int = 100, *, force_refresh: bool = False) -> list[dict]:
     limit = max(1, min(int(limit or 100), 100))
     cache_key = f"ssq:{limit}"
     now = time.monotonic()
-    cached = _CACHE.get(cache_key)
-    if cached and now - cached[0] < _CACHE_TTL_SEC:
-        return list(cached[1])
+    if force_refresh:
+        _CACHE.pop(cache_key, None)
+    else:
+        cached = _CACHE.get(cache_key)
+        if cached and now - cached[0] < _CACHE_TTL_SEC:
+            return list(cached[1])
 
     params = {
         "name": "ssq",
@@ -475,22 +482,32 @@ async def ai_refine_ssq(analysis: dict[str, Any], draws: list[dict], base_recs: 
     )
 
 
-async def get_ssq_recommendations(window: int = 100, use_ai: bool = True) -> dict[str, Any]:
+async def get_ssq_recommendations(
+    window: int = 100,
+    use_ai: bool = True,
+    *,
+    force_refresh: bool = False,
+) -> dict[str, Any]:
     from service.digital_ai import (
         configured_digital_models,
         model_display_name,
         rec_cache_get,
+        rec_cache_invalidate,
         rec_cache_set,
     )
 
     window = max(20, min(int(window or 100), 100))
     cache_key = f"rec:ssq:{window}:{int(bool(use_ai))}"
-    cached = rec_cache_get(cache_key)
-    if cached:
-        cached["cached"] = True
-        return cached
+    if force_refresh:
+        clear_ssq_history_cache()
+        rec_cache_invalidate("ssq")
+    else:
+        cached = rec_cache_get(cache_key)
+        if cached:
+            cached["cached"] = True
+            return cached
 
-    draws = await fetch_ssq_history(window)
+    draws = await fetch_ssq_history(window, force_refresh=force_refresh)
     if not draws:
         return {
             "reachable": False,
@@ -555,7 +572,8 @@ async def get_ssq_recommendations(window: int = 100, use_ai: bool = True) -> dic
             "ai_models": model_names,
             "pick_limit": 5,
             "desc": (
-                "双色球固定推荐 5 注；红蓝球分别统计历史出现概率、遗漏与近窗趋势"
+                "双色球固定推荐 5 注；红/蓝字母表内全部号码参与评分（含样本期内从未出现的冷号），"
+                "分别统计历史出现概率、遗漏与近窗趋势"
                 + (
                     f"，并由 {'+'.join(model_names)} 多模型精选前几注。"
                     if ai_picks and model_names

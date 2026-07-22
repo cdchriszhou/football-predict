@@ -55,7 +55,7 @@ export default {
       serieA: 'الدوري الإيطالي',
       bundesliga: 'الدوري الألماني',
       ligue1: 'الدوري الفرنسي',
-      pailie: 'Pailie 3 / 5 / 7-Star / SSQ / DLT',
+      pailie: 'Pailie 3 / 5 / 7-Star / SSQ / DLT / 3D',
     },
   },
   header: {

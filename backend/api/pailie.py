@@ -45,33 +45,36 @@ async def pailie_catalog(
 
 @router.get("/history")
 async def pailie_history(
-    game: str | None = Query(None, description="pl3 | pl5 | qxc | ssq | dlt，缺省返回全部"),
+    game: str | None = Query(None, description="pl3 | pl5 | qxc | ssq | dlt | fc3d，缺省返回全部"),
     limit: int = Query(30, ge=1, le=50),
+    refresh: bool = Query(False, description="强制绕过缓存，开奖后刷新用"),
     _slug: str = Depends(_require_pailie_access),
     current_user: str = Depends(get_current_user),
 ):
-    data = await get_draw_history(game, limit)
+    data = await get_draw_history(game, limit, force_refresh=refresh)
     return success(data)
 
 
 @router.get("/pools")
 async def pailie_pools(
     limit: int = Query(30, ge=5, le=50, description="每种玩法返回近期期数"),
+    refresh: bool = Query(False, description="强制绕过缓存，开奖后刷新用"),
     _slug: str = Depends(_require_pailie_access),
     current_user: str = Depends(get_current_user),
 ):
-    """实时同步排列3/5/七星彩/双色球/大乐透最新奖池，并返回历史每期奖池。"""
-    data = await get_prize_pools(limit)
+    """实时同步各数字彩玩法最新奖池，并返回历史每期奖池。"""
+    data = await get_prize_pools(limit, force_refresh=refresh)
     return success(data)
 
 
 @router.get("/recommend")
 async def pailie_recommend(
-    game: str = Query("pl3", description="pl3 | pl5 | qxc | ssq | dlt"),
+    game: str = Query("pl3", description="pl3 | pl5 | qxc | ssq | dlt | fc3d"),
     window: int = Query(100, ge=20, le=200, description="统计近 N 期开奖"),
     use_ai: bool = Query(True, description="是否启用多模型 AI 精选（DeepSeek / 千问 / GLM，按已配置密钥启用）"),
+    refresh: bool = Query(False, description="强制绕过缓存并重新生成推荐"),
     _slug: str = Depends(_require_pailie_access),
     current_user: str = Depends(get_current_user),
 ):
-    data = await get_recommendations(game, window, use_ai=use_ai)
+    data = await get_recommendations(game, window, use_ai=use_ai, force_refresh=refresh)
     return success(data)

@@ -20,6 +20,7 @@
 
     <el-tabs v-model="activeGame" class="game-tabs" @tab-change="onTabChange">
       <el-tab-pane :label="t('pailie.pl3')" name="pl3" />
+      <el-tab-pane :label="t('pailie.fc3d')" name="fc3d" />
       <el-tab-pane :label="t('pailie.pl5')" name="pl5" />
       <el-tab-pane :label="t('pailie.qxc')" name="qxc" />
       <el-tab-pane :label="t('pailie.ssq')" name="ssq" />
@@ -62,7 +63,7 @@
           <div class="pool-sale">
             {{ t('pailie.saleAmount') }}：{{ formatPool(poolOf(g)?.latest?.sale_amount_text) }}
           </div>
-          <div v-if="g === 'pl3'" class="pool-fixed">
+          <div v-if="g === 'pl3' || g === 'fc3d'" class="pool-fixed">
             {{ t('pailie.pl3FixedPrizes') }}
           </div>
           <p class="pool-note">{{ poolNoteDisplay(g) }}</p>
@@ -246,7 +247,7 @@
       <section class="panel picker-panel">
         <div class="picker-head">
           <h3>{{ t('pailie.pickTitle') }}</h3>
-          <el-radio-group v-if="activeGame === 'pl3'" v-model="pl3Mode" size="small">
+          <el-radio-group v-if="isThreeDigitGame" v-model="pl3Mode" size="small">
             <el-radio-button value="direct">{{ t('pailie.modeDirect') }}</el-radio-button>
             <el-radio-button value="group3">{{ t('pailie.modeGroup3') }}</el-radio-button>
             <el-radio-button value="group6">{{ t('pailie.modeGroup6') }}</el-radio-button>
@@ -341,7 +342,7 @@
         <div class="ticket-meta">
           <span>{{ t('pailie.betCount', { n: betCount }) }}</span>
           <span>{{ t('pailie.stakeAmount', { n: betCount * 2 }) }}</span>
-          <span v-if="activeGame === 'pl3'">{{ modeLabel }}</span>
+          <span v-if="isThreeDigitGame">{{ modeLabel }}</span>
         </div>
 
         <div v-if="tickets.length" class="ticket-list">
@@ -372,7 +373,7 @@
           <el-table-column prop="draw_time" :label="t('pailie.colTime')" min-width="110" />
           <el-table-column :label="t('pailie.colPool')" min-width="140">
             <template #default="{ row }">
-              {{ activeGame === 'pl3' ? t('pailie.noFloatingPool') : formatPool(row.pool_balance_text) }}
+              {{ isThreeDigitGame ? t('pailie.noFloatingPool') : formatPool(row.pool_balance_text) }}
             </template>
           </el-table-column>
           <el-table-column :label="t('pailie.colSale')" min-width="120">
@@ -406,7 +407,7 @@ const windowSize = ref(100)
 const useAi = ref(true)
 const selections = ref([[], [], []])
 const tickets = ref([])
-const poolGameIds = ['pl3', 'pl5', 'qxc', 'ssq', 'dlt']
+const poolGameIds = ['pl3', 'fc3d', 'pl5', 'qxc', 'ssq', 'dlt']
 const ssqRed = ref([])
 const ssqBlue = ref(null)
 const dltFront = ref([])
@@ -414,9 +415,22 @@ const dltBack = ref([])
 let poolTimer = null
 let recommendSeq = 0
 const recommendCache = new Map()
+/** 各玩法最近已知期号，用于开奖后自动刷新推荐 */
+const knownIssues = ref({})
+
+const isThreeDigitGame = computed(() => activeGame.value === 'pl3' || activeGame.value === 'fc3d')
 
 function recommendCacheKey(game, win, ai) {
   return `${game}:${win}:${ai ? 1 : 0}`
+}
+
+function clearRecommendCacheForGames(gameIds) {
+  if (!gameIds?.length) return
+  for (const key of [...recommendCache.keys()]) {
+    if (gameIds.some((g) => key.startsWith(`${g}:`))) {
+      recommendCache.delete(key)
+    }
+  }
 }
 
 const currentGame = computed(() =>
@@ -457,6 +471,7 @@ function poolOf(gameId) {
 
 function gameName(gameId) {
   if (gameId === 'pl3') return t('pailie.pl3')
+  if (gameId === 'fc3d') return t('pailie.fc3d')
   if (gameId === 'pl5') return t('pailie.pl5')
   if (gameId === 'qxc') return t('pailie.qxc')
   if (gameId === 'ssq') return t('pailie.ssq')
@@ -479,8 +494,8 @@ function formatPool(text) {
 
 function poolAmountDisplay(gameId) {
   const latest = poolOf(gameId)?.latest
-  if (gameId === 'pl3') {
-    // 排列3 为固定奖，无浮动奖池；官方接口奖池字段常为 0
+  if (gameId === 'pl3' || gameId === 'fc3d') {
+    // 排列3 / 福彩3D 为固定奖，无浮动奖池
     return t('pailie.noFloatingPool')
   }
   return formatPool(latest?.pool_balance_text)
@@ -488,6 +503,7 @@ function poolAmountDisplay(gameId) {
 
 function poolNoteDisplay(gameId) {
   if (gameId === 'pl3') return t('pailie.pl3PoolExplain')
+  if (gameId === 'fc3d') return t('pailie.fc3dPoolExplain')
   return poolOf(gameId)?.pool_note || ''
 }
 
@@ -497,7 +513,7 @@ function switchToGame(gameId) {
   onTabChange()
 }
 const modeLabel = computed(() => {
-  if (activeGame.value !== 'pl3') return t('pailie.modeDirect')
+  if (!isThreeDigitGame.value) return t('pailie.modeDirect')
   if (pl3Mode.value === 'group3') return t('pailie.modeGroup3')
   if (pl3Mode.value === 'group6') return t('pailie.modeGroup6')
   return t('pailie.modeDirect')
@@ -553,7 +569,7 @@ function positionLabel(idx) {
   if (activeGame.value === 'dlt') {
     return idx === 0 ? t('pailie.dltFront') : t('pailie.dltBack')
   }
-  if (activeGame.value === 'pl3' && pl3Mode.value !== 'direct' && digitRows.value.length === 1) {
+  if (isThreeDigitGame.value && pl3Mode.value !== 'direct' && digitRows.value.length === 1) {
     return t('pailie.pool')
   }
   if (activeGame.value === 'qxc') {
@@ -576,7 +592,7 @@ function ensureRows() {
     dltBack.value = []
     return
   }
-  if (activeGame.value === 'pl3' && pl3Mode.value !== 'direct') {
+  if (isThreeDigitGame.value && pl3Mode.value !== 'direct') {
     selections.value = [[]]
     return
   }
@@ -633,7 +649,7 @@ function countBets() {
   }
   const rows = selections.value
   if (rows.some((r) => !r.length)) return 0
-  if (activeGame.value === 'pl5' || pl3Mode.value === 'direct') {
+  if (activeGame.value === 'pl5' || !isThreeDigitGame.value || pl3Mode.value === 'direct') {
     return rows.reduce((p, r) => p * r.length, 1)
   }
   const pool = uniqueSorted(rows[0] || [])
@@ -662,7 +678,7 @@ function displayFromSelection() {
     const back = dltBack.value.map(formatBall).join(' ')
     return `${front} + ${back}`
   }
-  if (activeGame.value === 'pl3' && pl3Mode.value !== 'direct') {
+  if (isThreeDigitGame.value && pl3Mode.value !== 'direct') {
     return uniqueSorted(selections.value[0] || []).join(' ')
   }
   return selections.value.map((r) => (r.length === 1 ? String(r[0]) : `[${r.join(',')}]`)).join(' · ')
@@ -740,7 +756,7 @@ function machinePick() {
     dltBack.value = back.sort((a, b) => a - b)
     return
   }
-  if (activeGame.value === 'pl3' && pl3Mode.value !== 'direct') {
+  if (isThreeDigitGame.value && pl3Mode.value !== 'direct') {
     const count = pl3Mode.value === 'group3' ? 2 : 3
     const pool = []
     while (pool.length < count) {
@@ -769,7 +785,7 @@ function addTicket() {
       ? 'ssq'
       : (activeGame.value === 'dlt'
         ? 'dlt'
-        : (activeGame.value === 'pl3' ? pl3Mode.value : 'direct')),
+        : (isThreeDigitGame.value ? pl3Mode.value : 'direct')),
     display: displayFromSelection(),
     bets: betCount.value,
     amount: betCount.value * 2,
@@ -790,11 +806,32 @@ function ticketModeLabel(tk) {
   return t('pailie.modeDirect')
 }
 
-async function loadPools() {
+async function loadPools(opts) {
+  const forceRefresh = !!(opts && typeof opts === 'object' && !('isTrusted' in opts) && opts.forceRefresh)
   poolsLoading.value = true
   try {
-    const res = await getPailiePools({ limit: 30 })
-    if (res?.code === 200) poolsData.value = res.data
+    const res = await getPailiePools({ limit: 30, refresh: forceRefresh || undefined })
+    if (res?.code === 200) {
+      const data = res.data
+      poolsData.value = data
+      const changed = []
+      const pools = data?.pools || {}
+      for (const g of poolGameIds) {
+        const issue = pools[g]?.latest?.issue
+        if (!issue) continue
+        const prev = knownIssues.value[g]
+        if (prev && prev !== issue) changed.push(g)
+        knownIssues.value[g] = issue
+      }
+      const fromApi = data?.refreshed_games || []
+      const toRefresh = [...new Set([...changed, ...fromApi])]
+      if (toRefresh.length) {
+        clearRecommendCacheForGames(toRefresh)
+        if (toRefresh.includes(activeGame.value)) {
+          await loadRecommend({ forceRefresh: true })
+        }
+      }
+    }
   } catch (e) {
     poolsData.value = {
       pools: {},
@@ -806,7 +843,8 @@ async function loadPools() {
   }
 }
 
-async function loadRecommend() {
+async function loadRecommend(opts) {
+  const forceRefresh = !!(opts && typeof opts === 'object' && !('isTrusted' in opts) && opts.forceRefresh)
   const game = activeGame.value
   const win = windowSize.value
   const wantAi = useAi.value
@@ -814,8 +852,12 @@ async function loadRecommend() {
   const fullKey = recommendCacheKey(game, win, wantAi)
   const freqKey = recommendCacheKey(game, win, false)
 
+  if (forceRefresh) {
+    clearRecommendCacheForGames([game])
+  }
+
   // 回访直接用缓存，避免切 Tab 再等 AI
-  if (recommendCache.has(fullKey)) {
+  if (!forceRefresh && recommendCache.has(fullKey)) {
     recommend.value = recommendCache.get(fullKey)
     aiEnhancing.value = false
     recommendLoading.value = false
@@ -823,7 +865,7 @@ async function loadRecommend() {
   }
 
   // 有频率缓存时先展示，再后台补 AI
-  if (recommendCache.has(freqKey)) {
+  if (!forceRefresh && recommendCache.has(freqKey)) {
     recommend.value = recommendCache.get(freqKey)
   }
 
@@ -835,11 +877,14 @@ async function loadRecommend() {
       game,
       window: win,
       use_ai: false,
+      refresh: forceRefresh || undefined,
     })
     if (seq !== recommendSeq || activeGame.value !== game) return
     if (freqRes?.code === 200) {
       recommend.value = freqRes.data
       recommendCache.set(freqKey, freqRes.data)
+      const issue = freqRes.data?.latest?.issue
+      if (issue) knownIssues.value[game] = issue
     }
   } catch (e) {
     if (seq !== recommendSeq || activeGame.value !== game) return
@@ -861,6 +906,7 @@ async function loadRecommend() {
       game,
       window: win,
       use_ai: true,
+      refresh: forceRefresh || undefined,
     })
     if (seq !== recommendSeq || activeGame.value !== game) return
     if (aiRes?.code === 200) {
@@ -881,17 +927,18 @@ async function onTabChange() {
 }
 
 watch(pl3Mode, () => {
-  if (activeGame.value === 'pl3') ensureRows()
+  if (isThreeDigitGame.value) ensureRows()
 })
 
 async function refresh() {
   loading.value = true
   try {
+    recommendCache.clear()
     const [catRes, histRes] = await Promise.all([
       getPailieCatalog(),
-      getPailieHistory({ limit: 30 }),
-      loadRecommend(),
-      loadPools(),
+      getPailieHistory({ limit: 30, refresh: true }),
+      loadRecommend({ forceRefresh: true }),
+      loadPools({ forceRefresh: true }),
     ])
     if (catRes?.code === 200) catalog.value = catRes.data
     if (histRes?.code === 200) history.value = histRes.data
@@ -905,9 +952,10 @@ async function refresh() {
 onMounted(() => {
   ensureRows()
   refresh()
+  // 约 2 分钟轮询奖池；检测到新期号后自动刷新对应玩法推荐
   poolTimer = setInterval(() => {
-    loadPools()
-  }, 5 * 60 * 1000)
+    loadPools({ forceRefresh: true })
+  }, 2 * 60 * 1000)
 })
 
 onUnmounted(() => {

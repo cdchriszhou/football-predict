@@ -36,6 +36,17 @@ def rec_cache_set(key: str, payload: dict[str, Any]) -> None:
     _REC_CACHE[key] = (time.monotonic(), dict(payload))
 
 
+def rec_cache_invalidate(game_id: str | None = None) -> None:
+    """开奖后强制刷新：清空推荐短缓存。game_id 为空则全清。"""
+    if game_id is None:
+        _REC_CACHE.clear()
+        return
+    prefix = f"rec:{game_id}:"
+    for key in list(_REC_CACHE.keys()):
+        if key.startswith(prefix):
+            _REC_CACHE.pop(key, None)
+
+
 def configured_digital_models() -> list[str]:
     from service.prediction_service import get_configured_models
 
