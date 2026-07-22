@@ -68,6 +68,20 @@ if ! unzip -l "$LATEST_ZIP" 2>/dev/null | grep -q "worldcup-predict"; then
     err "Package does not contain 'worldcup-predict/' root directory"
     exit 1
 fi
+# Reject incomplete Windows builds that omit backend packages (causes ModuleNotFoundError: db)
+ZIP_LIST=$(unzip -l "$LATEST_ZIP" 2>/dev/null | tr '\\' '/')
+for need in \
+    "worldcup-predict/backend/db/" \
+    "worldcup-predict/backend/api/" \
+    "worldcup-predict/backend/service/" \
+    "worldcup-predict/backend/alembic/" \
+    "worldcup-predict/backend/main.py"
+do
+    if ! echo "$ZIP_LIST" | grep -qF "$need"; then
+        err "Package incomplete — missing $need (rebuild with fixed build.bat / build.sh)"
+        exit 1
+    fi
+done
 log "Package structure verified"
 
 # ── Stop services ───────────────────────────────────────────

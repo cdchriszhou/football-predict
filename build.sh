@@ -49,7 +49,9 @@ STAGE="$BUILD_DIR/worldcup-predict"
 
 # ── 3. Copy backend (source only) ────────────────────────
 
-cp -r "$DIR/backend" "$STAGE/backend"
+# Strip venv, caches, db files — exclude venv BEFORE copy would be better, but
+# cp -r then delete is fine on Linux; do NOT let a huge venv abort packaging.
+cp -a "$DIR/backend" "$STAGE/backend"
 
 # Strip venv, caches, db files
 rm -rf "$STAGE/backend/venv"           2>/dev/null || true
@@ -62,8 +64,24 @@ find "$STAGE/backend" -name "*.db" -delete 2>/dev/null || true
 find "$STAGE/backend" -name "*.db-shm" -delete 2>/dev/null || true
 find "$STAGE/backend" -name "*.db-wal" -delete 2>/dev/null || true
 find "$STAGE/backend" -name ".DS_Store" -delete 2>/dev/null || true
+# Dev-only dirs not needed in production package
+rm -rf "$STAGE/backend/tests" "$STAGE/backend/.pytest_cache" 2>/dev/null || true
 
 log "Backend staged"
+
+# Fail fast if critical packages missing (Windows xcopy/venv abort used to drop these)
+for req in db api service alembic data utils main.py requirements.txt alembic.ini; do
+    if [ ! -e "$STAGE/backend/$req" ]; then
+        err "Staged backend missing required path: $req"
+    fi
+done
+if [ ! -f "$STAGE/backend/db/__init__.py" ]; then
+    err "Staged backend missing db/__init__.py"
+fi
+if [ ! -f "$STAGE/backend/alembic/env.py" ]; then
+    err "Staged backend missing alembic/env.py"
+fi
+log "Verified: critical backend packages present"
 
 # ── 4. Copy frontend (dist + server.js only) ─────────────
 
@@ -117,6 +135,27 @@ info "Creating $ZIP_NAME..."
 
 cd "$BUILD_DIR"
 zip -qr "$DIR/$ZIP_NAME" "worldcup-predict"
+
+# Verify zip contents before cleanup
+ZIP_CHECK=$(unzip -l "$DIR/$ZIP_NAME" 2>/dev/null | tr '\\' '/')
+for need in \
+    "worldcup-predict/backend/db/" \
+    "worldcup-predict/backend/api/" \
+    "worldcup-predict/backend/service/" \
+    "worldcup-predict/backend/alembic/" \
+    "worldcup-predict/backend/main.py"
+do
+    if ! echo "$ZIP_CHECK" | grep -qF "$need"; then
+        rm -f "$DIR/$ZIP_NAME"
+        err "ZIP incomplete — missing $need"
+    fi
+done
+BACKEND_N=$(echo "$ZIP_CHECK" | grep -c "worldcup-predict/backend/" || true)
+if [ "${BACKEND_N:-0}" -lt 50 ]; then
+    rm -f "$DIR/$ZIP_NAME"
+    err "ZIP backend entry count too low: $BACKEND_N (expected >= 50)"
+fi
+log "ZIP verified ($BACKEND_N backend entries)"
 
 # Cleanup
 rm -rf "$BUILD_DIR"
