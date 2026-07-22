@@ -136,48 +136,27 @@ echo [OK] Verified: backend venv not in package
 
 echo [..] Creating %ZIP_NAME%...
 
-powershell -NoProfile -Command ^
-  "$ErrorActionPreference='Stop';" ^
-  "Add-Type -AssemblyName System.IO.Compression; Add-Type -AssemblyName System.IO.Compression.FileSystem;" ^
-  "$src = '%STAGE%'; $zipPath = '%DIR%\%ZIP_NAME%';" ^
-  "if (Test-Path -LiteralPath $zipPath) { Remove-Item -LiteralPath $zipPath -Force };" ^
-  "$zip = [System.IO.Compression.ZipFile]::Open($zipPath, [System.IO.Compression.ZipArchiveMode]::Create);" ^
-  "try {" ^
-  "  $rootLen = $src.TrimEnd('\').Length + 1;" ^
-  "  Get-ChildItem -LiteralPath $src -Recurse -File | ForEach-Object {" ^
-  "    $rel = $_.FullName.Substring($rootLen) -replace '\\','/';" ^
-  "    [void][System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip, $_.FullName, ('worldcup-predict/' + $rel), [System.IO.Compression.CompressionLevel]::Optimal)" ^
-  "  }" ^
-  "} finally { $zip.Dispose() }"
-if %errorlevel% neq 0 (
+powershell -NoProfile -ExecutionPolicy Bypass -File "%DIR%\tools\make-prod-zip.ps1" -StageDir "%STAGE%" -ZipPath "%DIR%\%ZIP_NAME%"
+if errorlevel 1 (
     echo [ERROR] ZIP creation failed
     exit /b 1
 )
 
-:: Verify zip contains critical backend modules
-powershell -NoProfile -Command ^
-  "$ErrorActionPreference='Stop';" ^
-  "Add-Type -AssemblyName System.IO.Compression.FileSystem;" ^
-  "$z=[IO.Compression.ZipFile]::OpenRead('%DIR%\%ZIP_NAME%');" ^
-  "try {" ^
-  "  $names=@($z.Entries | ForEach-Object { $_.FullName -replace '\\','/' });" ^
-  "  $need=@('worldcup-predict/backend/db/__init__.py','worldcup-predict/backend/api/','worldcup-predict/backend/service/','worldcup-predict/backend/alembic/env.py','worldcup-predict/backend/main.py');" ^
-  "  foreach($n in $need){" ^
-  "    if (-not ($names | Where-Object { $_ -like ($n.TrimEnd('/') + '*') })) { throw \"ZIP missing required entry: $n\" }" ^
-  "  };" ^
-  "  $backendCount = @($names | Where-Object { $_ -like 'worldcup-predict/backend/*' }).Count;" ^
-  "  if ($backendCount -lt 50) { throw \"ZIP backend entry count too low: $backendCount (expected >= 50)\" };" ^
-  "  Write-Host \"[OK] ZIP verified: $backendCount backend entries\"" ^
-  "} finally { $z.Dispose() }"
-if %errorlevel% neq 0 (
+powershell -NoProfile -ExecutionPolicy Bypass -File "%DIR%\tools\verify-prod-zip.ps1" -ZipPath "%DIR%\%ZIP_NAME%"
+if errorlevel 1 (
     echo [ERROR] ZIP integrity check failed — package not safe to deploy
     del /f /q "%DIR%\%ZIP_NAME%" 2>nul
     exit /b 1
 )
 
-:: Cleanup
+:: Cleanup staging (ignore if already gone)
 cd /d "%DIR%"
-rmdir /s /q "%BUILD_DIR%"
+if exist "%BUILD_DIR%" (
+    rmdir /s /q "%BUILD_DIR%" 2>nul
+    if exist "%BUILD_DIR%" (
+        powershell -NoProfile -Command "Remove-Item -LiteralPath '%BUILD_DIR%' -Recurse -Force -ErrorAction SilentlyContinue"
+    )
+)
 
 :: ---- Done ---------------------------------------------
 
