@@ -73,8 +73,11 @@ async def pailie_recommend(
     window: int = Query(100, ge=20, le=200, description="统计近 N 期开奖"),
     use_ai: bool = Query(True, description="是否启用多模型 AI 精选（DeepSeek / 千问 / GLM，按已配置密钥启用）"),
     refresh: bool = Query(False, description="强制绕过缓存并重新生成推荐"),
+    rotate: int = Query(0, ge=0, le=99, description="换一批序号；同窗口下切换可得到另一组热号池组合"),
     _slug: str = Depends(_require_pailie_access),
     current_user: str = Depends(get_current_user),
 ):
-    data = await get_recommendations(game, window, use_ai=use_ai, force_refresh=refresh)
+    data = await get_recommendations(
+        game, window, use_ai=use_ai, force_refresh=refresh, rotate=rotate,
+    )
     return success(data)

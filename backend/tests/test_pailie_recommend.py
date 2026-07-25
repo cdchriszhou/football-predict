@@ -38,6 +38,30 @@ def test_pick_direct_and_build_recs_pl3():
     assert all(r["id"].startswith("pick-") for r in recs)
 
 
+def test_period_seed_changes_picks_across_issues():
+    """同一频率下，不同期号种子应得到不同主推组合（避免几天锁死同一组号）。"""
+    from service.digital_pick import period_seed
+
+    draws = _mk_draws(
+        [[5, 5, 1], [5, 4, 1], [5, 3, 1], [2, 2, 8], [2, 7, 8], [7, 0, 3], [1, 9, 4], [8, 6, 2]] * 5
+    )
+    analysis = _analyze_draws(draws, [10, 10, 10])
+    seeds = [period_seed("26001", 0), period_seed("26002", 0), period_seed("26001", 1)]
+    displays = []
+    for s in seeds:
+        recs = _build_recommendations("pl3", draws, analysis, seed=s)
+        displays.append(tuple(recs[0]["digits"]))
+    # 至少有两种不同主推（期号或换一批带来变化）
+    assert len(set(displays)) >= 2
+
+
+def test_build_excludes_latest_draw_as_primary():
+    draws = _mk_draws([[9, 9, 9]] + [[1, 2, 3]] * 30)
+    analysis = _analyze_draws(draws, [10, 10, 10])
+    recs = _build_recommendations("pl3", draws, analysis, seed=0)
+    assert all(tuple(r["digits"]) != (9, 9, 9) for r in recs[:3])
+
+
 def test_qxc_normalize_and_analyze():
     raw = {
         "lotteryDrawNum": "26080",

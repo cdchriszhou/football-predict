@@ -81,13 +81,21 @@
               <template v-if="recommend?.sample_size">
                 · {{ t('pailie.sampleSize', { n: recommend.sample_size }) }}
               </template>
+              <template v-if="recommend?.based_on_issue">
+                · {{ t('pailie.basedOnIssue', { issue: recommend.based_on_issue }) }}
+              </template>
             </p>
           </div>
-          <el-radio-group v-model="windowSize" size="small" @change="loadRecommend">
-            <el-radio-button :value="30">30{{ t('pailie.periods') }}</el-radio-button>
-            <el-radio-button :value="60">60{{ t('pailie.periods') }}</el-radio-button>
-            <el-radio-button :value="100">100{{ t('pailie.periods') }}</el-radio-button>
-          </el-radio-group>
+          <div class="rec-toolbar">
+            <el-button size="small" :loading="recommendLoading" @click="rotateRecommend">
+              {{ t('pailie.rotateBatch') }}
+            </el-button>
+            <el-radio-group v-model="windowSize" size="small" @change="onWindowChange">
+              <el-radio-button :value="30">30{{ t('pailie.periods') }}</el-radio-button>
+              <el-radio-button :value="60">60{{ t('pailie.periods') }}</el-radio-button>
+              <el-radio-button :value="100">100{{ t('pailie.periods') }}</el-radio-button>
+            </el-radio-group>
+          </div>
         </div>
         <div class="ai-row">
           <el-switch v-model="useAi" @change="loadRecommend" />
@@ -405,6 +413,7 @@ const activeGame = ref('pl3')
 const pl3Mode = ref('direct')
 const windowSize = ref(100)
 const useAi = ref(true)
+const rotateBatch = ref(0)
 const selections = ref([[], [], []])
 const tickets = ref([])
 const poolGameIds = ['pl3', 'fc3d', 'pl5', 'qxc', 'ssq', 'dlt']
@@ -420,8 +429,8 @@ const knownIssues = ref({})
 
 const isThreeDigitGame = computed(() => activeGame.value === 'pl3' || activeGame.value === 'fc3d')
 
-function recommendCacheKey(game, win, ai) {
-  return `${game}:${win}:${ai ? 1 : 0}`
+function recommendCacheKey(game, win, ai, issue, rotate) {
+  return `${game}:${win}:${ai ? 1 : 0}:${issue || '-'}:${rotate || 0}`
 }
 
 function clearRecommendCacheForGames(gameIds) {
@@ -828,6 +837,7 @@ async function loadPools(opts) {
       if (toRefresh.length) {
         clearRecommendCacheForGames(toRefresh)
         if (toRefresh.includes(activeGame.value)) {
+          rotateBatch.value = 0
           await loadRecommend({ forceRefresh: true })
         }
       }
@@ -848,9 +858,11 @@ async function loadRecommend(opts) {
   const game = activeGame.value
   const win = windowSize.value
   const wantAi = useAi.value
+  const rotate = rotateBatch.value
+  const issueHint = knownIssues.value[game] || recommend.value?.based_on_issue || ''
   const seq = ++recommendSeq
-  const fullKey = recommendCacheKey(game, win, wantAi)
-  const freqKey = recommendCacheKey(game, win, false)
+  const fullKey = recommendCacheKey(game, win, wantAi, issueHint, rotate)
+  const freqKey = recommendCacheKey(game, win, false, issueHint, rotate)
 
   if (forceRefresh) {
     clearRecommendCacheForGames([game])
@@ -878,13 +890,14 @@ async function loadRecommend(opts) {
       window: win,
       use_ai: false,
       refresh: forceRefresh || undefined,
+      rotate,
     })
     if (seq !== recommendSeq || activeGame.value !== game) return
     if (freqRes?.code === 200) {
       recommend.value = freqRes.data
-      recommendCache.set(freqKey, freqRes.data)
-      const issue = freqRes.data?.latest?.issue
+      const issue = freqRes.data?.based_on_issue || freqRes.data?.latest?.issue || ''
       if (issue) knownIssues.value[game] = issue
+      recommendCache.set(recommendCacheKey(game, win, false, issue, rotate), freqRes.data)
     }
   } catch (e) {
     if (seq !== recommendSeq || activeGame.value !== game) return
@@ -907,11 +920,13 @@ async function loadRecommend(opts) {
       window: win,
       use_ai: true,
       refresh: forceRefresh || undefined,
+      rotate,
     })
     if (seq !== recommendSeq || activeGame.value !== game) return
     if (aiRes?.code === 200) {
       recommend.value = aiRes.data
-      recommendCache.set(fullKey, aiRes.data)
+      const issue = aiRes.data?.based_on_issue || aiRes.data?.latest?.issue || knownIssues.value[game] || ''
+      recommendCache.set(recommendCacheKey(game, win, true, issue, rotate), aiRes.data)
     }
   } catch {
     // 频率结果已展示，AI 失败可忽略
@@ -920,8 +935,19 @@ async function loadRecommend(opts) {
   }
 }
 
+function onWindowChange() {
+  rotateBatch.value = 0
+  loadRecommend({ forceRefresh: true })
+}
+
+function rotateRecommend() {
+  rotateBatch.value = (rotateBatch.value + 1) % 100
+  loadRecommend({ forceRefresh: true })
+}
+
 async function onTabChange() {
   ensureRows()
+  rotateBatch.value = 0
   // 不阻塞 Tab 切换：频率先出，AI 后台增强
   loadRecommend()
 }
@@ -934,6 +960,7 @@ async function refresh() {
   loading.value = true
   try {
     recommendCache.clear()
+    rotateBatch.value = 0
     const [catRes, histRes] = await Promise.all([
       getPailieCatalog(),
       getPailieHistory({ limit: 30, refresh: true }),
@@ -1328,6 +1355,12 @@ onUnmounted(() => {
   gap: 12px;
   flex-wrap: wrap;
   margin-bottom: 12px;
+}
+.rec-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 .ai-row {
   display: flex;

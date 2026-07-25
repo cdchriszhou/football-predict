@@ -631,59 +631,111 @@ def _analyze_draws(draws: list[dict], alphabets: list[int]) -> dict[str, Any]:
     }
 
 
-def _pick_direct_numbers(position_scores: list[list[float]], alphabets: list[int], count: int = 5) -> list[list[int]]:
+def _pick_direct_numbers(
+    position_scores: list[list[float]],
+    alphabets: list[int],
+    count: int = 5,
+    *,
+    seed: int = 0,
+    exclude: set[tuple[int, ...]] | None = None,
+) -> list[list[int]]:
+    """按位综合分选号；用期号种子在 Top-K 内轮换，避免长期锁死同一组号。"""
     n_pos = len(position_scores)
+    exclude = exclude or set()
     ranked = [
         sorted(range(alphabets[p]), key=lambda d: (-position_scores[p][d], d))
         for p in range(n_pos)
     ]
+    from service.digital_pick import rotate_ranked
+
+    pools = [
+        rotate_ranked(ranked[p], seed, top_k=min(4, alphabets[p]), salt=p * 17)
+        for p in range(n_pos)
+    ]
+
     picks: list[list[int]] = []
     used: set[tuple[int, ...]] = set()
 
-    primary = [ranked[p][0] for p in range(n_pos)]
-    picks.append(primary)
-    used.add(tuple(primary))
+    def try_add(nums: list[int]) -> bool:
+        key = tuple(nums)
+        if key in used or key in exclude:
+            return False
+        used.add(key)
+        picks.append(list(nums))
+        return True
 
-    for rank_i in range(1, 4):
+    primary = [pools[p][0] for p in range(n_pos)]
+    if not try_add(primary):
+        for p in range(n_pos):
+            for alt in pools[p][1:4]:
+                nums = list(primary)
+                nums[p] = alt
+                if try_add(nums):
+                    primary = nums
+                    break
+            if picks:
+                break
+    if not picks:
+        # 极端情况：放宽排除约束
+        try_add(primary) or try_add([ranked[p][0] for p in range(n_pos)])
+
+    for rank_i in range(1, 5):
         for pos in range(n_pos):
             nums = list(primary)
-            nums[pos] = ranked[pos][min(rank_i, alphabets[pos] - 1)]
-            key = tuple(nums)
-            if key in used:
-                continue
-            used.add(key)
-            picks.append(nums)
+            nums[pos] = pools[pos][min(rank_i, len(pools[pos]) - 1)]
+            try_add(nums)
             if len(picks) >= count:
-                return picks
+                return picks[:count]
 
-    secondary = [ranked[p][min(1, alphabets[p] - 1)] for p in range(n_pos)]
-    if tuple(secondary) not in used:
-        picks.append(secondary)
+    secondary = [pools[p][min(1, len(pools[p]) - 1)] for p in range(n_pos)]
+    try_add(secondary)
+
+    # 再从各位次优组合补足
+    offset = 1
+    while len(picks) < count and offset < 8:
+        nums = [pools[p][min(offset + (p % 3), len(pools[p]) - 1)] for p in range(n_pos)]
+        try_add(nums)
+        offset += 1
+
     return picks[:count]
 
 
-def _cold_pick(analysis: dict[str, Any]) -> list[int]:
+def _cold_pick(analysis: dict[str, Any], *, seed: int = 0) -> list[int]:
+    from service.digital_pick import pick_from_pool
+
     cold = []
-    for pos_stats in analysis["position_stats"]:
+    for pos, pos_stats in enumerate(analysis["position_stats"]):
         by_miss = sorted(pos_stats, key=lambda x: (-x["miss"], -x["score"], x["digit"]))
-        cold.append(by_miss[0]["digit"])
+        top = [r["digit"] for r in by_miss[:3]]
+        cold.append(pick_from_pool(top, seed, salt=31 + pos) if top else by_miss[0]["digit"])
     return cold
 
 
-def _build_recommendations(game_id: str, draws: list[dict], analysis: dict[str, Any]) -> list[dict]:
-    """每种玩法固定输出 5 注直选参考号（去冗余）。"""
+def _build_recommendations(
+    game_id: str,
+    draws: list[dict],
+    analysis: dict[str, Any],
+    *,
+    seed: int = 0,
+) -> list[dict]:
+    """每种玩法固定输出 5 注直选参考号（去冗余）；随期号种子变化。"""
     alphabets = analysis["alphabets"]
     n_pos = len(alphabets)
     scores = analysis["position_scores"]
-    directs = _pick_direct_numbers(scores, alphabets, count=5)
+    exclude: set[tuple[int, ...]] = set()
+    if draws and isinstance(draws[0].get("digits"), list) and len(draws[0]["digits"]) >= n_pos:
+        exclude.add(tuple(int(x) for x in draws[0]["digits"][:n_pos]))
+
+    directs = _pick_direct_numbers(scores, alphabets, count=5, seed=seed, exclude=exclude)
 
     # 第 5 注尽量用冷号回补，增加多样性
-    cold_pick = _cold_pick(analysis)
+    cold_pick = _cold_pick(analysis, seed=seed)
     used = {tuple(x) for x in directs}
-    if len(directs) >= 5 and tuple(cold_pick) not in used:
-        directs[4] = cold_pick
-    elif len(directs) < 5 and tuple(cold_pick) not in used:
-        directs.append(cold_pick)
+    if tuple(cold_pick) not in used and tuple(cold_pick) not in exclude:
+        if len(directs) >= 5:
+            directs[4] = cold_pick
+        else:
+            directs.append(cold_pick)
 
     recs: list[dict] = []
     for i, nums in enumerate(directs[:5]):
@@ -700,7 +752,7 @@ def _build_recommendations(game_id: str, draws: list[dict], analysis: dict[str, 
             "reason": (
                 "冷号回补：各位遗漏偏大，作均衡参考"
                 if is_cold
-                else "各位历史出现率 + 遗漏 + 近窗趋势综合得分"
+                else "各位历史出现率 + 遗漏 + 近窗趋势；并按最新期号在热号池内轮换"
             ),
             "bets": 1,
         })
@@ -821,8 +873,12 @@ async def get_recommendations(
     use_ai: bool = True,
     *,
     force_refresh: bool = False,
+    rotate: int = 0,
 ) -> dict[str, Any]:
     from service.digital_ai import rec_cache_get, rec_cache_invalidate, rec_cache_set
+    from service.digital_pick import period_seed
+
+    rotate = max(0, min(int(rotate or 0), 99))
 
     if game_id not in GAME_SPECS:
         return {
@@ -837,6 +893,7 @@ async def get_recommendations(
             "hot_digits": [],
             "cold_digits": [],
             "ai_enabled": False,
+            "rotate": rotate,
         }
 
     if force_refresh:
@@ -844,19 +901,26 @@ async def get_recommendations(
         rec_cache_invalidate(game_id)
 
     if game_id == "ssq":
-        return await get_ssq_recommendations(window=window, use_ai=use_ai, force_refresh=force_refresh)
+        return await get_ssq_recommendations(
+            window=window, use_ai=use_ai, force_refresh=force_refresh, rotate=rotate,
+        )
     if game_id == "dlt":
-        return await get_dlt_recommendations(window=window, use_ai=use_ai, force_refresh=force_refresh)
+        return await get_dlt_recommendations(
+            window=window, use_ai=use_ai, force_refresh=force_refresh, rotate=rotate,
+        )
 
     window = max(20, min(int(window or 100), 200))
-    cache_key = f"rec:{game_id}:{window}:{int(bool(use_ai))}"
+    # 先拉历史拿最新期号，缓存键绑定期号，避免跨期仍返回旧推荐
+    draws = await _fetch_history(game_id, window, force_refresh=force_refresh)
+    latest_issue = str(draws[0]["issue"]) if draws else ""
+    seed = period_seed(latest_issue, rotate)
+    cache_key = f"rec:{game_id}:{window}:{int(bool(use_ai))}:{latest_issue}:{rotate}"
     if not force_refresh:
         cached = rec_cache_get(cache_key)
         if cached:
             cached["cached"] = True
             return cached
 
-    draws = await _fetch_history(game_id, window, force_refresh=force_refresh)
     if not draws:
         return {
             "reachable": False,
@@ -871,11 +935,13 @@ async def get_recommendations(
             "cold_digits": [],
             "history_preview": [],
             "ai_enabled": False,
+            "rotate": rotate,
+            "based_on_issue": None,
         }
 
     alphabets = GAME_SPECS[game_id]["alphabets"]
     analysis = _analyze_draws(draws, alphabets)
-    freq_recs = _build_recommendations(game_id, draws, analysis)
+    freq_recs = _build_recommendations(game_id, draws, analysis, seed=seed)
 
     ai_picks: list[dict] = []
     from service.digital_ai import configured_digital_models, model_display_name
@@ -899,6 +965,8 @@ async def get_recommendations(
         "window": window,
         "sample_size": analysis["sample_size"],
         "alphabets": alphabets,
+        "based_on_issue": latest_issue or None,
+        "rotate": rotate,
         "method": {
             "hot_weight": _HOT_WEIGHT,
             "cold_weight": _COLD_WEIGHT,
@@ -906,13 +974,15 @@ async def get_recommendations(
             "ai_enabled": bool(ai_picks),
             "ai_models": model_names,
             "pick_limit": 5,
+            "period_seed": True,
             "desc": (
-                "每种玩法固定推荐 5 注；字母表内全部号码参与评分（含样本期内从未出现的冷号），"
-                "基于历史出现概率、遗漏与近窗趋势"
+                f"基于第 {latest_issue} 期后统计；字母表内全部号码参与评分（含未出现冷号）；"
+                "在热号池内按期号轮换生成 5 注"
+                + (f"（换号批次 {rotate}）" if rotate else "")
                 + (
                     f"，并由 {'+'.join(model_names)} 多模型精选前几注。"
                     if ai_picks and model_names
-                    else ("，并由 AI 精选前几注。" if ai_picks else "。")
+                    else ("，并由 AI 精选前几注。" if ai_picks else "。可点「换一批」换号。")
                 )
             ),
         },

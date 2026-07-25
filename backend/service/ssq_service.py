@@ -331,11 +331,24 @@ def analyze_ssq(draws: list[dict]) -> dict[str, Any]:
     }
 
 
-def _pick_ssq_sets(analysis: dict[str, Any], count: int = 5) -> list[tuple[list[int], int]]:
-    red_ranked = [r["digit"] for r in analysis["red_stats"]]
-    blue_ranked = [b["digit"] for b in analysis["blue_stats"]]
-    cold_red = analysis["cold_digits"]
-    cold_blue = analysis["cold_blue"]
+def _pick_ssq_sets(
+    analysis: dict[str, Any],
+    count: int = 5,
+    *,
+    seed: int = 0,
+    exclude: set[tuple[int, ...]] | None = None,
+) -> list[tuple[list[int], int]]:
+    from service.digital_pick import rotate_ranked
+
+    exclude = exclude or set()
+    red_ranked = rotate_ranked(
+        [r["digit"] for r in analysis["red_stats"]], seed, top_k=8, salt=3,
+    )
+    blue_ranked = rotate_ranked(
+        [b["digit"] for b in analysis["blue_stats"]], seed, top_k=4, salt=11,
+    )
+    cold_red = rotate_ranked(list(analysis["cold_digits"]), seed, top_k=6, salt=19)
+    cold_blue = rotate_ranked(list(analysis["cold_blue"]), seed, top_k=3, salt=23)
 
     picks: list[tuple[list[int], int]] = []
     used: set[tuple[int, ...]] = set()
@@ -345,7 +358,7 @@ def _pick_ssq_sets(analysis: dict[str, Any], count: int = 5) -> list[tuple[list[
         if len(reds) != 6 or not (1 <= blue <= 16):
             return
         key = tuple(reds + [blue])
-        if key in used:
+        if key in used or key in exclude:
             return
         used.add(key)
         picks.append((reds, blue))
@@ -380,14 +393,19 @@ def _pick_ssq_sets(analysis: dict[str, Any], count: int = 5) -> list[tuple[list[
     return picks[:count]
 
 
-def build_ssq_recommendations(analysis: dict[str, Any]) -> list[dict]:
+def build_ssq_recommendations(
+    analysis: dict[str, Any],
+    *,
+    seed: int = 0,
+    exclude: set[tuple[int, ...]] | None = None,
+) -> list[dict]:
     red_map = analysis["red_score_map"]
     blue_map = analysis["blue_score_map"]
-    picks = _pick_ssq_sets(analysis, count=5)
+    picks = _pick_ssq_sets(analysis, count=5, seed=seed, exclude=exclude)
     recs = []
     for i, (reds, blue) in enumerate(picks):
         conf = (sum(red_map[n] for n in reds) / 6 + blue_map[blue]) / 2
-        reason = "红球/蓝球历史出现率 + 遗漏 + 近窗趋势综合"
+        reason = "红球/蓝球历史频率 + 遗漏 + 近窗趋势；按最新期号在热号池内轮换"
         if i == 3:
             reason = "冷号回补：遗漏偏大的红蓝球作均衡参考"
         recs.append({
@@ -487,6 +505,7 @@ async def get_ssq_recommendations(
     use_ai: bool = True,
     *,
     force_refresh: bool = False,
+    rotate: int = 0,
 ) -> dict[str, Any]:
     from service.digital_ai import (
         configured_digital_models,
@@ -495,19 +514,24 @@ async def get_ssq_recommendations(
         rec_cache_invalidate,
         rec_cache_set,
     )
+    from service.digital_pick import period_seed
 
     window = max(20, min(int(window or 100), 100))
-    cache_key = f"rec:ssq:{window}:{int(bool(use_ai))}"
+    rotate = max(0, min(int(rotate or 0), 99))
     if force_refresh:
         clear_ssq_history_cache()
         rec_cache_invalidate("ssq")
-    else:
+
+    draws = await fetch_ssq_history(window, force_refresh=force_refresh)
+    latest_issue = str(draws[0]["issue"]) if draws else ""
+    seed = period_seed(latest_issue, rotate)
+    cache_key = f"rec:ssq:{window}:{int(bool(use_ai))}:{latest_issue}:{rotate}"
+    if not force_refresh:
         cached = rec_cache_get(cache_key)
         if cached:
             cached["cached"] = True
             return cached
 
-    draws = await fetch_ssq_history(window, force_refresh=force_refresh)
     if not draws:
         return {
             "reachable": False,
@@ -522,10 +546,16 @@ async def get_ssq_recommendations(
             "cold_digits": [],
             "ai_enabled": False,
             "ai_models": [],
+            "rotate": rotate,
+            "based_on_issue": None,
         }
 
+    exclude: set[tuple[int, ...]] = set()
+    if draws and isinstance(draws[0].get("digits"), list) and len(draws[0]["digits"]) >= 7:
+        exclude.add(tuple(int(x) for x in draws[0]["digits"][:7]))
+
     analysis = analyze_ssq(draws)
-    freq_recs = build_ssq_recommendations(analysis)
+    freq_recs = build_ssq_recommendations(analysis, seed=seed, exclude=exclude)
     ai_picks: list[dict] = []
     configured = configured_digital_models()
     if use_ai and configured:
@@ -564,6 +594,8 @@ async def get_ssq_recommendations(
         "sample_size": analysis["sample_size"],
         "kind": "ssq",
         "alphabets": [33, 16],
+        "based_on_issue": latest_issue or None,
+        "rotate": rotate,
         "method": {
             "hot_weight": _HOT_WEIGHT,
             "cold_weight": _COLD_WEIGHT,
@@ -571,13 +603,15 @@ async def get_ssq_recommendations(
             "ai_enabled": bool(ai_picks),
             "ai_models": model_names,
             "pick_limit": 5,
+            "period_seed": True,
             "desc": (
-                "双色球固定推荐 5 注；红/蓝字母表内全部号码参与评分（含样本期内从未出现的冷号），"
-                "分别统计历史出现概率、遗漏与近窗趋势"
+                f"基于第 {latest_issue} 期后统计；红/蓝字母表全量评分（含未出现冷号），"
+                "按期号在热号池内轮换生成 5 注"
+                + (f"（换号批次 {rotate}）" if rotate else "")
                 + (
                     f"，并由 {'+'.join(model_names)} 多模型精选前几注。"
                     if ai_picks and model_names
-                    else ("，并由 AI 精选前几注。" if ai_picks else "。")
+                    else ("，并由 AI 精选前几注。" if ai_picks else "。可点「换一批」换号。")
                 )
             ),
         },
