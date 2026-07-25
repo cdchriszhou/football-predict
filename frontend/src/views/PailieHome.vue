@@ -87,9 +87,6 @@
             </p>
           </div>
           <div class="rec-toolbar">
-            <el-button size="small" :loading="recommendLoading" @click="rotateRecommend">
-              {{ t('pailie.rotateBatch') }}
-            </el-button>
             <el-radio-group v-model="windowSize" size="small" @change="onWindowChange">
               <el-radio-button :value="30">30{{ t('pailie.periods') }}</el-radio-button>
               <el-radio-button :value="60">60{{ t('pailie.periods') }}</el-radio-button>
@@ -109,6 +106,19 @@
           <el-tag v-else-if="useAi" size="small" type="info">{{ t('pailie.aiInactive') }}</el-tag>
         </div>
 
+        <div class="rotate-bar">
+          <el-button
+            type="primary"
+            size="large"
+            class="rotate-btn"
+            :icon="Refresh"
+            :loading="recommendLoading"
+            @click="rotateRecommend"
+          >
+            {{ t('pailie.rotateBatch') }}
+          </el-button>
+          <span class="rotate-hint">{{ t('pailie.rotateHint') }}</span>
+        </div>
         <el-alert
           v-if="recommend?.disclaimer"
           type="info"
@@ -397,6 +407,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
+import { Refresh } from '@element-plus/icons-vue'
 import { getPailieCatalog, getPailieHistory, getPailiePools, getPailieRecommend } from '@/api/pailie'
 
 const { t } = useI18n()
@@ -1361,6 +1372,27 @@ onUnmounted(() => {
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
+}
+.rotate-bar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin: 0 0 16px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: linear-gradient(90deg, #e8f0ff 0%, #f5f8ff 100%);
+  border: 1px solid #c6d4f5;
+}
+.rotate-btn {
+  min-width: 140px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  box-shadow: 0 4px 12px rgba(64, 158, 255, 0.35);
+}
+.rotate-hint {
+  font-size: 13px;
+  color: #4a5d8c;
 }
 .ai-row {
   display: flex;
