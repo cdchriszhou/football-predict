@@ -32,7 +32,27 @@ def _score_outcome(score: str) -> str:
 
 
 def is_knockout_stage(stage: str | None) -> bool:
-    return bool(stage and stage not in ("", "小组赛"))
+    """True only for tournament knockout labels — not league matchdays like 第N轮."""
+    if not stage:
+        return False
+    s = str(stage).strip()
+    if not s or s in ("小组赛", "联赛"):
+        return False
+    if s.startswith("第") and s.endswith("轮"):
+        return False
+    if s.startswith("Matchday"):
+        return False
+    # "Round 12" = league; "Round of 16" = knockout
+    if s.startswith("Round ") and not s.lower().startswith("round of"):
+        rest = s[6:].strip()
+        if rest.isdigit():
+            return False
+    knockout_markers = (
+        "淘汰", "决赛", "半决赛", "四分之一", "八分之一", "十六分之一",
+        "1/8", "1/4", "1/2", "1/16", "季军", "决赛圈",
+        "Round of", "Quarter", "Semi", "Final",
+    )
+    return any(m in s for m in knockout_markers)
 
 
 def is_late_knockout_stage(stage: str | None) -> bool:
@@ -443,7 +463,11 @@ def prepare_pipeline_crs_and_hints(
     if crs:
         return crs, hints, None
 
+    # League / group without bookmaker CRS: Poisson synthetic so score picks still work
     if not is_knockout_stage(stage):
+        synthetic = poisson_to_synthetic_crs(expected_a, expected_b, draw_rate)
+        if synthetic:
+            return synthetic, hints, None
         return {}, hints, None
 
     ko_scores, ko_upset = finalize_knockout_score_picks(

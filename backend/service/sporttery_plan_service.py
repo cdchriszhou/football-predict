@@ -34,6 +34,7 @@ from service.confidence_service import compute_score_confidence, compute_wdl_con
 from service.match_context import analyze_match_context, build_group_context, apply_context_to_rates
 from data.worldcup_group_standings import load_group_standings
 from service.prediction_service import (
+    _club_home_override,
     get_players,
     infer_matchday,
     prepare_fused_odds,
@@ -599,6 +600,7 @@ async def _build_match_analysis(
         team_a_dict.get("rank", 50), team_b_dict.get("rank", 50),
         location=db_match.location or "",
         standings=standings,
+        home_side_override=_club_home_override(db_match.competition_slug),
     )
 
     pre_rule = _rule_engine.evaluate(

@@ -97,13 +97,25 @@ async def _sync_standings(
 ) -> int:
     if not standings:
         return 0
+    from data.league_seed import LEAGUE_TEAMS
+
     total = len(standings)
+    # Pre-season / all-zero table: football-data rank is registration order, not strength.
+    # Prefer curated LEAGUE_TEAMS hints until real matches have been played.
+    season_started = any(int(row.get("played") or 0) > 0 for row in standings)
+    seed_rank = {
+        cn: rank for cn, _en, rank in LEAGUE_TEAMS.get(slug, [])
+    }
     count = 0
     for row in standings:
         cn = resolve_club_cn(fd_id=row.get("fd_id"), name_en=row.get("name_en"))
         if not cn:
             continue
-        rank = row.get("rank") or 0
+        table_rank = row.get("rank") or 0
+        if season_started:
+            rank = table_rank
+        else:
+            rank = seed_rank.get(cn) or table_rank
         abilities = _ability_from_rank(rank, total)
         existing = (await db.execute(
             select(Team).where(

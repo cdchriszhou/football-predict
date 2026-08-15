@@ -55,6 +55,13 @@ def detect_home_side(team_a: str, team_b: str, location: str = "") -> str:
     return ""
 
 
+def _is_league_matchday(stage: str | None) -> bool:
+    s = (stage or "").strip()
+    if s in ("联赛",):
+        return True
+    return s.startswith("第") and s.endswith("轮")
+
+
 def build_group_context(
     stage: str,
     group_name: str = "",
@@ -65,15 +72,28 @@ def build_group_context(
     rank_b: int = 50,
     location: str = "",
     standings: dict | None = None,
+    home_side_override: str | None = None,
 ) -> dict:
-    """Build group-stage context for rule engine."""
-    home_side = detect_home_side(team_a, team_b, location)
+    """Build group-stage / league context for rule engine.
+
+    For club leagues, pass home_side_override='a' (team_a is always home in sync).
+    """
+    if home_side_override in ("a", "b"):
+        home_side = home_side_override
+    else:
+        home_side = detect_home_side(team_a, team_b, location)
     is_group_opener = stage == "小组赛" and matchday == 1 and bool(home_side)
+    is_league = _is_league_matchday(stage)
     home_win_boost = 0.0
     home_xg_boost = 0.0
     if home_side:
-        home_win_boost = 6.0 if is_group_opener else 4.0
-        home_xg_boost = 0.55 if is_group_opener else 0.28
+        if is_league:
+            # Typical club home advantage (weaker than WC host opener)
+            home_win_boost = 5.0
+            home_xg_boost = 0.35
+        else:
+            home_win_boost = 6.0 if is_group_opener else 4.0
+            home_xg_boost = 0.55 if is_group_opener else 0.28
 
     ctx = {
         "stage": stage,

@@ -6,7 +6,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from db import get_db
 from db.models import Prediction, Match, Team, Odds
 from db.redis_client import cache_get, cache_set, cache_delete
-from service.prediction_service import PredictionService, team_to_dict, prepare_fused_odds, infer_matchday
+from service.prediction_service import (
+    PredictionService,
+    team_to_dict,
+    prepare_fused_odds,
+    infer_matchday,
+    _club_home_override,
+)
 from service.calibration_service import CalibratedRuleEngine
 from service.score_backtest import compute_score_backtest, get_or_compute_daily_report
 from service.score_pick import (
@@ -145,6 +151,7 @@ async def get_predictions_batch(
                 ta_dict.get("rank", 50), tb_dict.get("rank", 50),
                 location=match.location or "",
                 standings=standings,
+                home_side_override=_club_home_override(match.competition_slug),
             )
             if match.stage == "小组赛" and match.group_name and matchday >= 2:
                 from data.worldcup_group_standings import load_group_fifa_ranks

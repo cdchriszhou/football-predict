@@ -372,7 +372,11 @@ def _fuse_predictions(llm_results: list, rule_result, odds_dict: dict = None,
 
 
 async def infer_matchday(match: Match, db: AsyncSession) -> int:
-    """Infer group matchday (1-3) from earlier matches in the same group."""
+    """Infer matchday: group 1-3 for WC, or round number from 第N轮 for clubs."""
+    stage = (match.stage or "").strip()
+    if stage.startswith("第") and stage.endswith("轮"):
+        digits = "".join(ch for ch in stage[1:-1] if ch.isdigit())
+        return int(digits) if digits else 0
     if match.stage != "小组赛" or not match.group_name:
         return 0
     count = (await db.execute(
@@ -383,6 +387,17 @@ async def infer_matchday(match: Match, db: AsyncSession) -> int:
         )
     )).scalar() or 0
     return min(3, count // 2 + 1)
+
+
+def _club_home_override(competition_slug: str | None) -> str | None:
+    """Club fixtures store home as team_a."""
+    if not competition_slug:
+        return None
+    from data.competitions import get_competition
+    comp = get_competition(competition_slug)
+    if (comp or {}).get("type") == "club":
+        return "a"
+    return None
 
 
 def _implied_wdl(win_win: float, draw: float, win_lose: float) -> dict | None:
@@ -583,6 +598,7 @@ class PredictionService:
             team_a_dict.get("rank", 50), team_b_dict.get("rank", 50),
             location=match.location or "",
             standings=standings,
+            home_side_override=_club_home_override(match.competition_slug),
         )
         if match.stage == "小组赛" and match.group_name and matchday >= 2:
             from data.worldcup_group_standings import load_group_fifa_ranks
