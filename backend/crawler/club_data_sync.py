@@ -68,8 +68,10 @@ async def sync_league_from_football_data(db: AsyncSession, slug: str) -> dict:
         return {"status": "empty", "reason": "football_data_empty"}
 
     teams_synced = await _sync_standings(db, slug, season_str, standings)
+    if standings:
+        await _prune_teams_not_in_standings(db, slug, standings)
     sched = await _sync_fixtures(db, slug, season_str, comp.get("short_name", slug), matches_raw)
-    squads = await _sync_squads(db, slug, max_teams=8)
+    squads = await _sync_squads(db, slug, max_teams=None)
     removed = await cleanup_orphan_seed_matches(db, slug)
 
     from data.league_standings import ensure_league_standings_stats
@@ -155,6 +157,37 @@ async def _sync_standings(
     return count
 
 
+async def _prune_teams_not_in_standings(
+    db: AsyncSession, slug: str, standings: list[dict],
+) -> int:
+    """Drop clubs that are no longer in the synced season standings."""
+    keep_ids = {row.get("fd_id") for row in standings if row.get("fd_id")}
+    keep_names = {
+        resolve_club_cn(fd_id=row.get("fd_id"), name_en=row.get("name_en"))
+        for row in standings
+    }
+    keep_names.discard("")
+    teams = (await db.execute(
+        select(Team).where(Team.competition_slug == slug)
+    )).scalars().all()
+    removed = 0
+    for team in teams:
+        keep = False
+        if team.external_id and team.external_id in keep_ids:
+            keep = True
+        elif team.name in keep_names:
+            keep = True
+        if keep:
+            continue
+        await db.execute(delete(Player).where(Player.team_id == team.id))
+        await db.delete(team)
+        removed += 1
+    if removed:
+        await db.flush()
+        logger.info(f"Pruned {removed} obsolete teams from {slug}")
+    return removed
+
+
 async def _sync_fixtures(
     db: AsyncSession,
     slug: str,
@@ -224,15 +257,15 @@ async def _sync_fixtures(
                 season=season,
                 matchday=matchday,
                 external_id=ext_id,
-                result_a=ra if ra is not None else 0,
-                result_b=rb if rb is not None else 0,
+                result_a=ra,
+                result_b=rb,
             ))
             created += 1
 
     return {"created": created, "updated": updated}
 
 
-async def _sync_squads(db: AsyncSession, slug: str, max_teams: int = 8) -> dict:
+async def _sync_squads(db: AsyncSession, slug: str, max_teams: int | None = None) -> dict:
     teams = (await db.execute(
         select(Team).where(
             Team.competition_slug == slug,
@@ -240,8 +273,9 @@ async def _sync_squads(db: AsyncSession, slug: str, max_teams: int = 8) -> dict:
         ).order_by(Team.rank.asc())
     )).scalars().all()
 
+    targets = teams if max_teams is None else teams[:max_teams]
     synced = players = 0
-    for team in teams[:max_teams]:
+    for team in targets:
         detail = await fetch_team_squad(team.external_id)
         if not detail or not detail.get("squad"):
             continue

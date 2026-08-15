@@ -32,44 +32,72 @@ for _slug, teams in LEAGUE_TEAMS.items():
     for cn, en, _rank in teams:
         _register(en, cn)
         _register(cn, cn)
-        # Common football-data / media variants
-        if en == "Manchester City":
-            _register("Man City", cn)
-        elif en == "Manchester United":
-            _register("Man United", cn)
-        elif en == "Tottenham Hotspur":
-            _register("Tottenham", cn)
-        elif en == "Newcastle United":
-            _register("Newcastle", cn)
-        elif en == "West Ham United":
-            _register("West Ham", cn)
-        elif en == "Wolverhampton":
-            _register("Wolverhampton Wanderers", cn)
-            _register("Wolves", cn)
-        elif en == "Real Madrid":
-            _register("Real Madrid CF", cn)
-        elif en == "Barcelona":
-            _register("FC Barcelona", cn)
-        elif en == "Atletico Madrid":
-            _register("Club Atlético de Madrid", cn)
-            _register("Atlético Madrid", cn)
-        elif en == "Inter Milan":
-            _register("FC Internazionale Milano", cn)
-            _register("Internazionale", cn)
-        elif en == "AC Milan":
-            _register("AC Milan", cn)
-        elif en == "Bayern Munich":
-            _register("FC Bayern München", cn)
-            _register("FC Bayern Munich", cn)
-        elif en == "Borussia Dortmund":
-            _register("BVB", cn)
-        elif en == "RB Leipzig":
-            _register("RasenBallsport Leipzig", cn)
-        elif en == "Paris Saint-Germain":
-            _register("Paris SG", cn)
-            _register("PSG", cn)
-        elif en == "Nottingham Forest":
-            _register("Nott'm Forest", cn)
+
+
+# Common football-data / media variants (beyond LEAGUE_TEAMS English names)
+_EXTRA_VARIANTS: list[tuple[str, str]] = [
+    ("Man City", "曼城"),
+    ("Man United", "曼联"),
+    ("Tottenham", "热刺"),
+    ("Newcastle", "纽卡斯尔联"),
+    ("West Ham", "西汉姆联"),
+    ("West Ham United", "西汉姆联"),
+    ("Wolverhampton Wanderers", "狼队"),
+    ("Wolves", "狼队"),
+    ("Brighton & Hove Albion", "布莱顿"),
+    ("Nottingham Forest", "诺丁汉森林"),
+    ("Nott'm Forest", "诺丁汉森林"),
+    ("Coventry", "考文垂"),
+    ("Hull", "赫尔城"),
+    ("Leeds", "利兹联"),
+    ("Real Madrid CF", "皇马"),
+    ("FC Barcelona", "巴萨"),
+    ("Club Atlético de Madrid", "马竞"),
+    ("Atlético Madrid", "马竞"),
+    ("Athletic Club", "毕尔巴鄂"),
+    ("Deportivo de La Coruña", "拉科鲁尼亚"),
+    ("RC Deportivo de La Coruña", "拉科鲁尼亚"),
+    ("Racing de Santander", "桑坦德竞技"),
+    ("Real Racing Club", "桑坦德竞技"),
+    ("Málaga CF", "马拉加"),
+    ("Málaga", "马拉加"),
+    ("FC Internazionale Milano", "国际米兰"),
+    ("Internazionale", "国际米兰"),
+    ("Inter", "国际米兰"),
+    ("AC Milan", "AC米兰"),
+    ("AS Roma", "罗马"),
+    ("Hellas Verona FC", "维罗纳"),
+    ("US Sassuolo Calcio", "萨索洛"),
+    ("Frosinone Calcio", "弗罗西诺内"),
+    ("FC Bayern München", "拜仁慕尼黑"),
+    ("FC Bayern Munich", "拜仁慕尼黑"),
+    ("BVB", "多特蒙德"),
+    ("RasenBallsport Leipzig", "莱比锡"),
+    ("1. FC Köln", "科隆"),
+    ("1. FC Cologne", "科隆"),
+    ("FC Cologne", "科隆"),
+    ("Hamburger SV", "汉堡"),
+    ("HSV", "汉堡"),
+    ("FC Schalke 04", "沙尔克04"),
+    ("Schalke", "沙尔克04"),
+    ("SC Paderborn 07", "帕德博恩"),
+    ("Paderborn", "帕德博恩"),
+    ("Elversberg", "埃尔弗斯贝格"),
+    ("Paris SG", "巴黎圣日耳曼"),
+    ("PSG", "巴黎圣日耳曼"),
+    ("Olympique de Marseille", "马赛"),
+    ("Olympique Lyonnais", "里昂"),
+    ("LOSC Lille", "里尔"),
+    ("Stade Rennais FC", "雷恩"),
+    ("Stade Brestois 29", "布雷斯特"),
+    ("ESTAC Troyes", "特鲁瓦"),
+    ("Le Mans FC", "勒芒"),
+    ("Paris FC", "巴黎FC"),
+    ("FC Lorient", "洛里昂"),
+]
+
+for _en, _cn in _EXTRA_VARIANTS:
+    _register(_en, _cn)
 
 
 def resolve_club_cn(*, fd_id: int | None = None, name_en: str | None = None) -> str:
@@ -88,4 +116,6 @@ def resolve_club_cn(*, fd_id: int | None = None, name_en: str | None = None) -> 
             base = en[: -len(suffix)].strip()
             if base in EN_TO_CN_CLUB:
                 return EN_TO_CN_CLUB[base]
+            if base.lower() in EN_TO_CN_CLUB:
+                return EN_TO_CN_CLUB[base.lower()]
     return en

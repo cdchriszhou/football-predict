@@ -174,7 +174,7 @@ async def cleanup_orphan_seed_matches(db: AsyncSession, slug: str) -> int:
     """
     Remove placeholder seed fixtures once real API fixtures exist.
 
-    Seed rows have no external_id/season; football-data rows have both.
+    Any club match without external_id is treated as seed/placeholder.
     """
     comp = get_competition(slug)
     if not comp or comp.get("type") != "club":
@@ -193,7 +193,6 @@ async def cleanup_orphan_seed_matches(db: AsyncSession, slug: str) -> int:
         select(Match.id).where(
             Match.competition_slug == slug,
             Match.external_id.is_(None),
-            Match.season.is_(None),
         )
     )).scalars().all())
     if not orphan_ids:
