@@ -216,7 +216,7 @@ async def get_competition_detail(
 
 
 def resolve_competition(competition: str | None) -> str:
-    slug = competition or "worldcup-2026"
+    slug = competition or "premier-league"
     if not is_valid_competition(slug):
         raise HTTPException(status_code=400, detail=f"未知赛事: {slug}")
     return slug

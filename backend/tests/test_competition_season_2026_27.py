@@ -14,6 +14,11 @@ CLUB_SLUGS = (
 )
 
 
+def test_world_cup_removed_from_registry():
+    assert "worldcup-2026" not in COMPETITIONS
+    assert get_competition("worldcup-2026") is None
+
+
 def test_big_five_season_year_is_2026():
     for slug in CLUB_SLUGS:
         assert get_competition(slug)["season_year"] == 2026

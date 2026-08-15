@@ -23,7 +23,7 @@ export default {
   },
   competition: {
     homeTitle: '选择赛事',
-    homeSubtitle: '世界杯 · 五大联赛 · 体彩排列/七星彩',
+    homeSubtitle: '五大联赛 · 体彩排列/七星彩',
     enter: '进入预测',
     enterDigital: '进入玩法',
     statMatches: '{n} 场比赛',
@@ -61,13 +61,12 @@ export default {
       pailie: '排列3 / 排列5 / 七星彩 / 双色球 / 大乐透 / 福彩3D',
     },
     pricingTitle: '访问权益说明',
-    pricingWorldCup: '399元，解锁世界杯赛事权益',
     pricingLeagues: '499元/月，解锁五大联赛赛事权益',
     pricingSingle: '199元/月，解锁单个赛事权益',
     locked: '未开通',
   },
   header: {
-    title: '2026 世界杯预测',
+    title: '足智预测',
     beijing: '北京',
     usa: '美国',
     countdown: '距开幕式 {time}',
@@ -94,7 +93,7 @@ export default {
   },
   auth: {
     loginTitle: '足智预测',
-    loginSubtitle: '世界杯 · 五大联赛 · AI 比分分析',
+    loginSubtitle: '五大联赛 · AI 比分分析',
     username: '用户名',
     password: '密码',
     serverSettings: '服务器设置',
@@ -155,7 +154,7 @@ export default {
     finished: '已结束'
   },
   dashboard: {
-    title: '世界杯预测仪表盘',
+    title: '预测仪表盘',
     titleWithCompetition: '{name}预测仪表盘',
     subtitle: '实时数据驱动，AI 智能预测',
     subtitleLeague: '{league} · 实时数据与 AI 比分预测',

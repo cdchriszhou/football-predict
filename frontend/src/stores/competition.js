@@ -3,10 +3,11 @@ import { getCompetitions, getCompetitionDetail } from '@/api/competitions'
 import { FALLBACK_COMPETITIONS, findCompetitionMeta, normalizeCompetition } from '@/data/competitions'
 
 const STORAGE_KEY = 'worldcup_competition_slug'
-const REMOVED_SLUGS = new Set(['hong-kong-racing'])
+const DEFAULT_SLUG = 'premier-league'
+const REMOVED_SLUGS = new Set(['hong-kong-racing', 'worldcup-2026'])
 
 function sanitizeSlug(slug) {
-  if (!slug || REMOVED_SLUGS.has(slug)) return 'worldcup-2026'
+  if (!slug || REMOVED_SLUGS.has(slug)) return DEFAULT_SLUG
   return slug
 }
 

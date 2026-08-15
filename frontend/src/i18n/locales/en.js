@@ -23,7 +23,7 @@ export default {
   },
   competition: {
     homeTitle: 'Choose Competition',
-    homeSubtitle: 'World Cup · Top 5 Leagues · Pailie / 7-Star',
+    homeSubtitle: 'Top 5 Leagues · Pailie / 7-Star',
     enter: 'Enter',
     enterDigital: 'Open games',
     statMatches: '{n} matches',
@@ -61,13 +61,12 @@ export default {
       pailie: 'Pailie 3 / 5 / 7-Star / SSQ / DLT / Welfare 3D',
     },
     pricingTitle: 'Access plans',
-    pricingWorldCup: '¥399 — World Cup access',
     pricingLeagues: '¥499/month — all top-5 league access',
     pricingSingle: '¥199/month — single competition access',
     locked: 'Locked',
   },
   header: {
-    title: '2026 World Cup Predict',
+    title: 'GoalSense',
     beijing: 'Beijing',
     usa: 'US East',
     countdown: 'Opening in {time}',
@@ -94,7 +93,7 @@ export default {
   },
   auth: {
     loginTitle: 'GoalSense',
-    loginSubtitle: 'World Cup · Top 5 Leagues · AI Score Insights',
+    loginSubtitle: 'Top 5 Leagues · AI Score Insights',
     username: 'Username',
     password: 'Password',
     serverSettings: 'Server Settings',
@@ -155,7 +154,7 @@ export default {
     finished: 'Finished'
   },
   dashboard: {
-    title: 'World Cup Dashboard',
+    title: 'Prediction Dashboard',
     titleWithCompetition: '{name} Prediction Dashboard',
     subtitle: 'Real-time data & AI predictions',
     subtitleLeague: '{league} · live data & AI score predictions',

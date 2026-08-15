@@ -22,7 +22,7 @@ export default {
   },
   competition: {
     homeTitle: 'اختر البطولة',
-    homeSubtitle: 'كأس العالم · الدوريات الخمس · Pailie 3/5',
+    homeSubtitle: 'الدوريات الخمس · Pailie 3/5',
     enter: 'دخول',
     enterDigital: 'فتح الألعاب',
     statMatches: '{n} مباراة',
@@ -61,7 +61,7 @@ export default {
     },
   },
   header: {
-    title: 'توقعات كأس العالم 2026',
+    title: 'GoalSense',
     beijing: 'بكين',
     usa: 'الساحل الشرقي',
     countdown: 'افتتاح البطولة خلال {time}',
@@ -88,7 +88,7 @@ export default {
   },
   auth: {
     loginTitle: 'GoalSense',
-    loginSubtitle: 'كأس العالم · الدوريات الخمس · تحليل ذكي للنتائج',
+    loginSubtitle: 'الدوريات الخمس · تحليل ذكي للنتائج',
     username: 'اسم المستخدم',
     password: 'كلمة المرور',
     serverSettings: 'إعدادات الخادم',

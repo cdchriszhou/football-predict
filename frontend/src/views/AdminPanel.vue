@@ -793,7 +793,7 @@ async function runBatchPredict() {
   batchPredicting.value = true
   batchResult.value = t('admin.batchPredicting')
   try {
-    await triggerBatchPredict(predictModel.value, 'worldcup-2026')
+    await triggerBatchPredict(predictModel.value, 'premier-league')
     await pollBatchPredict()
   } catch (e) {
     const msg = e.response?.data?.message || e.message || t('messages.unknownError')

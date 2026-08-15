@@ -19,7 +19,7 @@ export function getCrawlerStatus() {
   return api.get('/admin/crawler/status')
 }
 
-export function triggerBatchPredict(model = 'auto', competition = 'worldcup-2026') {
+export function triggerBatchPredict(model = 'auto', competition = 'premier-league') {
   return api.post('/admin/predictions/batch', null, {
     params: { model, competition, background: true },
     timeout: 30000,

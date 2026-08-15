@@ -22,7 +22,7 @@ export default {
   },
   competition: {
     homeTitle: '大会を選択',
-    homeSubtitle: 'ワールドカップ・五大リーグ・配列3/5',
+    homeSubtitle: '五大リーグ・配列3/5',
     enter: '予測へ',
     enterDigital: '遊び方へ',
     statMatches: '{n} 試合',
@@ -61,7 +61,7 @@ export default {
     },
   },
   header: {
-    title: '2026 W杯予測',
+    title: 'GoalSense',
     beijing: '北京',
     usa: '米国東部',
     countdown: '開幕まで {time}',
@@ -88,7 +88,7 @@ export default {
   },
   auth: {
     loginTitle: 'GoalSense',
-    loginSubtitle: 'ワールドカップ · 五大リーグ · AIスコア分析',
+    loginSubtitle: '五大リーグ · AIスコア分析',
     username: 'ユーザー名',
     password: 'パスワード',
     serverSettings: 'サーバー設定',

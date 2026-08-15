@@ -1,7 +1,6 @@
 export const BEIJING_TZ = 'Asia/Shanghai'
 
 export const COMPETITION_TIMEZONES = {
-  'worldcup-2026': { timezone: 'America/New_York', labelKey: 'usa' },
   'premier-league': { timezone: 'Europe/London', labelKey: 'uk' },
   'la-liga': { timezone: 'Europe/Madrid', labelKey: 'spain' },
   'serie-a': { timezone: 'Europe/Rome', labelKey: 'italy' },

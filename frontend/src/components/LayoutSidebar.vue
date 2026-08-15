@@ -81,7 +81,7 @@ const props = defineProps({
 const emit = defineEmits(['close'])
 
 const route = useRoute()
-const slug = computed(() => route.params.slug || compStore.slug || 'worldcup-2026')
+const slug = computed(() => route.params.slug || compStore.slug || 'premier-league')
 const basePath = computed(() => `/competition/${slug.value}`)
 const features = computed(() => compStore.current?.features || compStore.features || {})
 const isDigital = computed(() =>

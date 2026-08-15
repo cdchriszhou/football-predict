@@ -472,7 +472,7 @@ async def delete_invite_code(
 @router.post("/predictions/batch")
 async def trigger_batch_predict(
     model: str = Query("auto"),
-    competition: str = Query("worldcup-2026", description="仅预测该赛事；传 all 表示全部未开始比赛"),
+    competition: str = Query("premier-league", description="仅预测该赛事；传 all 表示全部未开始比赛"),
     background: bool = Query(True, description="后台执行，避免 HTTP 超时"),
     db: AsyncSession = Depends(get_db),
     current_user: str = Depends(get_current_admin_user),

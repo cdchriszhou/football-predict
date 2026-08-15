@@ -1,18 +1,6 @@
 /** Static competition metadata — used when API is unavailable. */
 export const FALLBACK_COMPETITIONS = [
   {
-    slug: 'worldcup-2026',
-    name_key: 'worldcup2026',
-    short_name: '2026世界杯',
-    type: 'international',
-    theme_color: '#1a237e',
-    timezone: 'America/New_York',
-    timezone_label_key: 'usa',
-    opening_date: '2026-06-11T20:00:00Z',
-    closing_date: '2026-07-19T22:00:00Z',
-    stats: { matches: 0, teams: 0, upcoming: 0 },
-  },
-  {
     slug: 'premier-league',
     name_key: 'premierLeague',
     short_name: '英超',

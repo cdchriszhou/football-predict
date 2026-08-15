@@ -38,7 +38,7 @@ def _team_standing_row(t: Team) -> dict:
 
 @router.get("/standings")
 async def get_team_standings(
-    competition: str = Query("worldcup-2026"),
+    competition: str = Query("premier-league"),
     db: AsyncSession = Depends(get_db),
     current_user: str = Depends(get_current_user),
 ):
@@ -70,7 +70,7 @@ async def get_team_standings(
 
 @router.get("/list")
 async def get_teams(
-    competition: str = Query("worldcup-2026", description="赛事 slug"),
+    competition: str = Query("premier-league", description="赛事 slug"),
     sort: str = Query("rank", description="排序字段: rank/attack/defend"),
     order: str = Query("asc", description="排序方向: asc/desc"),
     group_name: str = Query(None, description="小组筛选"),
@@ -117,7 +117,7 @@ async def get_teams(
 
 @router.get("/groups")
 async def get_teams_by_group(
-    competition: str = Query("worldcup-2026"),
+    competition: str = Query("premier-league"),
     db: AsyncSession = Depends(get_db),
     current_user: str = Depends(get_current_user),
 ):

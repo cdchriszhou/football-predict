@@ -22,7 +22,7 @@ export default {
   },
   competition: {
     homeTitle: '選擇賽事',
-    homeSubtitle: '世界盃 · 五大聯賽 · 體彩排列/七星彩',
+    homeSubtitle: '五大聯賽 · 體彩排列/七星彩',
     enter: '進入預測',
     enterDigital: '進入玩法',
     statMatches: '{n} 場比賽',
@@ -61,7 +61,7 @@ export default {
     },
   },
   header: {
-    title: '2026 世界盃預測',
+    title: '足智預測',
     beijing: '北京',
     usa: '美國',
     countdown: '距開幕式 {time}',
@@ -88,7 +88,7 @@ export default {
   },
   auth: {
     loginTitle: '足智預測',
-    loginSubtitle: '世界盃 · 五大聯賽 · AI 比分分析',
+    loginSubtitle: '五大聯賽 · AI 比分分析',
     username: '用戶名',
     password: '密碼',
     serverSettings: '伺服器設定',

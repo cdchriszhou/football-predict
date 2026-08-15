@@ -232,7 +232,7 @@ async def get_predictions_batch(
 
 @router.get("/backtest")
 async def get_score_backtest(
-    competition: str = Query("worldcup-2026"),
+    competition: str = Query("premier-league"),
     db: AsyncSession = Depends(get_db),
     current_user: str = Depends(get_current_user),
 ):
@@ -244,7 +244,7 @@ async def get_score_backtest(
 
 @router.get("/backtest/daily")
 async def get_daily_score_backtest(
-    competition: str = Query("worldcup-2026"),
+    competition: str = Query("premier-league"),
     days: int = Query(14, ge=1, le=90),
     refresh: bool = Query(False, description="跳过缓存强制重算"),
     db: AsyncSession = Depends(get_db),
@@ -258,7 +258,7 @@ async def get_daily_score_backtest(
 
 @router.get("/accuracy/stats")
 async def get_accuracy(
-    competition: str = Query("worldcup-2026"),
+    competition: str = Query("premier-league"),
     days: int = Query(30, ge=1, le=365),
     db: AsyncSession = Depends(get_db),
     current_user: str = Depends(get_current_user),

@@ -136,7 +136,7 @@ async def _knockout_by_no(db: AsyncSession, comp_slug: str) -> dict | None:
 
 @router.get("/list")
 async def get_matches(
-    competition: str = Query("worldcup-2026", description="赛事 slug"),
+    competition: str = Query("premier-league", description="赛事 slug"),
     stage: str = Query(None, description="阶段筛选"),
     status: str = Query(None, description="状态筛选"),
     group_name: str = Query(None, description="小组筛选 A-L"),
@@ -185,7 +185,7 @@ async def get_matches(
 
 @router.get("/knockout-bracket")
 async def get_knockout_bracket(
-    competition: str = Query("worldcup-2026"),
+    competition: str = Query("premier-league"),
     db: AsyncSession = Depends(get_db),
     current_user: str = Depends(get_current_user),
 ):
@@ -232,7 +232,7 @@ async def get_knockout_bracket(
 
 @router.get("/dates")
 async def get_match_dates(
-    competition: str = Query("worldcup-2026"),
+    competition: str = Query("premier-league"),
     db: AsyncSession = Depends(get_db),
     current_user: str = Depends(get_current_user),
 ):
@@ -255,7 +255,7 @@ async def get_match_dates(
 
 @router.get("/stages")
 async def get_match_stages(
-    competition: str = Query("worldcup-2026"),
+    competition: str = Query("premier-league"),
     db: AsyncSession = Depends(get_db),
     current_user: str = Depends(get_current_user),
 ):
@@ -302,7 +302,7 @@ async def _ensure_knockout_display_ready(db: AsyncSession, comp_slug: str) -> No
 
 @router.get("/recent-results")
 async def get_recent_results(
-    competition: str = Query("worldcup-2026"),
+    competition: str = Query("premier-league"),
     hours: int = Query(48, ge=1, le=168),
     limit: int = Query(12, ge=1, le=50),
     db: AsyncSession = Depends(get_db),
@@ -346,7 +346,7 @@ async def get_recent_results(
 
 @router.get("/today")
 async def get_today_matches(
-    competition: str = Query("worldcup-2026"),
+    competition: str = Query("premier-league"),
     db: AsyncSession = Depends(get_db),
     current_user: str = Depends(get_current_user),
 ):
@@ -421,7 +421,7 @@ async def get_today_matches(
 
 @router.get("/upcoming")
 async def get_upcoming_matches(
-    competition: str = Query("worldcup-2026"),
+    competition: str = Query("premier-league"),
     limit: int = Query(10, ge=1, le=50),
     db: AsyncSession = Depends(get_db),
     current_user: str = Depends(get_current_user),

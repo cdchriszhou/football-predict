@@ -1,6 +1,5 @@
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
-from apscheduler.triggers.interval import IntervalTrigger
 from crawler import run_all_crawlers
 from crawler.odds_crawler import run_all_odds_crawlers
 from data.competitions import list_competitions
@@ -49,32 +48,6 @@ async def _crawl_odds():
         except Exception as e:
             await db.rollback()
             logger.error(f"Scheduled odds crawl failed: {e}")
-
-
-async def _sync_live_scores():
-    from service.write_guard import is_heavy_job_running
-    if is_heavy_job_running():
-        return
-    async with async_session() as db:
-        try:
-            from data.match_status import sync_live_scores
-            from service.score_backtest import invalidate_daily_report_cache
-            if IS_SQLITE:
-                async with write_lock:
-                    result = await sync_live_scores(db, "worldcup-2026", network=True)
-                    if int(result.get("updated") or 0):
-                        logger.info(f"Scheduled live score sync: {result}")
-                        await invalidate_daily_report_cache("worldcup-2026")
-                    await _commit_with_retry(db)
-            else:
-                result = await sync_live_scores(db, "worldcup-2026", network=True)
-                if int(result.get("updated") or 0):
-                    logger.info(f"Scheduled live score sync: {result}")
-                    await invalidate_daily_report_cache("worldcup-2026")
-                await commit_session(db)
-        except Exception as e:
-            await db.rollback()
-            logger.error(f"Scheduled live score sync failed: {e}")
 
 
 async def _maintain_matches():
@@ -154,16 +127,8 @@ def start_scheduler():
         name="批量预测（每天8:00/18:00）"
     )
 
-    scheduler.add_job(
-        _sync_live_scores,
-        IntervalTrigger(minutes=1),
-        id="sync_live_scores",
-        replace_existing=True,
-        name="世界杯滚球比分（每分钟）",
-    )
-
     scheduler.start()
-    logger.info("Scheduler started with 5 jobs")
+    logger.info("Scheduler started with 4 jobs")
 
 
 def stop_scheduler():

@@ -31,21 +31,27 @@ async def _background_startup():
             await commit_session(session)
 
     from data.match_status import maintain_competition_matches
-    from crawler.worldcup_score_sync import refresh_fd_cache
+    from data.competitions import list_competitions, DEFAULT_COMPETITION
     from service.prediction_consistency import repair_stale_predictions
     async with write_lock:
         async with async_session() as session:
             try:
-                await refresh_fd_cache()
-                wc = await maintain_competition_matches(session, "worldcup-2026")
-                if any(wc.values()):
-                    logger.info(f"World Cup match maintenance on startup: {wc}")
-                repaired = await repair_stale_predictions(session, "worldcup-2026", upcoming_only=True)
+                for comp in list_competitions():
+                    if comp.get("type") == "digital":
+                        continue
+                    slug = comp["slug"]
+                    try:
+                        result = await maintain_competition_matches(session, slug)
+                        if any(result.values()):
+                            logger.info(f"Match maintenance on startup [{slug}]: {result}")
+                    except Exception as e:
+                        logger.warning(f"Match maintenance on startup failed [{slug}]: {e}")
+                repaired = await repair_stale_predictions(session, DEFAULT_COMPETITION, upcoming_only=True)
                 if repaired:
                     logger.info("Startup prediction consistency repair: %d fixture(s)", repaired)
                 await commit_session(session)
             except Exception as e:
-                logger.warning(f"World Cup match maintenance on startup failed: {e}")
+                logger.warning(f"Match maintenance on startup failed: {e}")
 
     try:
         from sqlalchemy import func, select
@@ -68,7 +74,7 @@ async def _background_startup():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    logger.info("Starting 2026 World Cup Predictor...")
+    logger.info("Starting GoalSense predictor...")
 
     from service.runtime_config import set_auth_credentials
     set_auth_credentials(ADMIN_USERNAME, ADMIN_PASSWORD)
@@ -149,7 +155,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="2026 World Cup Predictor",
+    title="GoalSense Predictor",
     version="1.0.0",
     lifespan=lifespan
 )
@@ -218,7 +224,7 @@ app.include_router(data_router, prefix="/api/v1/data", tags=["数据"])
 
 @app.get("/")
 async def root():
-    return {"name": "2026 World Cup Predictor", "version": "1.0.0", "status": "running"}
+    return {"name": "GoalSense Predictor", "version": "1.0.0", "status": "running"}
 
 
 # ── SPA static files & fallback (production) ───────────────────

@@ -115,7 +115,7 @@ def _has_crs_data(score_odds_raw) -> bool:
 
 async def run_odds_crawler(
     db: AsyncSession,
-    competition_slug: str = "worldcup-2026",
+    competition_slug: str = "premier-league",
     *,
     sporttery_pool: list[dict] | None = None,
 ):

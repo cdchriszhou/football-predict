@@ -1,31 +1,8 @@
-"""Competition registry — World Cup +五大联赛 + 体彩数字彩."""
+"""Competition registry — 五大联赛 + 体彩数字彩."""
 
 from __future__ import annotations
 
 COMPETITIONS: dict[str, dict] = {
-    "worldcup-2026": {
-        "slug": "worldcup-2026",
-        "name_key": "worldcup2026",
-        "short_name": "2026世界杯",
-        "type": "international",
-        "odds_api_sport_key": "soccer_fifa_world_cup",
-        "football_data_code": "WC",
-        "season_year": 2026,
-        "sporttery_league_hints": ["世界", "世界杯", "World Cup", "FIFA", "世预赛", "国际"],
-        "features": {
-            "bracket": True,
-            "tournament": True,
-            "sporttery": True,
-            "groups": True,
-        },
-        "opening_date": "2026-06-11T20:00:00Z",
-        # Final kickoff 03:00 BJT; mark ended after full-time + ET buffer.
-        "closing_date": "2026-07-19T22:00:00Z",
-        "theme_color": "#1a237e",
-        "timezone": "America/New_York",
-        "timezone_label_key": "usa",
-        "order": 0,
-    },
     "premier-league": {
         "slug": "premier-league",
         "name_key": "premierLeague",
@@ -47,7 +24,7 @@ COMPETITIONS: dict[str, dict] = {
         "theme_color": "#38003c",
         "timezone": "Europe/London",
         "timezone_label_key": "uk",
-        "order": 1,
+        "order": 0,
     },
     "la-liga": {
         "slug": "la-liga",
@@ -70,7 +47,7 @@ COMPETITIONS: dict[str, dict] = {
         "theme_color": "#ee8707",
         "timezone": "Europe/Madrid",
         "timezone_label_key": "spain",
-        "order": 2,
+        "order": 1,
     },
     "serie-a": {
         "slug": "serie-a",
@@ -92,7 +69,7 @@ COMPETITIONS: dict[str, dict] = {
         "theme_color": "#008fd7",
         "timezone": "Europe/Rome",
         "timezone_label_key": "italy",
-        "order": 3,
+        "order": 2,
     },
     "bundesliga": {
         "slug": "bundesliga",
@@ -115,7 +92,7 @@ COMPETITIONS: dict[str, dict] = {
         "theme_color": "#d20515",
         "timezone": "Europe/Berlin",
         "timezone_label_key": "germany",
-        "order": 4,
+        "order": 3,
     },
     "ligue-1": {
         "slug": "ligue-1",
@@ -137,7 +114,7 @@ COMPETITIONS: dict[str, dict] = {
         "theme_color": "#091c3e",
         "timezone": "Europe/Paris",
         "timezone_label_key": "france",
-        "order": 5,
+        "order": 4,
     },
     "pailie": {
         "slug": "pailie",
@@ -157,11 +134,11 @@ COMPETITIONS: dict[str, dict] = {
         "theme_color": "#c62828",
         "timezone": "Asia/Shanghai",
         "timezone_label_key": "beijing",
-        "order": 6,
+        "order": 5,
     },
 }
 
-DEFAULT_COMPETITION = "worldcup-2026"
+DEFAULT_COMPETITION = "premier-league"
 
 
 def get_competition(slug: str) -> dict | None:

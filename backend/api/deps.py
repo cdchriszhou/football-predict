@@ -12,7 +12,7 @@ _security = HTTPBearer()
 
 
 async def require_competition_entitlement(
-    competition: str = Query("worldcup-2026"),
+    competition: str = Query("premier-league"),
     credentials: HTTPAuthorizationCredentials = Depends(_security),
     db: AsyncSession = Depends(get_db),
 ) -> str:

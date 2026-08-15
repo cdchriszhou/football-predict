@@ -22,7 +22,7 @@ export default {
   },
   competition: {
     homeTitle: 'Выберите турнир',
-    homeSubtitle: 'ЧМ · топ-5 лиг · Pailie 3/5',
+    homeSubtitle: 'Топ-5 лиг · Pailie 3/5',
     enter: 'Перейти',
     enterDigital: 'Открыть',
     statMatches: '{n} матчей',
@@ -61,7 +61,7 @@ export default {
     },
   },
   header: {
-    title: 'ЧМ-2026 Прогноз',
+    title: 'GoalSense',
     beijing: 'Пекин',
     usa: 'США (вост.)',
     countdown: 'До открытия {time}',
@@ -88,7 +88,7 @@ export default {
   },
   auth: {
     loginTitle: 'GoalSense',
-    loginSubtitle: 'ЧМ · Топ-5 лиг · AI-прогноз счёта',
+    loginSubtitle: 'Топ-5 лиг · AI-прогноз счёта',
     username: 'Имя пользователя',
     password: 'Пароль',
     serverSettings: 'Настройки сервера',

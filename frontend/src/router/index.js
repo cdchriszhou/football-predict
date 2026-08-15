@@ -106,15 +106,16 @@ const routes = [
     component: () => import('../views/AdminPanel.vue'),
     meta: { titleKey: 'route.admin' }
   },
-  // Backward-compatible redirects
-  { path: '/matches', redirect: '/competition/worldcup-2026/matches' },
-  { path: '/matches/:id', redirect: to => `/competition/worldcup-2026/matches/${to.params.id}` },
-  { path: '/sporttery-plan', redirect: '/competition/worldcup-2026/sporttery-plan' },
-  { path: '/teams', redirect: '/competition/worldcup-2026/teams' },
-  { path: '/teams/:id', redirect: to => `/competition/worldcup-2026/teams/${to.params.id}` },
-  { path: '/bracket', redirect: '/competition/worldcup-2026/bracket' },
-  { path: '/tournament', redirect: '/competition/worldcup-2026/tournament' },
-  { path: '/predictions', redirect: '/competition/worldcup-2026/predictions' },
+  // Ended World Cup → home; other legacy paths → Premier League
+  { path: '/competition/worldcup-2026/:pathMatch(.*)*', redirect: '/' },
+  { path: '/matches', redirect: '/competition/premier-league/matches' },
+  { path: '/matches/:id', redirect: to => `/competition/premier-league/matches/${to.params.id}` },
+  { path: '/sporttery-plan', redirect: '/competition/premier-league/sporttery-plan' },
+  { path: '/teams', redirect: '/competition/premier-league/teams' },
+  { path: '/teams/:id', redirect: to => `/competition/premier-league/teams/${to.params.id}` },
+  { path: '/bracket', redirect: '/' },
+  { path: '/tournament', redirect: '/' },
+  { path: '/predictions', redirect: '/competition/premier-league/predictions' },
 ]
 
 const router = createRouter({
@@ -146,6 +147,10 @@ router.beforeEach(async (to, from, next) => {
   }
 
   if (to.path === '/admin' && localStorage.getItem(ADMIN_KEY) !== 'true') {
+    return next('/')
+  }
+
+  if (to.params.slug === 'worldcup-2026') {
     return next('/')
   }
 

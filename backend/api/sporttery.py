@@ -16,7 +16,7 @@ _security = HTTPBearer()
 
 @router.get("/plan/today")
 async def get_today_plan(
-    competition: str = Query("worldcup-2026"),
+    competition: str = Query("premier-league"),
     db: AsyncSession = Depends(get_db),
     current_user: str = Depends(get_current_user),
     credentials: HTTPAuthorizationCredentials = Depends(_security),
