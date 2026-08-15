@@ -73,3 +73,17 @@ export function formatDateTimeInTz(isoString, timeZone = BEIJING_TZ, locale = 'z
     hour12: false,
   }).format(d).replace(/\//g, '-')
 }
+
+/** Short date for competition cards (opening day in Beijing). */
+export function formatOpeningDate(isoString, locale = 'zh-CN') {
+  if (!isoString) return ''
+  const d = new Date(isoString)
+  if (Number.isNaN(d.getTime())) return String(isoString)
+  const fmtLocale = locale === 'zh-TW' ? 'zh-TW' : locale === 'zh-CN' ? 'zh-CN' : 'en-US'
+  return new Intl.DateTimeFormat(fmtLocale, {
+    timeZone: BEIJING_TZ,
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  }).format(d)
+}

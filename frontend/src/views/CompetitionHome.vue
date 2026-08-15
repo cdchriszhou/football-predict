@@ -50,6 +50,7 @@
         class="comp-card"
         :class="{
           'comp-card--ended': item.season_status === 'ended',
+          'comp-card--upcoming': item.season_status === 'upcoming',
           'comp-card--locked': !authStore.canAccessCompetition(item.slug),
         }"
         :style="{ '--accent': item.theme_color || '#1a237e' }"
@@ -58,6 +59,12 @@
         <div class="comp-card-badges">
           <span v-if="item.season_status === 'ended'" class="comp-card-badge comp-card-badge--ended">
             {{ t('competition.statusEnded') }}
+          </span>
+          <span v-else-if="item.season_status === 'upcoming'" class="comp-card-badge comp-card-badge--upcoming">
+            {{ t('competition.statusUpcoming') }}
+          </span>
+          <span v-else-if="item.season_status === 'live' && item.type !== 'digital'" class="comp-card-badge comp-card-badge--live">
+            {{ t('competition.statusLive') }}
           </span>
           <span v-if="item.type === 'international'" class="comp-card-badge comp-card-badge--type">FIFA</span>
           <span v-else-if="item.type === 'digital'" class="comp-card-badge comp-card-badge--type">{{ t('competition.badgeDigital') }}</span>
@@ -74,6 +81,9 @@
         </div>
         <h3>{{ t(`competition.names.${item.name_key}`) }}</h3>
         <p class="comp-short">{{ item.short_name }}</p>
+        <p v-if="item.season_status === 'upcoming' && item.opening_date" class="comp-opens-on">
+          {{ t('competition.opensOn', { date: cardOpeningDate(item) }) }}
+        </p>
         <div class="comp-times">
           <div class="comp-time-row">
             <span class="comp-time-label">{{ t('competition.timeBeijing') }}</span>
@@ -92,6 +102,9 @@
           <template v-if="item.type === 'digital'">
             <span>{{ t('competition.statGames', { n: item.features?.games?.length || 2 }) }}</span>
             <span>{{ t('competition.statDigital') }}</span>
+          </template>
+          <template v-else-if="item.season_status === 'upcoming'">
+            <span>{{ t('competition.statSeasonReady') }}</span>
           </template>
           <template v-else>
             <span>{{ t('competition.statMatches', { n: item.stats?.matches ?? 0 }) }}</span>
@@ -172,7 +185,7 @@ import { useAuthStore } from '@/stores/auth'
 import { changePassword } from '@/api/auth'
 import LanguageSwitcher from '@/components/LanguageSwitcher.vue'
 import {
-  BEIJING_TZ, formatClock, resolveCompetitionTimezone,
+  BEIJING_TZ, formatClock, formatOpeningDate, resolveCompetitionTimezone,
 } from '@/utils/timezone'
 
 const { t, locale } = useI18n()
@@ -226,6 +239,10 @@ function cardLocalTime(item) {
   void clockTick.value
   const { timezone } = resolveCompetitionTimezone(item)
   return formatClock(timezone, locale.value, new Date(clockTick.value))
+}
+
+function cardOpeningDate(item) {
+  return formatOpeningDate(item.opening_date, locale.value)
 }
 
 async function loadCompetitions() {
@@ -388,6 +405,9 @@ onUnmounted(() => {
 .comp-card--ended:hover {
   opacity: 1;
 }
+.comp-card--upcoming {
+  box-shadow: 0 4px 20px rgba(64, 158, 255, 0.12);
+}
 .comp-card--locked {
   opacity: 0.88;
 }
@@ -419,6 +439,14 @@ onUnmounted(() => {
   color: #fff;
   background: #909399;
 }
+.comp-card-badge--upcoming {
+  color: #fff;
+  background: #409eff;
+}
+.comp-card-badge--live {
+  color: #fff;
+  background: #67c23a;
+}
 .comp-card-badge--locked {
   color: #fff;
   background: #e6a23c;
@@ -435,7 +463,13 @@ onUnmounted(() => {
 .comp-short {
   color: #909399;
   font-size: 13px;
+  margin: 0 0 6px;
+}
+.comp-opens-on {
   margin: 0 0 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent);
 }
 .comp-times {
   background: #f5f7fa;

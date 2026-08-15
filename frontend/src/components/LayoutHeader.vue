@@ -193,7 +193,9 @@ const countdownLabel = computed(() => {
   if (countdownMode.value === 'live') return t('header.inProgress')
   if (countdownMode.value === 'ended') return t('header.tournamentEnded')
   if (countdownMode.value === 'countdown') {
-    return t('header.countdown', { time: countdownText.value })
+    const isClub = resolveActiveCompetition(compStore)?.type === 'club'
+    const key = isClub ? 'header.countdownKickoff' : 'header.countdown'
+    return t(key, { time: countdownText.value })
   }
   return ''
 })
