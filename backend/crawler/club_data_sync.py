@@ -71,6 +71,9 @@ async def sync_league_from_football_data(db: AsyncSession, slug: str) -> dict:
     if standings:
         await _prune_teams_not_in_standings(db, slug, standings)
     sched = await _sync_fixtures(db, slug, season_str, comp.get("short_name", slug), matches_raw)
+    from db.sqlite_write import flush_session
+    await flush_session(db)
+
     squads = await _sync_squads(db, slug, max_teams=None)
     removed = await cleanup_orphan_seed_matches(db, slug)
 
@@ -211,7 +214,7 @@ async def _sync_fixtures(
     for row in matches_raw:
         home = resolve_club_cn(fd_id=row.get("home_id"), name_en=row.get("home_name_en"))
         away = resolve_club_cn(fd_id=row.get("away_id"), name_en=row.get("away_name_en"))
-        kickoff = row.get("utc_date")
+        kickoff = row.get("kickoff_beijing") or row.get("utc_date")
         if not home or not away or not kickoff:
             continue
 
