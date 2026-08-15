@@ -66,3 +66,37 @@ def test_league_synthetic_crs_produces_scores():
     )
     assert best and best[0] != "?"
     assert all(":" in s for s in best if s)
+
+
+def test_fuse_ai_and_rule_without_crs_uses_pipeline():
+    """AI votes must still go through score pipeline when bookmaker CRS is missing."""
+    from types import SimpleNamespace
+    from service.prediction_service import _fuse_predictions
+    from service.rule_engine import RulePrediction
+
+    llm = SimpleNamespace(
+        win_rate=68.0, draw_rate=18.0, lose_rate=14.0,
+        best_scores=["2:0", "3:0", "2:1"],
+        handicap_result="胜", total_goals="大",
+        reason="主队实力明显占优，看好2:0或3:0",
+        model_used="deepseek-test", confidence=0.72,
+    )
+    rule = RulePrediction(
+        win_rate=70.0, draw_rate=15.0, lose_rate=15.0,
+        best_scores=["2:0", "3:0", "1:0"],
+        upset_score="0:1",
+        handicap_result="胜", total_goals="大",
+        expected_a=2.2, expected_b=0.6,
+    )
+    fused = _fuse_predictions(
+        [llm], rule, odds_dict=None, score_odds=None,
+        team_a={"name": "阿森纳", "rank": 1},
+        team_b={"name": "考文垂", "rank": 19},
+        stage="第1轮",
+        group_context={"stage": "第1轮", "home_side": "a", "matchday": 1},
+    )
+    assert fused["best_scores"]
+    assert fused["best_scores"][0] != "?"
+    assert ":" in fused["best_scores"][0]
+    assert fused["win_rate"] + fused["draw_rate"] + fused["lose_rate"] == 100
+    assert "DeepSeek" in fused["model_used"] or "deepseek" in fused["model_used"].lower()

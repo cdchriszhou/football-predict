@@ -159,6 +159,42 @@ class BaseLLMClient(ABC):
         lines.append("")
         return "\n".join(lines)
 
+    @staticmethod
+    def _format_match_context_section(input: PredictionInput) -> str:
+        """League home advantage / knockout notes for the LLM (beyond WC group tables)."""
+        ctx = input.group_context or {}
+        stage = (ctx.get("stage") or "").strip()
+        a = (input.team_a or {}).get("name", "主队")
+        b = (input.team_b or {}).get("name", "客队")
+        lines: list[str] = []
+
+        is_league = (stage.startswith("第") and stage.endswith("轮")) or stage == "联赛"
+        if is_league:
+            lines.append(f"【赛事】俱乐部联赛 · {stage or '联赛轮次'}（主客场双循环，非淘汰赛）")
+            lines.append("【排名说明】下列“排名”为联赛实力档/积分档参考，不是 FIFA 国家队排名。")
+            if ctx.get("home_side") == "a":
+                lines.append(
+                    f"【主场】{a} 主场作战 vs 客队 {b}。"
+                    "联赛主场优势明确：主胜概率通常 +4~+8%，主队预期进球可略上调；"
+                    "比分应优先考虑主队不败或小胜（如 1:0/2:0/2:1），除非实力差距极大。"
+                )
+            elif ctx.get("home_side") == "b":
+                lines.append(
+                    f"【主场】{b} 主场作战（对阵列表中 {b} 为客队位，请按主客场解读盘口）。"
+                )
+            else:
+                lines.append("【主场】本场主客场信息未标明，勿过度假设主场加成。")
+            lines.append(
+                "【联赛比分习惯】强弱分明时常见 2:0/3:0/2:1；势均力敌时 1:1/1:0/2:1 更常见；"
+                "避免无依据的 4:3 类极端比分。"
+            )
+        elif stage and stage not in ("小组赛",):
+            lines.append(f"【赛事阶段】{stage}")
+
+        if not lines:
+            return ""
+        return "\n".join(lines) + "\n\n"
+
     def build_prompt(self, input: PredictionInput) -> str:
         a = input.team_a
         b = input.team_b
@@ -183,17 +219,25 @@ class BaseLLMClient(ABC):
                 a.get("name", ""),
                 b.get("name", ""),
             )
+            if group_section and not group_section.endswith("\n"):
+                group_section += "\n"
 
-        return f"""你是专业世界杯足球预测分析师。请综合以下多维数据，结合博彩市场信号，进行科学严谨的比赛预测。
+        match_ctx_section = self._format_match_context_section(input)
+        stage = ((input.group_context or {}).get("stage") or "").strip()
+        is_league = (stage.startswith("第") and stage.endswith("轮")) or stage == "联赛"
+        role = "五大联赛" if is_league else "国际足球赛事"
+        rank_label = "实力档" if is_league else "FIFA排名"
 
-【对阵】{a['name']} vs {b['name']}
+        return f"""你是专业{role}足球预测分析师。请综合以下多维数据，结合博彩市场信号与规则模型提示，进行科学严谨的比赛预测，并给出相对合理的常规时间比分。
 
-【{a['name']}】FIFA排名{a.get('rank','?')}
+{match_ctx_section}【对阵】{a['name']} vs {b['name']}
+
+【{a['name']}】{rank_label}{a.get('rank','?')}
   进攻{a.get('attack','?')}(射门/射正能力) | 防守{a.get('defend','?')}(拦截/解围) | 中场{a.get('midfield','?')}(传球组织)
   速度{a.get('speed','?')}(反击效率) | 身体{a.get('physical','?')}(对抗/争顶) | 战术{a.get('tactic','?')}(阵型纪律)
   核心球员: {players_a_str}
 
-【{b['name']}】FIFA排名{b.get('rank','?')}
+【{b['name']}】{rank_label}{b.get('rank','?')}
   进攻{b.get('attack','?')}(射门/射正能力) | 防守{b.get('defend','?')}(拦截/解围) | 中场{b.get('midfield','?')}(传球组织)
   速度{b.get('speed','?')}(反击效率) | 身体{b.get('physical','?')}(对抗/争顶) | 战术{b.get('tactic','?')}(阵型纪律)
   核心球员: {players_b_str}
@@ -201,33 +245,34 @@ class BaseLLMClient(ABC):
 {group_section}{odds_section}
 【历史交锋】{input.h2h if input.h2h else '无'}
 
-预测要求（五维分析法 + 博彩市场信号）：
-1. 分析维度：排名差距→攻防实力对比→中场控制力→速度/身体对抗→战术风格克制→核心球员状态→博彩市场信号验证
-2. 博彩市场权重（30-35%）：赔率汇集了全球资金和信息，是重要的预测信号——
+预测要求（五维分析法 + 博彩市场信号 + 比分合理性）：
+1. 分析维度：排名/实力差距→攻防实力对比→中场控制力→速度/身体对抗→战术风格克制→核心球员状态→主场因素→博彩市场信号验证
+2. 博彩市场权重（有盘口时 30-35%）：赔率汇集了全球资金和信息——
    a) 欧赔隐含概率是最直接的胜负预测，应作为基准参考
    b) 平赔<3.5时博彩公司在防范平局，应显著提高平局概率（+5~+12%）
    c) 亚盘深度反映市场对净胜球的预期，深盘(≥1.5)意味着强队大概率大胜
    d) 大小球盘口偏高(≥3.0)→进球大战；偏低(≤2.0)→防守为主低比分
    e) 比分赔率最低的选项是市场共识结果，你的比分预测应与此交叉验证
+   f) 若暂无盘口，则更依赖实力差、主场与预期进球，confidence 应略降
 3. win_rate+draw_rate+lose_rate 必须精确等于100
 4. best_scores 是长度为3的数组，按概率从高到低排列，列出最可能打出的3个比分——
-   a) 全部为常规时间（90分钟）比分，不含加时赛及点球大战进球（与体彩CRS结算一致）
-   b) 参考市场比分赔率（赔率最低的3个比分）、预期进球模型、亚盘盘口深度
-   c) 每个比分必须真实可行，单场最大分差不超过5球
+   a) 全部为常规时间（90分钟）比分，不含加时赛及点球大战进球
+   b) 参考市场比分赔率（若有）、预期进球模型、亚盘盘口深度与主场因素
+   c) 每个比分必须真实可行，单场最大分差不超过5球；强弱分明时主推 2:0/3:0/2:1，接近时主推 1:1/1:0/2:1
    d) 如果市场数据指向小球（大小球≤2），不要预测大比分
    e) 如果市场数据指向大球（大小球≥3），不要只预测小球
-5. handicap_result 根据让球盘口和目标分差给出"胜/平/负"（让球后的结果）
-6. total_goals 参考大小球盘口给出"大/小"
-7. confidence 反映预测把握度(0.45-0.85)：深盘一边倒、模型与市场一致时可到 0.75+；胶着战、冷门风险、小组赛第二轮抢分局应明显降低，勿一律给 0.85
+   f) 三个比分应覆盖主结果方向，避免三个比分胜平负互相矛盾
+5. handicap_result 根据让球盘口和目标分差给出"胜/平/负"（让球后的结果；无盘口时可按净胜球直觉给出）
+6. total_goals 参考大小球盘口给出"大/小"（无盘口时按预期总进球≈2.5 判断）
+7. confidence 反映预测把握度(0.45-0.85)：深盘一边倒、模型与市场一致时可到 0.75+；胶着战、冷门风险、无盘口时应明显降低
 8. 【淘汰赛特殊考量】如果本场为淘汰赛（1/8、1/4、半决赛、决赛、季军赛）：
-   a) 预测比分仅指常规时间90分钟，体彩CRS不含加时进球
+   a) 预测比分仅指常规时间90分钟
    b) 常规时间打平将进入加时赛，球队战术可能更保守
    c) 弱队倾向防守反击；强队则需在90分钟内解决战斗
    d) 淘汰赛常规时间平局率约30-40%，显著高于小组赛的22-28%
    e) 亚盘让球方若让球偏浅（如强队仅-0.5），需警惕常规时间打平风险
    f) 大小球盘口若偏低（≤2.25），优先考虑1:0/0:0/1:1类小比分
-   g) 半全场数据若与CRS方向不一致，降低极端比分权重
-9. reason 用中文写150字内，按【排名/实力→战术克制→核心球员→盘口信号验证】结构撰写，必须引用具体赔率数字和3个预测比分
+9. reason 用中文写150字内，按【实力/主场→战术→球员→盘口或模型交叉验证】结构撰写，必须点名 3 个预测比分
 
 严格按JSON格式输出，不要任何多余文字：
 {{"win_rate": 数字, "draw_rate": 数字, "lose_rate": 数字, "best_scores": ["X:Y", "X:Y", "X:Y"], "handicap_result": "胜/平/负", "total_goals": "大/小", "reason": "分析理由150字内", "confidence": 0.45-0.85}}

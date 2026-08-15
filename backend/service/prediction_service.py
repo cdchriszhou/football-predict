@@ -137,6 +137,66 @@ def _append_calibrated_score_note(
     return f"{reason} | {note}" if reason else note
 
 
+def _goal_diff(score: str) -> int:
+    try:
+        a, b = score.split(":")
+        return abs(int(a) - int(b))
+    except (ValueError, AttributeError):
+        return 0
+
+
+def _merge_ai_score_hints(
+    best_scores: list[str] | None,
+    model_hint: list[str] | None,
+    *,
+    win_rate: float,
+    draw_rate: float,
+    lose_rate: float,
+    has_book_crs: bool,
+) -> list[str]:
+    """When bookmaker CRS is missing, keep pipeline primary but soften extreme seconds with AI consensus."""
+    picks = [s for s in (best_scores or []) if s and s != "?"]
+    hints = [s for s in (model_hint or []) if s and s != "?"]
+    if has_book_crs or not hints:
+        return picks[:2] if picks else hints[:2]
+
+    fav = dominant_wdl_outcome(win_rate, draw_rate, lose_rate)
+    aligned_hints = [s for s in hints if _score_outcome(s) == fav] or hints
+
+    if not picks:
+        return aligned_hints[:2]
+
+    primary = picks[0]
+    # Prefer AI primary if same WDL direction and milder / equal margin
+    ai_primary = aligned_hints[0]
+    if (
+        ai_primary != primary
+        and _score_outcome(ai_primary) == _score_outcome(primary)
+        and _goal_diff(ai_primary) <= max(2, _goal_diff(primary))
+    ):
+        # Keep pipeline primary if already reasonable (diff<=2); else adopt AI
+        if _goal_diff(primary) >= 3 and _goal_diff(ai_primary) <= 2:
+            primary = ai_primary
+
+    secondary_candidates = []
+    for s in aligned_hints + picks[1:]:
+        if s != primary and s not in secondary_candidates:
+            secondary_candidates.append(s)
+    # Avoid absurd second pick (e.g. 3:0) when AI prefers closer score
+    secondary = None
+    for s in secondary_candidates:
+        if _goal_diff(s) <= 2 or not any(_goal_diff(h) <= 2 for h in aligned_hints):
+            secondary = s
+            break
+    if secondary is None and secondary_candidates:
+        secondary = secondary_candidates[0]
+
+    out = [primary]
+    if secondary:
+        out.append(secondary)
+    return out[:2]
+
+
 def _fuse_predictions(llm_results: list, rule_result, odds_dict: dict = None,
                       context_alerts: list = None, confidence_penalty: float = 0.0,
                       score_odds: dict | None = None,
@@ -225,31 +285,39 @@ def _fuse_predictions(llm_results: list, rule_result, odds_dict: dict = None,
     pick_warnings: list[str] = []
     upset_score: str | None = None
 
-    if score_odds:
-        best_scores, upset_score, _, pick_warnings = run_full_score_pipeline(
-            score_odds,
-            win_rate=win_rate,
-            draw_rate=draw_rate,
-            lose_rate=lose_rate,
-            expected_a=rule_result.expected_a,
-            expected_b=rule_result.expected_b,
-            model_scores=model_hint,
-            stage=stage,
-            sp_win=(odds_dict or {}).get("win_win"),
-            sp_lose=(odds_dict or {}).get("win_lose"),
-            sp_draw=(odds_dict or {}).get("draw"),
-            handicap=(odds_dict or {}).get("handicap"),
-            rank_a=(team_a or {}).get("rank"),
-            rank_b=(team_b or {}).get("rank"),
-            group_context=group_context,
-            odds_dict=odds_dict,
-            rule_result=rule_result,
-            team_a=team_a,
-            team_b=team_b,
-            skip_wdl_resilience=True,
-        )
-    else:
-        best_scores = RuleEngine.pick_likely_scores(score_votes, max_count=2)
+    # Always finalize via score pipeline so AI votes + rule xG share one calibrated path.
+    # Empty bookmaker CRS → league/group synthetic Poisson CRS inside the pipeline.
+    best_scores, upset_score, _, pick_warnings = run_full_score_pipeline(
+        score_odds or {},
+        win_rate=win_rate,
+        draw_rate=draw_rate,
+        lose_rate=lose_rate,
+        expected_a=rule_result.expected_a,
+        expected_b=rule_result.expected_b,
+        model_scores=model_hint,
+        stage=stage,
+        sp_win=(odds_dict or {}).get("win_win"),
+        sp_lose=(odds_dict or {}).get("win_lose"),
+        sp_draw=(odds_dict or {}).get("draw"),
+        handicap=(odds_dict or {}).get("handicap"),
+        rank_a=(team_a or {}).get("rank"),
+        rank_b=(team_b or {}).get("rank"),
+        group_context=group_context,
+        odds_dict=odds_dict,
+        rule_result=rule_result,
+        team_a=team_a,
+        team_b=team_b,
+        skip_wdl_resilience=True,
+    )
+    best_scores = _merge_ai_score_hints(
+        best_scores,
+        model_hint,
+        win_rate=win_rate,
+        draw_rate=draw_rate,
+        lose_rate=lose_rate,
+        has_book_crs=bool(score_odds),
+    )
+    if not upset_score:
         upset_score = (
             rule_result.upset_score
             if rule_result.upset_score and rule_result.upset_score != "?"
@@ -732,7 +800,7 @@ class PredictionService:
             else:
                 from service.score_pick import prepare_pipeline_crs_and_hints
 
-                score_odds, ko_hints, ko_upset = prepare_pipeline_crs_and_hints(
+                synth_crs, score_hints, synth_upset = prepare_pipeline_crs_and_hints(
                     None,
                     expected_a=rule_result.expected_a,
                     expected_b=rule_result.expected_b,
@@ -747,15 +815,15 @@ class PredictionService:
                     sp_draw=(market_odds or {}).get("draw"),
                     sp_lose=(market_odds or {}).get("win_lose"),
                 )
-                if score_odds and match.stage not in ("", "小组赛"):
+                if synth_crs:
                     scores, upset, _, pick_warnings = run_full_score_pipeline(
-                        score_odds,
+                        synth_crs,
                         win_rate=rule_result.win_rate,
                         draw_rate=rule_result.draw_rate,
                         lose_rate=rule_result.lose_rate,
                         expected_a=rule_result.expected_a,
                         expected_b=rule_result.expected_b,
-                        model_scores=ko_hints,
+                        model_scores=score_hints or rule_result.best_scores,
                         stage=match.stage,
                         handicap=score_ctx.get("handicap"),
                         rank_a=(team_a_dict or {}).get("rank"),
@@ -768,8 +836,8 @@ class PredictionService:
                         skip_wdl_resilience=True,
                     )
                 else:
-                    scores = ko_hints
-                    upset = ko_upset
+                    scores = score_hints or (rule_result.best_scores or ["?"])[:2]
+                    upset = synth_upset
                     pick_warnings = []
                 if not upset:
                     upset = rule_result.upset_score if rule_result.upset_score != "?" else None
