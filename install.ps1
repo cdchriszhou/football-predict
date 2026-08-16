@@ -7,13 +7,7 @@
 
 $ErrorActionPreference = "Stop"
 
-try {
-    $utf8 = New-Object System.Text.UTF8Encoding $false
-    [Console]::InputEncoding = $utf8
-    [Console]::OutputEncoding = $utf8
-    $OutputEncoding = $utf8
-    chcp 65001 | Out-Null
-} catch {}
+# Keep host console code page. Messages below are ASCII-only.
 
 $Dir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $BackendDir = Join-Path $Dir "backend"

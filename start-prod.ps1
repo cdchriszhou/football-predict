@@ -7,14 +7,8 @@
 
 $ErrorActionPreference = "Stop"
 
-# Console UTF-8 so Chinese Windows cmd does not mojibake script / pause text
-try {
-    $utf8 = New-Object System.Text.UTF8Encoding $false
-    [Console]::InputEncoding = $utf8
-    [Console]::OutputEncoding = $utf8
-    $OutputEncoding = $utf8
-    chcp 65001 | Out-Null
-} catch {}
+# Keep host console code page. Messages below are ASCII-only so CP936/UTF-8 both OK.
+# Do not force chcp 65001 here - it often garbles host locale console text.
 
 $Dir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $BackendDir = Join-Path $Dir "backend"
@@ -217,7 +211,7 @@ for ($i = 1; $i -le 45; $i++) {
 if (-not $healthy) {
     Write-Err "Backend failed health check after ~90s - last 30 lines of backend.log:"
     if (Test-Path -LiteralPath $backendLog) {
-        Get-Content -LiteralPath $backendLog -Tail 30
+        Get-Content -LiteralPath $backendLog -Tail 30 -Encoding UTF8
     }
     Write-Err "Check .env (ADMIN_PASSWORD, JWT_SECRET) or see backend.log"
     exit 1
