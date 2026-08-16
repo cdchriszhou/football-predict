@@ -104,6 +104,8 @@ echo [OK] Frontend staged
 :: ---- 5. Copy scripts ----------------------------------
 
 copy /y "%DIR%\install.sh"       "%STAGE%\install.sh"       >nul
+copy /y "%DIR%\install.bat"      "%STAGE%\install.bat"      >nul
+copy /y "%DIR%\install.ps1"      "%STAGE%\install.ps1"      >nul
 copy /y "%DIR%\start-prod.sh"    "%STAGE%\start-prod.sh"    >nul
 copy /y "%DIR%\stop-prod.sh"     "%STAGE%\stop-prod.sh"     >nul
 copy /y "%DIR%\start-prod.bat"   "%STAGE%\start-prod.bat"   >nul
@@ -123,7 +125,7 @@ if exist "%DIR%\.env.example" (
     copy /y "%DIR%\.env.example" "%STAGE%\.env.example" >nul
 )
 
-for %%S in (start-prod.sh stop-prod.sh start-prod.bat stop-prod.bat start-prod.ps1 stop-prod.ps1) do (
+for %%S in (install.sh install.bat install.ps1 start-prod.sh stop-prod.sh start-prod.bat stop-prod.bat start-prod.ps1 stop-prod.ps1) do (
     if not exist "%STAGE%\%%S" (
         echo [ERROR] Staged package missing %%S
         exit /b 1
@@ -182,7 +184,9 @@ echo   Package: %ZIP_NAME% (!SIZE_MB! MB)
 echo.
 echo   Deploy:
 echo     Linux:   upload to /mnt/ then  cd /mnt ^&^& ./update.sh
-echo     Windows: unzip, copy .env.example to .env, then:
+echo     Windows: unzip, then:
+echo              install.bat
+echo              edit .env  (ADMIN_PASSWORD / JWT_SECRET)
 echo              start-prod.bat
 echo              stop-prod.bat
 echo.

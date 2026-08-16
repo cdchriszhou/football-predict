@@ -95,6 +95,8 @@ log "Frontend staged"
 # ── 5. Copy scripts & config ─────────────────────────────
 
 cp "$DIR/install.sh"       "$STAGE/install.sh"
+cp "$DIR/install.bat"      "$STAGE/install.bat"
+cp "$DIR/install.ps1"      "$STAGE/install.ps1"
 cp "$DIR/start-prod.sh"    "$STAGE/start-prod.sh"
 cp "$DIR/stop-prod.sh"     "$STAGE/stop-prod.sh"
 cp "$DIR/start-prod.bat"   "$STAGE/start-prod.bat"
@@ -116,7 +118,7 @@ for f in "$STAGE"/*.sh "$STAGE"/lib/*.sh; do
 done
 
 # CRLF, UTF-8 without BOM for Windows scripts (BOM breaks cmd .bat; ASCII-safe messages)
-WIN_SCRIPTS=("$STAGE/start-prod.bat" "$STAGE/stop-prod.bat" "$STAGE/start-prod.ps1" "$STAGE/stop-prod.ps1")
+WIN_SCRIPTS=("$STAGE/install.bat" "$STAGE/install.ps1" "$STAGE/start-prod.bat" "$STAGE/stop-prod.bat" "$STAGE/start-prod.ps1" "$STAGE/stop-prod.ps1")
 if python3 -c "
 from pathlib import Path
 import sys
@@ -136,7 +138,7 @@ else
     echo "[WARN] Could not convert Windows scripts to CRLF"
 fi
 
-for req in start-prod.sh stop-prod.sh start-prod.bat stop-prod.bat start-prod.ps1 stop-prod.ps1; do
+for req in install.sh install.bat install.ps1 start-prod.sh stop-prod.sh start-prod.bat stop-prod.bat start-prod.ps1 stop-prod.ps1; do
     [ -f "$STAGE/$req" ] || err "Staged package missing $req"
 done
 
@@ -173,6 +175,9 @@ for need in \
     "worldcup-predict/backend/service/" \
     "worldcup-predict/backend/alembic/" \
     "worldcup-predict/backend/main.py" \
+    "worldcup-predict/install.sh" \
+    "worldcup-predict/install.bat" \
+    "worldcup-predict/install.ps1" \
     "worldcup-predict/start-prod.sh" \
     "worldcup-predict/stop-prod.sh" \
     "worldcup-predict/start-prod.bat" \
@@ -208,8 +213,8 @@ echo ""
 echo "  Deploy:"
 echo "    Linux:   unzip, then ./install.sh (first time) && ./start-prod.sh"
 echo "             stop: ./stop-prod.sh"
-echo "    Windows: unzip, copy .env.example to .env, then start-prod.bat"
-echo "             stop: stop-prod.bat"
+echo "    Windows: unzip, then install.bat (first time)"
+echo "             edit .env, then start-prod.bat / stop-prod.bat"
 echo ""
 echo "  Services (recommended: open :4173, login server URL empty):"
 echo "    Frontend: http://<ip>:4173  (/api proxied to backend)"
