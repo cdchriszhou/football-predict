@@ -3,6 +3,10 @@
 build.bat text eol=crlf
 start.bat text eol=crlf
 stop.bat text eol=crlf
+start-prod.bat text eol=crlf
+stop-prod.bat text eol=crlf
+start-prod.ps1 text eol=crlf
+stop-prod.ps1 text eol=crlf
 
 # Shell scripts must use LF on Linux servers
 *.sh text eol=lf

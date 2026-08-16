@@ -1,6 +1,7 @@
 #!/bin/bash
 # ============================================================
 #  2026 World Cup Predictor — Production Stopper
+#  Windows: stop-prod.bat
 # ============================================================
 
 DIR="$(cd "$(dirname "$0")" && pwd)"

@@ -22,7 +22,13 @@ try {
     $needExact = @(
         "worldcup-predict/backend/db/__init__.py",
         "worldcup-predict/backend/alembic/env.py",
-        "worldcup-predict/backend/main.py"
+        "worldcup-predict/backend/main.py",
+        "worldcup-predict/start-prod.sh",
+        "worldcup-predict/stop-prod.sh",
+        "worldcup-predict/start-prod.bat",
+        "worldcup-predict/stop-prod.bat",
+        "worldcup-predict/start-prod.ps1",
+        "worldcup-predict/stop-prod.ps1"
     )
     foreach ($n in $needExact) {
         if ($names -notcontains $n) {

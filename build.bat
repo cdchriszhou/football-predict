@@ -106,6 +106,10 @@ echo [OK] Frontend staged
 copy /y "%DIR%\install.sh"       "%STAGE%\install.sh"       >nul
 copy /y "%DIR%\start-prod.sh"    "%STAGE%\start-prod.sh"    >nul
 copy /y "%DIR%\stop-prod.sh"     "%STAGE%\stop-prod.sh"     >nul
+copy /y "%DIR%\start-prod.bat"   "%STAGE%\start-prod.bat"   >nul
+copy /y "%DIR%\stop-prod.bat"    "%STAGE%\stop-prod.bat"    >nul
+copy /y "%DIR%\start-prod.ps1"   "%STAGE%\start-prod.ps1"   >nul
+copy /y "%DIR%\stop-prod.ps1"    "%STAGE%\stop-prod.ps1"    >nul
 copy /y "%DIR%\update.sh"        "%STAGE%\update.sh"        >nul
 copy /y "%DIR%\lib\ensure-venv.sh"  "%STAGE%\lib\ensure-venv.sh"  >nul
 copy /y "%DIR%\lib\merge-env.sh"    "%STAGE%\lib\merge-env.sh"    >nul
@@ -113,9 +117,17 @@ copy /y "%DIR%\lib\health-check.sh" "%STAGE%\lib\health-check.sh" >nul
 copy /y "%DIR%\lib\fix-crlf.sh"       "%STAGE%\lib\fix-crlf.sh"       >nul
 copy /y "%DIR%\lib\reset-admin.sh"    "%STAGE%\lib\reset-admin.sh"    >nul
 powershell -NoProfile -Command "Get-ChildItem -Path '%STAGE%' -Recurse -Filter '*.sh' | ForEach-Object { $c = [IO.File]::ReadAllText($_.FullName) -replace \"`r`n\", \"`n\" -replace \"`r\", \"\"; [IO.File]::WriteAllText($_.FullName, $c) }"
+powershell -NoProfile -Command "Get-ChildItem -Path '%STAGE%' -File | Where-Object { $_.Extension -match '\.(bat|ps1)$' } | ForEach-Object { $c = [IO.File]::ReadAllText($_.FullName) -replace \"`r`n\", \"`n\" -replace \"`r\", \"`n\"; $c = $c -replace \"`n\", \"`r`n\"; [IO.File]::WriteAllText($_.FullName, $c) }"
 
 if exist "%DIR%\.env.example" (
     copy /y "%DIR%\.env.example" "%STAGE%\.env.example" >nul
+)
+
+for %%S in (start-prod.sh stop-prod.sh start-prod.bat stop-prod.bat start-prod.ps1 stop-prod.ps1) do (
+    if not exist "%STAGE%\%%S" (
+        echo [ERROR] Staged package missing %%S
+        exit /b 1
+    )
 )
 
 echo [OK] Scripts staged
@@ -168,9 +180,11 @@ echo ==============================================
 echo   Build complete!
 echo   Package: %ZIP_NAME% (!SIZE_MB! MB)
 echo.
-echo   Deploy to server:
-echo     1. Upload %ZIP_NAME% to server /mnt/
-echo     2. cd /mnt ^&^& ./update.sh
+echo   Deploy:
+echo     Linux:   upload to /mnt/ then  cd /mnt ^&^& ./update.sh
+echo     Windows: unzip, copy .env.example to .env, then:
+echo              start-prod.bat
+echo              stop-prod.bat
 echo.
 echo   Services (use :4173 in browser, leave login server URL empty):
 echo     Frontend: http://^<ip^>:4173

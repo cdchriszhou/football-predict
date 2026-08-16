@@ -97,6 +97,10 @@ log "Frontend staged"
 cp "$DIR/install.sh"       "$STAGE/install.sh"
 cp "$DIR/start-prod.sh"    "$STAGE/start-prod.sh"
 cp "$DIR/stop-prod.sh"     "$STAGE/stop-prod.sh"
+cp "$DIR/start-prod.bat"   "$STAGE/start-prod.bat"
+cp "$DIR/stop-prod.bat"    "$STAGE/stop-prod.bat"
+cp "$DIR/start-prod.ps1"   "$STAGE/start-prod.ps1"
+cp "$DIR/stop-prod.ps1"    "$STAGE/stop-prod.ps1"
 cp "$DIR/update.sh"        "$STAGE/update.sh"
 mkdir -p "$STAGE/lib"
 cp "$DIR/lib/ensure-venv.sh" "$STAGE/lib/ensure-venv.sh"
@@ -109,6 +113,28 @@ chmod +x "$STAGE/lib/"*.sh 2>/dev/null || true
 # LF line endings for Linux (Git Bash / WSL build on Windows)
 for f in "$STAGE"/*.sh "$STAGE"/lib/*.sh; do
     [ -f "$f" ] && sed -i 's/\r$//' "$f" 2>/dev/null || perl -pi -e 's/\r\n/\n/g' "$f" 2>/dev/null || true
+done
+
+# CRLF for Windows cmd/PowerShell scripts (cmd.exe breaks on LF-only .bat)
+WIN_SCRIPTS=("$STAGE/start-prod.bat" "$STAGE/stop-prod.bat" "$STAGE/start-prod.ps1" "$STAGE/stop-prod.ps1")
+if python3 -c "
+from pathlib import Path
+import sys
+for p in sys.argv[1:]:
+    path = Path(p)
+    if path.is_file():
+        data = path.read_bytes().replace(b'\r\n', b'\n').replace(b'\r', b'\n')
+        path.write_bytes(data.replace(b'\n', b'\r\n'))
+" "${WIN_SCRIPTS[@]}"; then
+    :
+elif command -v perl >/dev/null 2>&1; then
+    perl -0777 -i -pe 's/\r\n/\n/g; s/\r/\n/g; s/\n/\r\n/g' "${WIN_SCRIPTS[@]}"
+else
+    echo "[WARN] Could not convert Windows scripts to CRLF"
+fi
+
+for req in start-prod.sh stop-prod.sh start-prod.bat stop-prod.bat start-prod.ps1 stop-prod.ps1; do
+    [ -f "$STAGE/$req" ] || err "Staged package missing $req"
 done
 
 if [ -f "$DIR/.env.example" ]; then
@@ -143,7 +169,13 @@ for need in \
     "worldcup-predict/backend/api/" \
     "worldcup-predict/backend/service/" \
     "worldcup-predict/backend/alembic/" \
-    "worldcup-predict/backend/main.py"
+    "worldcup-predict/backend/main.py" \
+    "worldcup-predict/start-prod.sh" \
+    "worldcup-predict/stop-prod.sh" \
+    "worldcup-predict/start-prod.bat" \
+    "worldcup-predict/stop-prod.bat" \
+    "worldcup-predict/start-prod.ps1" \
+    "worldcup-predict/stop-prod.ps1"
 do
     if ! echo "$ZIP_CHECK" | grep -qF "$need"; then
         rm -f "$DIR/$ZIP_NAME"
@@ -170,12 +202,11 @@ echo "  Build complete!"
 echo ""
 echo "  Package: $ZIP_NAME ($SIZE)"
 echo ""
-echo "  Deploy to server:"
-echo "    1. Upload $ZIP_NAME to server"
-echo "    2. unzip $ZIP_NAME"
-echo "    3. cd worldcup-predict"
-echo "    4. ./install.sh      (first time only)"
-echo "    5. ./start-prod.sh"
+echo "  Deploy:"
+echo "    Linux:   unzip, then ./install.sh (first time) && ./start-prod.sh"
+echo "             stop: ./stop-prod.sh"
+echo "    Windows: unzip, copy .env.example to .env, then start-prod.bat"
+echo "             stop: stop-prod.bat"
 echo ""
 echo "  Services (recommended: open :4173, login server URL empty):"
 echo "    Frontend: http://<ip>:4173  (/api proxied to backend)"

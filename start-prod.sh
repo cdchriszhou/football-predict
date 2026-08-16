@@ -3,6 +3,7 @@
 #  2026 World Cup Predictor — Production Launcher
 #  Serves built frontend (dist/) + backend API
 #  Run "npm run build" in frontend/ first, then deploy dist/
+#  Windows: start-prod.bat / stop-prod.bat
 # ============================================================
 
 set -e
