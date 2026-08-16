@@ -115,20 +115,23 @@ for f in "$STAGE"/*.sh "$STAGE"/lib/*.sh; do
     [ -f "$f" ] && sed -i 's/\r$//' "$f" 2>/dev/null || perl -pi -e 's/\r\n/\n/g' "$f" 2>/dev/null || true
 done
 
-# CRLF for Windows cmd/PowerShell scripts (cmd.exe breaks on LF-only .bat)
+# CRLF, UTF-8 without BOM for Windows scripts (BOM breaks cmd .bat; ASCII-safe messages)
 WIN_SCRIPTS=("$STAGE/start-prod.bat" "$STAGE/stop-prod.bat" "$STAGE/start-prod.ps1" "$STAGE/stop-prod.ps1")
 if python3 -c "
 from pathlib import Path
 import sys
+bom = bytes([0xEF, 0xBB, 0xBF])
 for p in sys.argv[1:]:
     path = Path(p)
-    if path.is_file():
-        data = path.read_bytes().replace(b'\r\n', b'\n').replace(b'\r', b'\n')
-        path.write_bytes(data.replace(b'\n', b'\r\n'))
+    if not path.is_file():
+        continue
+    data = path.read_bytes()
+    if data.startswith(bom):
+        data = data[3:]
+    data = data.replace(b'\r\n', b'\n').replace(b'\r', b'\n').replace(b'\n', b'\r\n')
+    path.write_bytes(data)
 " "${WIN_SCRIPTS[@]}"; then
     :
-elif command -v perl >/dev/null 2>&1; then
-    perl -0777 -i -pe 's/\r\n/\n/g; s/\r/\n/g; s/\n/\r\n/g' "${WIN_SCRIPTS[@]}"
 else
     echo "[WARN] Could not convert Windows scripts to CRLF"
 fi

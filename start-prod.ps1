@@ -1,11 +1,20 @@
 # ============================================================
-#  2026 World Cup Predictor — Production Launcher (Windows)
+#  2026 World Cup Predictor - Production Launcher (Windows)
 #  Serves built frontend (dist/) + backend API
 #  Usage: powershell -NoProfile -ExecutionPolicy Bypass -File start-prod.ps1
 #         or double-click start-prod.bat
 # ============================================================
 
 $ErrorActionPreference = "Stop"
+
+# Console UTF-8 so Chinese Windows cmd does not mojibake script / pause text
+try {
+    $utf8 = New-Object System.Text.UTF8Encoding $false
+    [Console]::InputEncoding = $utf8
+    [Console]::OutputEncoding = $utf8
+    $OutputEncoding = $utf8
+    chcp 65001 | Out-Null
+} catch {}
 
 $Dir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $BackendDir = Join-Path $Dir "backend"
@@ -107,7 +116,7 @@ function Start-HiddenProcess {
 }
 
 Write-Host "=============================================="
-Write-Host " 2026 World Cup Predictor — Production Mode"
+Write-Host " 2026 World Cup Predictor - Production Mode"
 Write-Host "=============================================="
 
 if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
@@ -144,11 +153,11 @@ if (Test-Path -LiteralPath $envFile) {
 if (-not $env:APP_ENV) { $env:APP_ENV = "production" }
 if ($env:APP_ENV -eq "production") {
     if (-not $env:ADMIN_PASSWORD -or $env:ADMIN_PASSWORD -eq "change-me-in-production") {
-        Write-Err "APP_ENV=production but ADMIN_PASSWORD is unset or still placeholder — edit .env"
+        Write-Err "APP_ENV=production but ADMIN_PASSWORD is unset or still placeholder - edit .env"
         exit 1
     }
     if (-not $env:JWT_SECRET -or $env:JWT_SECRET -eq "change-me-in-production") {
-        Write-Err "APP_ENV=production but JWT_SECRET is unset or still placeholder — edit .env"
+        Write-Err "APP_ENV=production but JWT_SECRET is unset or still placeholder - edit .env"
         exit 1
     }
     Write-Ok "APP_ENV=production"
@@ -157,9 +166,9 @@ if ($env:APP_ENV -eq "production") {
 $venvDir = Join-Path $BackendDir "venv"
 if ((Test-Path -LiteralPath $venvDir) -and -not (Test-Path -LiteralPath $VenvPython)) {
     if (Test-Path -LiteralPath (Join-Path $venvDir "bin\activate")) {
-        Write-Warn "Linux venv at $venvDir cannot run on Windows — recreating"
+        Write-Warn "Linux venv at $venvDir cannot run on Windows - recreating"
     } else {
-        Write-Warn "Invalid venv at $venvDir — recreating"
+        Write-Warn "Invalid venv at $venvDir - recreating"
     }
     Remove-Item -LiteralPath $venvDir -Recurse -Force -ErrorAction SilentlyContinue
 }
@@ -178,7 +187,7 @@ $reqFile = Join-Path $BackendDir "requirements.txt"
 Write-Host "[..] Installing Python dependencies..."
 & $VenvPython -m pip install -r $reqFile -q
 if ($LASTEXITCODE -ne 0) {
-    Write-Err "pip install failed — see output above"
+    Write-Err "pip install failed - see output above"
     exit 1
 }
 Write-Ok "Python dependencies up to date"
@@ -206,7 +215,7 @@ for ($i = 1; $i -le 45; $i++) {
     Start-Sleep -Seconds 2
 }
 if (-not $healthy) {
-    Write-Err "Backend failed health check after ~90s — last 30 lines of backend.log:"
+    Write-Err "Backend failed health check after ~90s - last 30 lines of backend.log:"
     if (Test-Path -LiteralPath $backendLog) {
         Get-Content -LiteralPath $backendLog -Tail 30
     }
@@ -233,7 +242,7 @@ Start-Sleep -Seconds 2
 if (Test-HttpOk "http://127.0.0.1:$FrontendPort/health") {
     Write-Ok "Frontend health OK"
 } else {
-    Write-Warn "Frontend health check failed — see frontend.log"
+    Write-Warn "Frontend health check failed - see frontend.log"
 }
 
 Write-Host ""

@@ -1,10 +1,19 @@
 # ============================================================
-#  2026 World Cup Predictor — Production Stopper (Windows)
+#  2026 World Cup Predictor - Production Stopper (Windows)
 #  Usage: powershell -NoProfile -ExecutionPolicy Bypass -File stop-prod.ps1
 #         or double-click stop-prod.bat
 # ============================================================
 
 $ErrorActionPreference = "Continue"
+
+# Console UTF-8 so Chinese Windows cmd does not mojibake script / pause text
+try {
+    $utf8 = New-Object System.Text.UTF8Encoding $false
+    [Console]::InputEncoding = $utf8
+    [Console]::OutputEncoding = $utf8
+    $OutputEncoding = $utf8
+    chcp 65001 | Out-Null
+} catch {}
 
 $Dir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $BackendPort = 8888

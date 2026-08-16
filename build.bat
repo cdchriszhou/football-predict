@@ -117,7 +117,7 @@ copy /y "%DIR%\lib\health-check.sh" "%STAGE%\lib\health-check.sh" >nul
 copy /y "%DIR%\lib\fix-crlf.sh"       "%STAGE%\lib\fix-crlf.sh"       >nul
 copy /y "%DIR%\lib\reset-admin.sh"    "%STAGE%\lib\reset-admin.sh"    >nul
 powershell -NoProfile -Command "Get-ChildItem -Path '%STAGE%' -Recurse -Filter '*.sh' | ForEach-Object { $c = [IO.File]::ReadAllText($_.FullName) -replace \"`r`n\", \"`n\" -replace \"`r\", \"\"; [IO.File]::WriteAllText($_.FullName, $c) }"
-powershell -NoProfile -Command "Get-ChildItem -Path '%STAGE%' -File | Where-Object { $_.Extension -match '\.(bat|ps1)$' } | ForEach-Object { $c = [IO.File]::ReadAllText($_.FullName) -replace \"`r`n\", \"`n\" -replace \"`r\", \"`n\"; $c = $c -replace \"`n\", \"`r`n\"; [IO.File]::WriteAllText($_.FullName, $c) }"
+powershell -NoProfile -Command "$enc = New-Object System.Text.UTF8Encoding $false; Get-ChildItem -Path '%STAGE%' -File | Where-Object { $_.Extension -match '\.(bat|ps1)$' } | ForEach-Object { $c = [IO.File]::ReadAllText($_.FullName) -replace \"`r`n\", \"`n\" -replace \"`r\", \"`n\"; if ($c.Length -gt 0 -and [int][char]$c[0] -eq 0xFEFF) { $c = $c.Substring(1) }; $c = $c -replace \"`n\", \"`r`n\"; [IO.File]::WriteAllText($_.FullName, $c, $enc) }"
 
 if exist "%DIR%\.env.example" (
     copy /y "%DIR%\.env.example" "%STAGE%\.env.example" >nul
