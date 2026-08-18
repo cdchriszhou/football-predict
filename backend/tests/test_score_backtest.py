@@ -280,6 +280,14 @@ def test_league_backtest_does_not_seed_worldcup_matches():
     assert report["competition_slug"] == "bundesliga"
 
 
+def test_league_expected_goals_do_not_use_fifa_team_data():
+    from service.score_backtest import _expected_goals, _pipeline_ranks, LEAGUE_HOME_XG, LEAGUE_AWAY_XG
+
+    assert _expected_goals("巴萨", "马竞", "la-liga") == (LEAGUE_HOME_XG, LEAGUE_AWAY_XG)
+    assert _pipeline_ranks("巴萨", "马竞", "la-liga") == (10, 10)
+    assert _expected_goals("巴萨", "马竞", "premier-league") == (LEAGUE_HOME_XG, LEAGUE_AWAY_XG)
+
+
 def test_all_big_five_backtests_ignore_worldcup_history():
     from data.competitions import COMPETITIONS
 

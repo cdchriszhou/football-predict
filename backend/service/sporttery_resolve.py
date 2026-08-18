@@ -120,7 +120,7 @@ async def resolve_sporttery_for_match(
     odds_row: Odds | None = None,
 ) -> dict | None:
     """Return sporttery odds: prefer live on-sale API, else last stored pre-match snapshot."""
-    hints = league_hints_for(match.competition_slug) or ("世界", "世界杯", "World Cup", "FIFA")
+    hints = league_hints_for(match.competition_slug)
     sporttery_pool = pool if pool is not None else await fetch_sporttery_on_sale()
     stored_id = _stored_sporttery_match_id(odds_row)
     st_raw = find_sporttery_match_by_id(stored_id, sporttery_pool)

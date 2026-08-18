@@ -53,6 +53,10 @@ DAILY_REPORT_CACHE_TTL = 300
 DAILY_REPORT_CACHE_PREFIX = "score_backtest_daily:v8:"
 
 
+LEAGUE_HOME_XG = 1.45
+LEAGUE_AWAY_XG = 1.20
+
+
 def _is_worldcup_competition(slug: str) -> bool:
     return slug == WORLDCUP_SLUG
 
@@ -122,13 +126,13 @@ def _ensure_crs_for_backtest(
     stage: str,
     wdl: tuple[float, float, float] | None,
     odds_meta: dict | None,
+    competition_slug: str = "",
 ) -> tuple[dict[str, float], str]:
     """Return CRS map and source tag (book|synthetic_ko|synthetic|empty)."""
     if crs:
         return crs, "book"
-    exp_a, exp_b = _expected_goals(team_a, team_b)
-    ra = TEAM_DATA.get(team_a, {}).get("rank", 50)
-    rb = TEAM_DATA.get(team_b, {}).get("rank", 50)
+    exp_a, exp_b = _expected_goals(team_a, team_b, competition_slug)
+    ra, rb = _pipeline_ranks(team_a, team_b, competition_slug)
     wr, dr, lr = wdl if wdl else (50.0, 25.0, 25.0)
     inferred = _wdl_from_european(odds_meta)
     if inferred:
@@ -160,7 +164,19 @@ def _ensure_crs_for_backtest(
     return {}, "empty"
 
 
-def _expected_goals(team_a: str, team_b: str) -> tuple[float, float]:
+def _pipeline_ranks(team_a: str, team_b: str, competition_slug: str = "") -> tuple[int, int]:
+    """FIFA ranks only for World Cup replay; league sides stay rank-neutral."""
+    if competition_slug and not _is_worldcup_competition(competition_slug):
+        return 10, 10
+    return (
+        int(TEAM_DATA.get(team_a, {}).get("rank", 50) or 50),
+        int(TEAM_DATA.get(team_b, {}).get("rank", 50) or 50),
+    )
+
+
+def _expected_goals(team_a: str, team_b: str, competition_slug: str = "") -> tuple[float, float]:
+    if competition_slug and not _is_worldcup_competition(competition_slug):
+        return LEAGUE_HOME_XG, LEAGUE_AWAY_XG
     a = rank_to_abilities(TEAM_DATA.get(team_a, {}).get("rank", 50))
     b = rank_to_abilities(TEAM_DATA.get(team_b, {}).get("rank", 50))
     return round((a["attack"] + b["defend"]) / 80, 2), round((b["attack"] + a["defend"]) / 80, 2)
@@ -234,14 +250,14 @@ def run_score_prediction(
     *,
     stage: str | None = None,
     model_scores: list[str] | None = None,
+    competition_slug: str = "",
 ) -> tuple[str, str, str | None, list[str]]:
     """Run full CRS score pick pipeline (same as production)."""
     wr, dr, lr = wdl if wdl else (50.0, 25.0, 25.0)
     sp = odds_meta or {}
     wr, dr, lr = _correct_draw(wr, dr, lr, sp)
-    exp_a, exp_b = _expected_goals(team_a, team_b)
-    ra = TEAM_DATA.get(team_a, {}).get("rank", 50)
-    rb = TEAM_DATA.get(team_b, {}).get("rank", 50)
+    exp_a, exp_b = _expected_goals(team_a, team_b, competition_slug)
+    ra, rb = _pipeline_ranks(team_a, team_b, competition_slug)
     hints = model_scores or _poisson_model_hints(exp_a, exp_b, dr)
 
     best, upset, picks, _ = run_full_score_pipeline(
@@ -318,6 +334,7 @@ def _evaluate_match(
     matchday: int | None = None,
     location: str | None = None,
     published_picks: tuple[str, str, str | None, list[str]] | None = None,
+    competition_slug: str = "",
 ) -> dict | None:
     crs, crs_source = _ensure_crs_for_backtest(
         crs or {},
@@ -326,6 +343,7 @@ def _evaluate_match(
         stage=stage or "",
         wdl=wdl,
         odds_meta=odds_meta,
+        competition_slug=competition_slug,
     )
     if crs_source == "empty":
         return None
@@ -335,6 +353,7 @@ def _evaluate_match(
     else:
         p1, p2, upset, all_picks = run_score_prediction(
             team_a, team_b, crs, wdl, odds_meta, stage=stage or None,
+            competition_slug=competition_slug,
         )
         pick_source = "replay"
     if crs_source != "book":
@@ -401,6 +420,7 @@ def _seed_worldcup_history_rows(evaluated: list[dict]) -> None:
             group_name=hist.get("group_name"),
             matchday=hist.get("matchday"),
             location=hist.get("location"),
+            competition_slug=WORLDCUP_SLUG,
         )
         if row:
             evaluated.append(row)
@@ -500,6 +520,7 @@ async def _collect_evaluated_rows(
             matchday=match.matchday,
             location=match.location,
             published_picks=published,
+            competition_slug=competition_slug,
         )
         if row:
             evaluated.append(row)

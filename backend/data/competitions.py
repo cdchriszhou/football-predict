@@ -139,10 +139,21 @@ COMPETITIONS: dict[str, dict] = {
 }
 
 DEFAULT_COMPETITION = "premier-league"
+WORLDCUP_SLUG = "worldcup-2026"
 
 
 def get_competition(slug: str) -> dict | None:
     return COMPETITIONS.get(slug)
+
+
+def is_worldcup_competition(slug: str | None) -> bool:
+    return (slug or "") == WORLDCUP_SLUG
+
+
+def is_club_competition(slug: str | None) -> bool:
+    if not slug:
+        return False
+    return (get_competition(slug) or {}).get("type") == "club"
 
 
 def list_competitions() -> list[dict]:

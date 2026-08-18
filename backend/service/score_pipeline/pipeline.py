@@ -29,7 +29,7 @@ from .upset_picker import UpsetPicker
 
 class ScorePredictionPipeline:
     """
-    Poisson-first weighted ensemble for World Cup score prediction.
+    Poisson-first weighted ensemble for Big Five league score prediction.
 
     Same interface as old run_full_score_pipeline() for drop-in compatibility.
     """

@@ -179,12 +179,12 @@ export default {
     algoTitle: 'Prediction Methodology',
     algoIntro: 'Our score prediction uses a three-layer framework: historical calibration, multi-market fusion, and Poisson modeling.',
     algoSteps: [
-      { title: 'Fundamental Quantification', desc: 'FIFA rankings, six-dimensional team ratings (attack, defense, midfield, pace, physical, tactics), tactical matchups, and squad quality to estimate true strength.' },
+      { title: 'Fundamental Quantification', desc: 'League table ranking, six-dimensional team ratings (attack, defense, midfield, pace, physical, tactics), tactical matchups, and squad quality to estimate true strength.' },
       { title: 'European + Asian Market Fusion', desc: 'Combines European 1X2 odds with Asian handicap lines to extract implied probabilities and detect divergences or shallow-line traps.' },
-      { title: 'Expected Goals (xG) Modeling', desc: 'Derives expected goals from attack/defense ratios, normalized to World Cup historical averages (~2.7 goals), with lower expectations in knockout rounds.' },
+      { title: 'Expected Goals (xG) Modeling', desc: 'Derives expected goals from attack/defense ratios, normalized to Big Five league averages (~2.7 goals). Predicts 90-minute regulation time only — no knockout low-score bias.' },
       { title: 'Poisson Score Simulation', desc: 'Uses Dixon-Coles low-score correlation adjustment with draw probability, handicap and totals lines to produce Top 3 likely scorelines.' },
-      { title: 'Correct-Score Odds Calibration', desc: 'Blends bookmaker correct-score implied distributions with Poisson outputs, auto-tuned via 2014/2018/2022 backtests.' },
-      { title: 'Contextual Risk Adjustment', desc: 'Flags upsets, collusion-prone final-round draws, and market manipulation signals; dynamically adjusts W/D/L and confidence.' },
+      { title: 'Correct-Score Odds Calibration', desc: 'Blends bookmaker correct-score implied distributions with Poisson outputs, tuned on league markets and results.' },
+      { title: 'Contextual Risk Adjustment', desc: 'Flags upsets, home/away edges, and market manipulation signals; dynamically adjusts W/D/L and confidence.' },
       { title: 'Multi-LLM Fusion', desc: 'DeepSeek, Qwen and GLM run in parallel, weighted with the calibrated rule engine for final predictions and risk alerts.' }
     ],
     totalMatches: 'Total Matches',

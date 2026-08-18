@@ -37,7 +37,7 @@ class Team(Base):
     __tablename__ = "teams"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    competition_slug = Column(String(40), nullable=False, default="worldcup-2026", index=True)
+    competition_slug = Column(String(40), nullable=False, default="premier-league", index=True)
     name = Column(String(50), nullable=False, index=True)
     name_en = Column(String(50))
     flag_url = Column(String(200))
@@ -87,8 +87,8 @@ class Match(Base):
     __tablename__ = "matches"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    competition_slug = Column(String(40), nullable=False, default="worldcup-2026", index=True)
-    stage = Column(String(30), nullable=False, index=True, comment="小组赛/1/8决赛/1/4决赛/半决赛/季军赛/决赛")
+    competition_slug = Column(String(40), nullable=False, default="premier-league", index=True)
+    stage = Column(String(30), nullable=False, index=True, comment="联赛轮次 如 第1轮")
     group_name = Column(String(10), comment="小组名称")
     team_a = Column(String(50), nullable=False)
     team_b = Column(String(50), nullable=False)

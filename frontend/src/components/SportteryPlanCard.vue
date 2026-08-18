@@ -75,7 +75,7 @@
             <div v-for="side in ['team_a', 'team_b']" :key="side" class="team-ref">
               <template v-if="pick.references.teams[side]?.available">
                 <strong>{{ pick.references.teams[side].name }}</strong>
-                <span>FIFA #{{ pick.references.teams[side].rank }}</span>
+                <span>{{ t('team.leagueRank', { n: pick.references.teams[side].rank }) }}</span>
               </template>
             </div>
           </template>

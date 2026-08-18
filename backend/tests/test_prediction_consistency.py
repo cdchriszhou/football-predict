@@ -56,7 +56,24 @@ def test_maybe_correct_odds_orientation_swaps_rank_mismatch():
         "win_lose": 6.0,
         "score_odds": {"1:0": 5.75, "0:1": 6.8},
     }
-    fixed = maybe_correct_odds_orientation(odds, rank_a=89, rank_b=29)
+    fixed = maybe_correct_odds_orientation(
+        odds, rank_a=89, rank_b=29, competition_slug="worldcup-2026",
+    )
     imp = _implied_wdl(fixed["win_win"], fixed["draw"], fixed["win_lose"])
     assert imp["imp_lose"] > imp["imp_win"]
     assert fixed["score_odds"]["0:1"] == 5.75
+
+
+def test_maybe_correct_odds_orientation_skips_league_ranks():
+    odds = {
+        "win_win": 1.42,
+        "draw": 3.87,
+        "win_lose": 6.0,
+        "score_odds": {"1:0": 5.75, "0:1": 6.8},
+    }
+    # League table 1 vs missing-data 50 would have triggered FIFA inversion.
+    same = maybe_correct_odds_orientation(
+        odds, rank_a=1, rank_b=50, competition_slug="la-liga",
+    )
+    assert same["win_win"] == 1.42
+    assert same["win_lose"] == 6.0

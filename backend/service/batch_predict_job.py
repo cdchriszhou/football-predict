@@ -12,6 +12,7 @@ from db.models import Match
 from data.status_constants import MATCH_UPCOMING
 from service.prediction_service import PredictionService
 from service.write_guard import claim_heavy_job, is_heavy_job_running, release_heavy_job
+from data.competitions import DEFAULT_COMPETITION
 from utils.logger import logger
 
 ProgressCb = Callable[[int, int], Awaitable[None] | None]
@@ -42,7 +43,7 @@ def is_batch_running() -> bool:
 
 async def run_batch_predict_job(
     model: str | None = None,
-    competition_slug: str | None = "worldcup-2026",
+    competition_slug: str | None = DEFAULT_COMPETITION,
 ) -> None:
     if not await claim_heavy_job("batch"):
         logger.warning("Batch predict skipped: another heavy job is running")
@@ -104,7 +105,7 @@ async def run_batch_predict_job(
 
 async def start_batch_predict_job(
     model: str | None = None,
-    competition_slug: str | None = "worldcup-2026",
+    competition_slug: str | None = DEFAULT_COMPETITION,
 ) -> dict:
     async with _batch_lock:
         if _batch_state["running"] or is_heavy_job_running():

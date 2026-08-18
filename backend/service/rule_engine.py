@@ -16,10 +16,10 @@ class RulePrediction:
 
 
 class RuleEngine:
-    """Statistical rule-based prediction engine for World Cup matches.
+    """Statistical rule-based prediction engine for Big-Five league matches.
 
     Implements the professional three-layer methodology:
-      Layer 1 — Fundamentals (rank, ability, tactics, motivation)
+      Layer 1 — Fundamentals (league rank, ability, tactics, motivation)
       Layer 2 — Data (expected goals, player quality, style analysis)
       Layer 3 — Odds market (implied probability, handicap, over/under,
                 odds-fundamentals consistency check)
@@ -38,12 +38,12 @@ class RuleEngine:
         "players": 0.15,
     }
 
-    # Average goals per match in recent World Cups (2014/2018/2022)
+    # Average goals per match across the Big Five leagues (~2.6–3.0)
     AVG_GOALS = 2.7
-    # Knockout stage goals tend to be ~15% lower
+    # Knockout stage goals tend to be ~15% lower (unused for league rounds)
     KNOCKOUT_GOAL_REDUCTION = 0.85
 
-    # Reference values for normalization (typical World Cup team ~75)
+    # Reference values for normalization (typical top-flight club ~75)
     LEAGUE_AVG_ATK = 75.0
     LEAGUE_AVG_DEF = 75.0
     LEAGUE_AVG_MID = 75.0
@@ -55,13 +55,12 @@ class RuleEngine:
     LOW_DRAW_ODDS = 3.5
 
     # Draw base rate for target_draw anchoring (overridable by CalibratedRuleEngine)
-    # Note: 2026 WC group stage observed draw rate ~28%, higher than historical ~25%
+    # Production uses calibrated_params.json (~26, typical Big Five draw rate)
     DRAW_BASE = 28.0
 
     # Dixon-Coles low-score correlation (typical football value ~ -0.10 to -0.15)
     DIXON_COLES_RHO = -0.12
-    # Per-team expected-goals ceiling (raised from 3.2 — World Cup blowouts like
-    # Germany 7:1 or Netherlands 5:1 need headroom above 4.0 xG for the favourite)
+    # Per-team expected-goals ceiling for lopsided league mismatches
     MAX_XG_PER_TEAM = 5.5
 
     TACTIC_MAP = {
@@ -103,7 +102,7 @@ class RuleEngine:
         scores = {"a": 0.0, "b": 0.0, "draw": 0.0}
         active_weight = 0.0
 
-        # ── 1. FIFA rank differential (Elo-like) ──
+        # ── 1. League-table rank differential (Elo-like) ──
         rank_a = _num(team_a, "rank", 50)
         rank_b = _num(team_b, "rank", 50)
         if rank_a and rank_b:
@@ -418,7 +417,7 @@ class RuleEngine:
         """Poisson-rate model with total-goals normalization.
 
         Uses attack/defense ratios (not weakness amplification) so mismatches
-        stay realistic, then normalizes to historical World Cup averages.
+        stay realistic, then normalizes to Big Five league scoring averages.
         """
         half_avg = self.AVG_GOALS / 2.0
         # Per-round knockout goal reduction (configurable)
@@ -455,7 +454,7 @@ class RuleEngine:
         ex_a *= tac_mul_a
         ex_b *= tac_mul_b
 
-        # Soft-blend toward World Cup average (preserves attack/defense mismatch signal)
+        # Soft-blend toward league scoring average (preserves attack/defense mismatch signal)
         total = ex_a + ex_b
         if total > 0 and abs(total - target_total) > 0.05:
             # Blend 50% raw model + 50% normalized to target — allows natural variation

@@ -83,6 +83,80 @@ def test_league_prompt_does_not_include_knockout_instructions():
     assert format_group_situation(_league_ctx("第2轮", 2), "巴萨", "马拉加") == ""
 
 
+def test_empty_stage_prompt_defaults_to_league():
+    class _Dummy(BaseLLMClient):
+        async def predict(self, input):
+            return None
+
+        def model_name(self):
+            return "dummy"
+
+    prompt = _Dummy().build_prompt(PredictionInput(
+        match_id=1,
+        team_a=_club("巴萨", 1),
+        team_b=_club("马拉加", 20),
+        group_context=_league_ctx("联赛", 1),
+    ))
+    assert "五大联赛" in prompt
+    assert "FIFA排名" not in prompt
+    assert "淘汰赛特殊考量" not in prompt
+
+
+def test_production_score_path_does_not_load_worldcup_group_data():
+    import inspect
+    import service.prediction_service as ps
+    import api.predictions as api_pred
+    import service.sporttery_plan_service as plan
+    import service.sporttery_resolve as resolve
+
+    for mod in (ps, api_pred, plan):
+        src = inspect.getsource(mod)
+        assert "load_group_standings" not in src
+        assert "enrich_knockout_outlook" not in src
+        assert "load_group_fifa_ranks" not in src
+        assert "worldcup_group_standings" not in src
+
+    resolve_src = inspect.getsource(resolve)
+    assert "世界杯" not in resolve_src
+    assert "World Cup" not in resolve_src
+
+
+def test_score_job_defaults_are_premier_league():
+    import inspect
+    from data.competitions import DEFAULT_COMPETITION
+    from service.batch_predict_job import run_batch_predict_job, start_batch_predict_job
+    from service.sporttery_plan_service import get_today_sporttery_plan, _find_db_match
+
+    assert DEFAULT_COMPETITION == "premier-league"
+    assert inspect.signature(run_batch_predict_job).parameters["competition_slug"].default == "premier-league"
+    assert inspect.signature(start_batch_predict_job).parameters["competition_slug"].default == "premier-league"
+    assert inspect.signature(get_today_sporttery_plan).parameters["competition_slug"].default == "premier-league"
+    assert inspect.signature(_find_db_match).parameters["competition_slug"].default == "premier-league"
+
+
+def test_knockout_scorer_skips_league_rounds():
+    from service.score_pipeline.base import ScorerInput
+    from service.score_pipeline.knockout_scorer import KnockoutMarketScorer
+
+    scorer = KnockoutMarketScorer()
+    inp = ScorerInput(
+        score_odds={"1:0": 5.0, "1:1": 6.0, "0:1": 7.0},
+        win_rate=52.0,
+        draw_rate=26.0,
+        lose_rate=22.0,
+        expected_a=1.5,
+        expected_b=1.1,
+        stage="第3轮",
+        group_context={"stage": "第3轮"},
+        sp_win=1.85,
+        sp_draw=3.4,
+        sp_lose=4.2,
+    )
+    result = scorer.score(inp)
+    assert result.scores == {}
+    assert "league" in result.rationale
+
+
 def test_worldcup_group_md3_collusion_still_applies():
     ctx = build_group_context(
         "小组赛", "A", 3, "巴西", "克罗地亚", 5, 12,

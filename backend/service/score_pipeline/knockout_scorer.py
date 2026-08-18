@@ -30,9 +30,11 @@ class KnockoutMarketScorer(BaseScorer):
         ctx = inp.group_context or {}
         actual_stage = ctx.get("stage", stage)
 
-        # Stage-gate: only activate for knockout matches
-        if not actual_stage or actual_stage in ("", "小组赛"):
-            return ScorerResult(scores={}, confidence=1.0, rationale="group stage skip", source=self.label)
+        from service.score_pick import is_knockout_stage
+
+        # Stage-gate: league rounds (第N轮 / 联赛) must not use World Cup knockout logic
+        if not is_knockout_stage(actual_stage or stage):
+            return ScorerResult(scores={}, confidence=1.0, rationale="league skip", source=self.label)
 
         adjustments: dict[str, float] = {}
 

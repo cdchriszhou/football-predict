@@ -20,7 +20,6 @@ from service.score_pick import (
     score_matches_pick,
 )
 from service.match_context import build_group_context
-from data.worldcup_group_standings import load_group_standings
 from utils.response import success
 from api.auth import get_current_user
 from api.competitions import resolve_competition
@@ -140,43 +139,14 @@ async def get_predictions_batch(
             score_odds = (odds_dict or {}).get("score_odds") or None
 
             matchday = await infer_matchday(match, db)
-            standings = None
-            if match.stage == "小组赛" and match.group_name:
-                standings = await load_group_standings(
-                    db, match.competition_slug, match.group_name, match.match_time,
-                )
             group_context = build_group_context(
                 match.stage, match.group_name or "", matchday,
                 match.team_a, match.team_b,
                 ta_dict.get("rank", 50), tb_dict.get("rank", 50),
                 location=match.location or "",
-                standings=standings,
+                standings=None,
                 home_side_override=_club_home_override(match.competition_slug),
             )
-            if match.stage == "小组赛" and match.group_name and matchday >= 2:
-                from data.worldcup_group_standings import load_group_fifa_ranks
-                from service.score_context import enrich_knockout_outlook
-                from service.score_context import _R16_RUNNER_VS_WINNER, _R16_WINNER_VS_RUNNER
-
-                letter = (match.group_name or "").strip().upper()
-                paired: set[str] = set()
-                if letter in _R16_WINNER_VS_RUNNER:
-                    paired.add(_R16_WINNER_VS_RUNNER[letter])
-                if letter in _R16_RUNNER_VS_WINNER:
-                    paired.add(_R16_RUNNER_VS_WINNER[letter])
-                paired_ranks: dict[str, list[int]] = {}
-                for pg in paired:
-                    paired_ranks[pg] = await load_group_fifa_ranks(
-                        db, match.competition_slug, pg,
-                    )
-                enrich_knockout_outlook(
-                    group_context,
-                    match.team_a,
-                    match.team_b,
-                    int(ta_dict.get("rank") or 50),
-                    int(tb_dict.get("rank") or 50),
-                    paired_group_ranks=paired_ranks,
-                )
 
             if score_odds:
                 r = rule_engine.evaluate(

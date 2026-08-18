@@ -1,8 +1,8 @@
 """
-China Sports Lottery purchase plan — today's World Cup singles & parlay suggestions.
+China Sports Lottery purchase plan — today's Big-Five league singles & parlay suggestions.
 
 Integrates: sporttery.cn on-sale odds, crawler-fused European/Asian markets,
-team/player crawler data, rule engine, and AI predictions.
+team/player data, rule engine, and AI predictions.
 For reference only; not betting advice.
 """
 from __future__ import annotations
@@ -32,7 +32,7 @@ from data.status_constants import MATCH_LIVE, MATCH_UPCOMING, PLAYER_ACTIVE, mat
 from service.calibration_service import CalibratedRuleEngine
 from service.confidence_service import compute_score_confidence, compute_wdl_confidence
 from service.match_context import analyze_match_context, build_group_context, apply_context_to_rates
-from data.worldcup_group_standings import load_group_standings
+from data.competitions import DEFAULT_COMPETITION, get_competition, league_hints_for
 from service.prediction_service import (
     _club_home_override,
     get_players,
@@ -41,10 +41,6 @@ from service.prediction_service import (
     maybe_correct_odds_orientation,
     team_to_dict,
 )
-
-from data.competitions import get_competition, league_hints_for
-
-WORLD_CUP_LEAGUE_HINTS = ("世界", "世界杯", "World Cup", "FIFA")
 
 # 参考单注金额（元），体彩比分单关/过关常用 2 元起步
 DEFAULT_STAKE_YUAN = 2.0
@@ -523,7 +519,7 @@ async def _find_db_match(
     home: str,
     away: str,
     kickoff: Optional[datetime],
-    competition_slug: str = "worldcup-2026",
+    competition_slug: str = DEFAULT_COMPETITION,
 ) -> Optional[Match]:
     home_n = normalize_team_name(home)
     away_n = normalize_team_name(away)
@@ -586,20 +582,16 @@ async def _build_match_analysis(
     fused = prepare_fused_odds(odds_row, db_match.team_a, db_match.team_b)
     fused = maybe_correct_odds_orientation(
         fused, team_a_dict.get("rank"), team_b_dict.get("rank"),
+        competition_slug=db_match.competition_slug,
     )
 
     matchday = await infer_matchday(db_match, db)
-    standings = None
-    if db_match.stage == "小组赛" and db_match.group_name:
-        standings = await load_group_standings(
-            db, db_match.competition_slug, db_match.group_name, db_match.match_time,
-        )
     group_context = build_group_context(
         db_match.stage, db_match.group_name or "", matchday,
         db_match.team_a, db_match.team_b,
         team_a_dict.get("rank", 50), team_b_dict.get("rank", 50),
         location=db_match.location or "",
-        standings=standings,
+        standings=None,
         home_side_override=_club_home_override(db_match.competition_slug),
     )
 
@@ -775,7 +767,7 @@ def _build_reason(
     if ta.get("available") and tb.get("available"):
         rank_a, rank_b = ta.get("rank"), tb.get("rank")
         if rank_a and rank_b:
-            parts.append(f"FIFA排名{rank_a} vs {rank_b}")
+            parts.append(f"联赛排名{rank_a} vs {rank_b}")
         atk_gap = (ta.get("attack") or 0) - (tb.get("attack") or 0)
         if abs(atk_gap) >= 8:
             fav = ta["name"] if atk_gap > 0 else tb["name"]
@@ -913,7 +905,7 @@ def _build_score_reason(
     if ta.get("available") and tb.get("available"):
         rank_a, rank_b = ta.get("rank"), tb.get("rank")
         if rank_a and rank_b:
-            parts.append(f"FIFA排名 {rank_a} vs {rank_b}")
+            parts.append(f"联赛排名 {rank_a} vs {rank_b}")
 
     ai = refs.get("models", {}).get("ai")
     if ai:
@@ -1363,11 +1355,11 @@ async def _build_singles_from_st_matches(
     return singles
 
 
-async def get_today_sporttery_plan(db: AsyncSession, competition_slug: str = "worldcup-2026") -> dict:
+async def get_today_sporttery_plan(db: AsyncSession, competition_slug: str = DEFAULT_COMPETITION) -> dict:
     today = china_today()
     sporttery_pool = await fetch_sporttery_on_sale(force_refresh=True)
     fetch_status = get_sporttery_fetch_status()
-    hints = league_hints_for(competition_slug) or WORLD_CUP_LEAGUE_HINTS
+    hints = league_hints_for(competition_slug)
     comp = get_competition(competition_slug)
     is_club = comp.get("type") == "club"
 

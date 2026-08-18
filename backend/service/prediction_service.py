@@ -1,6 +1,6 @@
 import asyncio
 import json
-from sqlalchemy import select, func
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from llm.base_client import BaseLLMClient, PredictionInput
 from llm.deepseek_client import create_llm_client
@@ -9,7 +9,6 @@ from .calibration_service import CalibratedRuleEngine, load_calibrated_params
 from .odds_fusion import fuse_multi_market_odds, fused_odds_to_dict
 from .data_sources import meta_has_real_markets, is_real_sporttery
 from .match_context import build_group_context, analyze_match_context
-from data.worldcup_group_standings import load_group_standings
 from db.models import Match, Team, Player, Odds, Prediction
 from data.status_constants import MATCH_UPCOMING
 from db.redis_client import cache_get, cache_set
@@ -440,30 +439,26 @@ def _fuse_predictions(llm_results: list, rule_result, odds_dict: dict = None,
 
 
 async def infer_matchday(match: Match, db: AsyncSession) -> int:
-    """Infer matchday: group 1-3 for WC, or round number from 第N轮 for clubs."""
+    """League matchday from DB column or 第N轮. World Cup group MD1-3 is not used."""
+    md = getattr(match, "matchday", None)
+    if md:
+        try:
+            n = int(md)
+            if n > 0:
+                return n
+        except (TypeError, ValueError):
+            pass
     stage = (match.stage or "").strip()
     if stage.startswith("第") and stage.endswith("轮"):
         digits = "".join(ch for ch in stage[1:-1] if ch.isdigit())
         return int(digits) if digits else 0
-    if match.stage != "小组赛" or not match.group_name:
-        return 0
-    count = (await db.execute(
-        select(func.count(Match.id)).where(
-            Match.group_name == match.group_name,
-            Match.stage == "小组赛",
-            Match.match_time < match.match_time,
-        )
-    )).scalar() or 0
-    return min(3, count // 2 + 1)
+    return 0
 
 
 def _club_home_override(competition_slug: str | None) -> str | None:
     """Club fixtures store home as team_a."""
-    if not competition_slug:
-        return None
-    from data.competitions import get_competition
-    comp = get_competition(competition_slug)
-    if (comp or {}).get("type") == "club":
+    from data.competitions import is_club_competition
+    if is_club_competition(competition_slug):
         return "a"
     return None
 
@@ -487,8 +482,15 @@ def maybe_correct_odds_orientation(
     *,
     rank_gap: int = 25,
     imp_margin: float = 12.0,
+    competition_slug: str | None = None,
 ) -> dict:
-    """Swap inverted W/D/L when FIFA rank gap strongly disagrees with market favourite."""
+    """Swap inverted W/D/L when FIFA rank gap strongly disagrees with market favourite.
+
+    Club league table ranks (typically 1–20) must not use this World Cup heuristic.
+    """
+    from data.competitions import is_worldcup_competition
+    if not is_worldcup_competition(competition_slug):
+        return odds_dict
     if not odds_dict or rank_a is None or rank_b is None:
         return odds_dict
     win_win = odds_dict.get("win_win")
@@ -644,6 +646,7 @@ class PredictionService:
             odds_dict,
             (team_a_dict or {}).get("rank"),
             (team_b_dict or {}).get("rank"),
+            competition_slug=match.competition_slug,
         )
         score_odds = odds_dict.get("score_odds", {})
         half_full_odds = odds_dict.get("half_full_odds", {})
@@ -653,45 +656,16 @@ class PredictionService:
         players_a = await get_players(db, team_a.id) if team_a else []
         players_b = await get_players(db, team_b.id) if team_b else []
 
-        # 2. Build group context + situational analysis
+        # 2. League context + situational analysis (no World Cup group / knockout outlook)
         matchday = await infer_matchday(match, db)
-        standings = None
-        if match.stage == "小组赛" and match.group_name:
-            standings = await load_group_standings(
-                db, match.competition_slug, match.group_name, match.match_time,
-            )
         group_context = build_group_context(
             match.stage, match.group_name or "", matchday,
             match.team_a, match.team_b,
             team_a_dict.get("rank", 50), team_b_dict.get("rank", 50),
             location=match.location or "",
-            standings=standings,
+            standings=None,
             home_side_override=_club_home_override(match.competition_slug),
         )
-        if match.stage == "小组赛" and match.group_name and matchday >= 2:
-            from data.worldcup_group_standings import load_group_fifa_ranks
-            from service.score_context import enrich_knockout_outlook
-            from service.score_context import _R16_RUNNER_VS_WINNER, _R16_WINNER_VS_RUNNER
-
-            letter = (match.group_name or "").strip().upper()
-            paired: set[str] = set()
-            if letter in _R16_WINNER_VS_RUNNER:
-                paired.add(_R16_WINNER_VS_RUNNER[letter])
-            if letter in _R16_RUNNER_VS_WINNER:
-                paired.add(_R16_RUNNER_VS_WINNER[letter])
-            paired_ranks: dict[str, list[int]] = {}
-            for pg in paired:
-                paired_ranks[pg] = await load_group_fifa_ranks(
-                    db, match.competition_slug, pg,
-                )
-            enrich_knockout_outlook(
-                group_context,
-                match.team_a,
-                match.team_b,
-                int(team_a_dict.get("rank") or 50),
-                int(team_b_dict.get("rank") or 50),
-                paired_group_ranks=paired_ranks,
-            )
 
         pre_result = self.rule_engine.evaluate(
             team_a_dict, team_b_dict, odds=None, group_context=group_context

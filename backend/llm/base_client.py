@@ -17,6 +17,15 @@ class PredictionInput:
     group_context: dict = field(default_factory=dict)
 
 
+def _is_league_prompt_stage(stage: str | None) -> bool:
+    """Score prompts default to Big Five league unless the stage is a true tournament round."""
+    s = (stage or "").strip()
+    if s == "小组赛":
+        return False
+    from service.score_pick import is_knockout_stage
+    return not is_knockout_stage(s)
+
+
 @dataclass
 class PredictionOutput:
     win_rate: float
@@ -168,7 +177,7 @@ class BaseLLMClient(ABC):
         b = (input.team_b or {}).get("name", "客队")
         lines: list[str] = []
 
-        is_league = (stage.startswith("第") and stage.endswith("轮")) or stage == "联赛"
+        is_league = _is_league_prompt_stage(stage)
         if is_league:
             lines.append(f"【赛事】俱乐部联赛 · {stage or '联赛轮次'}（主客场双循环，非淘汰赛）")
             lines.append("【排名说明】下列“排名”为联赛实力档/积分档参考，不是 FIFA 国家队排名。")
@@ -212,7 +221,9 @@ class BaseLLMClient(ABC):
         odds_section = self._build_odds_section(input)
 
         group_section = ""
-        if input.group_context:
+        stage = ((input.group_context or {}).get("stage") or "").strip()
+        is_league = _is_league_prompt_stage(stage)
+        if input.group_context and not is_league:
             from data.worldcup_group_standings import format_group_situation
             group_section = format_group_situation(
                 input.group_context,
@@ -223,8 +234,6 @@ class BaseLLMClient(ABC):
                 group_section += "\n"
 
         match_ctx_section = self._format_match_context_section(input)
-        stage = ((input.group_context or {}).get("stage") or "").strip()
-        is_league = (stage.startswith("第") and stage.endswith("轮")) or stage == "联赛"
         role = "五大联赛" if is_league else "国际足球赛事"
         rank_label = "实力档" if is_league else "FIFA排名"
         if is_league:
