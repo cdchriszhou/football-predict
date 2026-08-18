@@ -33,6 +33,7 @@ from service.calibration_service import CalibratedRuleEngine
 from service.confidence_service import compute_score_confidence, compute_wdl_confidence
 from service.match_context import analyze_match_context, build_group_context, apply_context_to_rates
 from data.competitions import DEFAULT_COMPETITION, get_competition, league_hints_for
+from data.match_status import season_label_for
 from service.prediction_service import (
     _club_home_override,
     get_players,
@@ -184,14 +185,14 @@ def _is_sporttery_stopped(st_match: dict) -> bool:
     return lowered in ("0", "stop", "stopped", "停售", "close", "closed")
 
 
-def _is_purchasable_today(st_match: dict, today: date_type) -> bool:
+def _is_purchasable_today(st_match: dict, today: date_type, *, now: datetime | None = None) -> bool:
     """True when match is in an open sporttery sale window (China date/time).
 
     Sale opens on ``sale_date`` and stays open until kickoff — not only on that calendar day.
     """
     if _is_sporttery_stopped(st_match):
         return False
-    if not _kickoff_not_yet_passed(st_match):
+    if not _kickoff_not_yet_passed(st_match, now=now):
         return False
 
     sale_day = _parse_sale_date(st_match)
@@ -204,11 +205,11 @@ def _is_purchasable_today(st_match: dict, today: date_type) -> bool:
     return True
 
 
-def _is_upcoming_on_sale(st_match: dict, today: date_type, *, max_days: int = 3) -> bool:
+def _is_upcoming_on_sale(st_match: dict, today: date_type, *, max_days: int = 3, now: datetime | None = None) -> bool:
     """Listed in sporttery pool but sale window not open yet (preview only)."""
     if _is_sporttery_stopped(st_match):
         return False
-    if not _kickoff_not_yet_passed(st_match):
+    if not _kickoff_not_yet_passed(st_match, now=now):
         return False
     sale_day = _parse_sale_date(st_match)
     if sale_day is None or sale_day <= today:
@@ -524,12 +525,16 @@ async def _find_db_match(
 ) -> Optional[Match]:
     home_n = normalize_team_name(home)
     away_n = normalize_team_name(away)
-    matches = (await db.execute(
-        select(Match).where(
-            Match.competition_slug == competition_slug,
-            Match.status.in_(match_status_in_db_values(MATCH_UPCOMING, MATCH_LIVE)),
-        )
-    )).scalars().all()
+    filters = [
+        Match.competition_slug == competition_slug,
+        Match.status.in_(match_status_in_db_values(MATCH_UPCOMING, MATCH_LIVE)),
+    ]
+    comp = get_competition(competition_slug)
+    if comp and comp.get("type") == "club":
+        season = season_label_for(comp)
+        if season:
+            filters.append(Match.season == season)
+    matches = (await db.execute(select(Match).where(*filters))).scalars().all()
     candidates = []
     for m in matches:
         a, b = normalize_team_name(m.team_a), normalize_team_name(m.team_b)
@@ -978,6 +983,11 @@ def _build_single_pick(
     ) or st_match
     odds_row = to_db_odds(st_for_odds, odds_team_a, odds_team_b)
     if not odds_row:
+        # Already selected this sporttery row; don't drop it on alias gaps.
+        odds_row = to_db_odds(
+            st_for_odds, st_for_odds.get("home_team") or "", st_for_odds.get("away_team") or "",
+        )
+    if not odds_row:
         return None
 
     crs_odds = _clean_crs_odds(odds_row.get("score_odds") or {})
@@ -1233,16 +1243,12 @@ async def _st_match_passes_competition_filter(
     is_club: bool,
 ) -> bool:
     league = st.get("league") or ""
-    league_ok = _is_competition_league(league, hints)
+    if _is_competition_league(league, hints):
+        return True
     db_m = await _find_db_match(
         db, st["home_team"], st["away_team"], st.get("kickoff"), competition_slug,
     )
-    if league_ok:
-        if is_club and not db_m:
-            return False
-    elif not db_m:
-        return False
-    return True
+    return bool(db_m)
 
 
 async def _collect_competition_st_matches(
@@ -1268,9 +1274,6 @@ async def _collect_competition_st_matches(
         else:
             continue
 
-        kickoff = st.get("kickoff")
-        if kickoff and kickoff.date() < today and not upcoming_only:
-            continue
         if not await _st_match_passes_competition_filter(
             db, st, competition_slug=competition_slug, hints=hints, is_club=is_club,
         ):
@@ -1282,27 +1285,37 @@ async def _collect_competition_st_matches(
         seen_nums.add(num)
         out.append(st)
 
-    if purchasable_only and not out:
-        db_upcoming = (await db.execute(
-            select(Match).where(
-                Match.competition_slug == competition_slug,
-                Match.status.in_(match_status_in_db_values(MATCH_UPCOMING, MATCH_LIVE)),
-            )
-        )).scalars().all()
-        for m in db_upcoming:
-            if not m.match_time:
+    db_filters = [
+        Match.competition_slug == competition_slug,
+        Match.status.in_(match_status_in_db_values(MATCH_UPCOMING, MATCH_LIVE)),
+    ]
+    comp = get_competition(competition_slug)
+    if comp and comp.get("type") == "club":
+        season = season_label_for(comp)
+        if season:
+            db_filters.append(Match.season == season)
+    db_upcoming = (await db.execute(select(Match).where(*db_filters))).scalars().all()
+    for m in db_upcoming:
+        if not m.match_time:
+            continue
+        hit = find_sporttery_match(
+            m.team_a, m.team_b, m.match_time, sporttery_pool,
+            league_hints=hints,
+        )
+        if not hit:
+            continue
+        if purchasable_only:
+            if not _is_purchasable_today(hit, today):
                 continue
-            if m.match_time.date() < today:
+        elif upcoming_only:
+            if not _is_upcoming_on_sale(hit, today):
                 continue
-            hit = find_sporttery_match(
-                m.team_a, m.team_b, m.match_time, sporttery_pool,
-                league_hints=hints,
-            )
-            if hit and _is_purchasable_today(hit, today):
-                num = hit.get("match_num") or ""
-                if num not in seen_nums:
-                    seen_nums.add(num)
-                    out.append(hit)
+        else:
+            continue
+        num = hit.get("match_num") or ""
+        if num not in seen_nums:
+            seen_nums.add(num)
+            out.append(hit)
     return out
 
 
@@ -1328,8 +1341,6 @@ async def _build_singles_from_st_matches(
     singles: list[dict] = []
     for i, st in enumerate(st_matches):
         dm = db_by_st.get(i)
-        if is_club and not dm:
-            continue
         pred = preds.get(dm.id) if dm else None
 
         if dm:
