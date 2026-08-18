@@ -185,7 +185,8 @@ class CalibratedRuleEngine(RuleEngine):
             )
             result.best_scores = best
 
-        is_knockout = (group_context or {}).get("stage", "") not in ("", "小组赛")
+        from service.score_pick import is_knockout_stage
+        is_knockout = is_knockout_stage((group_context or {}).get("stage", ""))
         over_under = float((odds or {}).get("over_under", 2.5) or 2.5)
         if not getattr(result, 'upset_score', None) or result.upset_score == "?":
             result.upset_score = self._predict_upset_score(

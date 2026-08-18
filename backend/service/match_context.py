@@ -113,7 +113,7 @@ def build_group_context(
         "draw_suits_a": False,
         "draw_suits_b": False,
         "dead_rubber": False,
-        "is_final_group_match": matchday == 3,
+        "is_final_group_match": stage == "小组赛" and matchday == 3,
         "need_goals_a": False,
         "need_goals_b": False,
         "form_xg_a": 0.0,
@@ -198,16 +198,17 @@ def analyze_match_context(
         result.upset_risk = min(0.38, base_upset)
         result.underdog_side = underdog if fav_is_a else ("a" if rank_b < rank_a else "")
 
-    # Knockout underdog with defensive style
+    # Knockout underdog with defensive style (not club league matchdays)
     stage = ctx.get("stage", "")
-    if stage not in ("", "小组赛") and rank_gap >= 10:
+    from service.score_pick import is_knockout_stage
+    if is_knockout_stage(stage) and rank_gap >= 10:
         def_style = team_b.get("tactic", "") if rank_a < rank_b else team_a.get("tactic", "")
         if any(t in def_style for t in ("防守", "防反", "铁桶", "硬朗")):
             result.upset_risk = min(0.40, result.upset_risk + 0.08)
             result.alerts.append("淘汰赛防守型弱队：拖入加时/点球概率高")
 
-    # ── Collusion detection (默契球) ──
-    if ctx.get("is_final_group_match") or ctx.get("matchday") == 3:
+    # ── Collusion detection (默契球) — World Cup group MD3 only, not league round 3 ──
+    if ctx.get("stage") == "小组赛" and (ctx.get("is_final_group_match") or ctx.get("matchday") == 3):
         collusion = 0.15   # was 0.10 — higher baseline for 2026 draw rate
         if ctx.get("both_must_win"):
             collusion = 0.04

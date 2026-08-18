@@ -251,8 +251,10 @@ class RuleEngine:
             target_draw = max(8.0, target_draw - 4.0)
 
         # Knockout stage → higher draw probability (teams more cautious)
+        # League rounds like 第1轮 / 联赛 must NOT be treated as World Cup knockout.
         stage = group_context.get("stage", "") if group_context else ""
-        is_knockout = stage not in ("", "小组赛")
+        from service.score_pick import is_knockout_stage
+        is_knockout = is_knockout_stage(stage)
         if is_knockout:
             from service.score_pick_config import get_config
             cfg = get_config()

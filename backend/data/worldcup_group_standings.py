@@ -254,7 +254,7 @@ def format_group_situation(
     team_b: str,
 ) -> str:
     """Human-readable group situation for LLM prompt."""
-    if ctx.get("matchday", 0) < 2:
+    if ctx.get("stage") != "小组赛" or ctx.get("matchday", 0) < 2:
         return ""
 
     lines = [f"【小组形势 — 第{ctx.get('matchday')}轮】"]
