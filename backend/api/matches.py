@@ -84,7 +84,7 @@ def match_to_dict(m: Match, *, knockout_by_no: dict | None = None) -> dict:
     m = _as_match_row(m)
     status = resolve_public_match_status(m)
     ra, rb = m.result_a, m.result_b
-    pa, pb = m.penalty_a, m.penalty_b
+    pa, pb = getattr(m, "penalty_a", None), getattr(m, "penalty_b", None)
     if not match_has_recorded_score(m):
         hist = confirmed_scores_from_history(m)
         if hist:
@@ -372,16 +372,19 @@ async def get_today_matches(
 
     kickoff_today = [m for m in matches if include_in_today_dashboard(m)]
     source = kickoff_today
-    # Rest day: 今日赛果 shows the latest finished matchday within a short lookback
-    # (not only calendar yesterday — knockout gaps often span 1–2 rest days).
-    if comp_slug == "worldcup-2026" and not kickoff_today:
-        lookback_start = today_start - timedelta(days=4)
+    # Rest day: 今日赛果 shows the latest finished matchday within a short lookback.
+    comp = get_competition(comp_slug)
+    is_football = comp_slug == "worldcup-2026" or (comp or {}).get("type") == "club"
+    lookback_days = 4 if comp_slug == "worldcup-2026" else 5
+    if is_football and not kickoff_today:
+        lookback_start = today_start - timedelta(days=lookback_days)
         recent_rows = list((await db.execute(
             select(Match).where(
                 Match.competition_slug == comp_slug,
                 Match.match_time.isnot(None),
                 Match.match_time >= lookback_start,
                 Match.match_time < today_start,
+                *([season_filter] if season_filter is not None else []),
             ).order_by(Match.match_time.desc())
         )).scalars().all())
         ko_index_preview = await _knockout_by_no(db, comp_slug)
@@ -400,7 +403,7 @@ async def get_today_matches(
 
     ko_index = await _knockout_by_no(db, comp_slug)
     data = [match_to_dict(m, knockout_by_no=ko_index) for m in source]
-    if comp_slug == "worldcup-2026" and not kickoff_today:
+    if is_football and not kickoff_today:
         # Dedupe by display teams in case placeholder + advanced rows both scored.
         seen: set[tuple] = set()
         deduped: list[dict] = []

@@ -115,9 +115,9 @@
       </el-col>
     </el-row>
 
-    <!-- Recent finished results (World Cup) — skip when all already shown in 今日赛果 -->
+    <!-- Recent finished results — skip when all already shown in 今日赛果 -->
     <el-card
-      v-if="compStore.isWorldCup && displayedRecentResults.length"
+      v-if="showRecentResults && displayedRecentResults.length"
       class="section-card"
       style="margin-top: 20px"
     >
@@ -341,6 +341,8 @@ const dashboardSubtitle = computed(() => {
 
 const seasonEnded = computed(() => compStore.current?.season_status === 'ended')
 const isClubLeague = computed(() => compStore.current?.type === 'club')
+const isFootball = computed(() => isClubLeague.value || compStore.isWorldCup)
+const showRecentResults = computed(() => isFootball.value)
 
 const scheduleTotal = computed(() => Number(statValues.value.total) || 0)
 
@@ -364,12 +366,12 @@ const displayTodayMatches = computed(() => {
   }
   // Rest day / empty today: show latest finished results, but keep one section only
   // (exclude them from 「最近赛果」 via displayedRecentResults).
-  if (!byId.size && compStore.isWorldCup) {
+  if (!byId.size && isFootball.value) {
     for (const m of store.todayMatches) {
       byId.set(m.id, m)
     }
   }
-  if (!byId.size && compStore.isWorldCup) {
+  if (!byId.size && isFootball.value) {
     for (const m of store.recentResults) {
       byId.set(m.id, m)
     }
@@ -487,11 +489,13 @@ async function loadDashboard() {
     { key: 'upcoming', p: store.fetchUpcoming(compStore.isWorldCup ? 50 : 12) },
     { key: 'accuracy', p: predStore.fetchAccuracy(30) },
   ]
-  if (compStore.isWorldCup) {
+  if (isFootball.value) {
     dataCalls.push(
       { key: 'recentResults', p: store.fetchRecentResults(72, 12) },
-      { key: 'dailyReport', p: loadDailyReport() },
     )
+  }
+  if (compStore.isWorldCup) {
+    dataCalls.push({ key: 'dailyReport', p: loadDailyReport() })
   }
 
   const settled = await Promise.allSettled([
@@ -632,7 +636,7 @@ function needsScoreRefresh() {
   return matches.some((m) => {
     const st = effectiveMatchStatus(m)
     return st === 'live' || (st === 'finished' && !hasMatchScore(m))
-  }) || (compStore.isWorldCup && store.todayMatches.length > 0)
+  }) || (isFootball.value && (store.todayMatches.length > 0 || store.recentResults.length > 0))
 }
 
 async function refreshMatchScores() {
@@ -640,7 +644,7 @@ async function refreshMatchScores() {
     await Promise.all([
       store.fetchToday(),
       store.fetchUpcoming(compStore.isWorldCup ? 50 : 12),
-      compStore.isWorldCup ? store.fetchRecentResults(72, 12) : Promise.resolve(),
+      isFootball.value ? store.fetchRecentResults(72, 12) : Promise.resolve(),
       compStore.isWorldCup ? loadDailyReport() : Promise.resolve(),
     ])
   } catch {
@@ -650,7 +654,7 @@ async function refreshMatchScores() {
 
 function syncScorePolling() {
   clearInterval(scorePollTimer)
-  if (compStore.isWorldCup || needsScoreRefresh()) {
+  if (isFootball.value || needsScoreRefresh()) {
     scorePollTimer = setInterval(refreshMatchScores, SCORE_POLL_MS)
   }
 }

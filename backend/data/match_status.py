@@ -907,12 +907,27 @@ def include_in_today_dashboard(match) -> bool:
 
 
 async def sync_live_scores(db: AsyncSession, slug: str, *, network: bool = False) -> dict:
-    """Fetch real-time scores from external APIs (football-data for World Cup)."""
-    if slug != "worldcup-2026":
+    """Fetch real-time scores from football-data.org (World Cup + club leagues)."""
+    if slug == "worldcup-2026":
+        try:
+            from crawler.worldcup_score_sync import sync_worldcup_scores_from_football_data
+            return await sync_worldcup_scores_from_football_data(db, network=network)
+        except IntegrityError as exc:
+            logger.warning(f"Live score sync integrity error [{slug}]: {exc}")
+            await db.rollback()
+            return {"status": "failed", "error": "integrity_error"}
+        except Exception as exc:
+            logger.warning(f"Live score sync failed [{slug}]: {exc}")
+            await db.rollback()
+            return {"status": "failed", "error": str(exc)}
+
+    from data.competitions import get_competition
+    comp = get_competition(slug)
+    if not comp or comp.get("type") != "club":
         return {"status": "skipped"}
     try:
-        from crawler.worldcup_score_sync import sync_worldcup_scores_from_football_data
-        return await sync_worldcup_scores_from_football_data(db, network=network)
+        from crawler.club_score_sync import sync_club_scores_from_football_data
+        return await sync_club_scores_from_football_data(db, slug, network=network)
     except IntegrityError as exc:
         logger.warning(f"Live score sync integrity error [{slug}]: {exc}")
         await db.rollback()
@@ -924,11 +939,8 @@ async def sync_live_scores(db: AsyncSession, slug: str, *, network: bool = False
 
 
 async def sync_match_results_for_read(db: AsyncSession, slug: str) -> int:
-    """Fast sync for HTTP read endpoints — no DB writes (avoid SQLite lock on dashboard)."""
+    """Fast sync for HTTP read endpoints — apply cache, refresh football-data in background."""
     applied = await apply_confirmed_results(db, slug, recent_days=14, flush=False)
-    if slug != "worldcup-2026":
-        return applied
-
     try:
         from service.write_guard import is_heavy_job_running
         if is_heavy_job_running():
@@ -940,7 +952,6 @@ async def sync_match_results_for_read(db: AsyncSession, slug: str) -> int:
     fd_updated = int(live_sync.get("updated") or 0)
     if fd_updated:
         applied += await apply_confirmed_results(db, slug, recent_days=14, flush=False)
-
     return applied + fd_updated
 
 
@@ -950,21 +961,24 @@ async def sync_match_results_throttled(db: AsyncSession, slug: str) -> int:
 
     now = time.monotonic()
     elapsed = now - _last_result_sync_at.get(slug, 0)
-    ttl = _LIVE_CACHE_TTL_SEC if slug == "worldcup-2026" else _RESULT_SYNC_INTERVAL_SEC
+    from data.competitions import get_competition
+    comp = get_competition(slug)
+    use_live_ttl = slug == "worldcup-2026" or (comp or {}).get("type") == "club"
+    ttl = _LIVE_CACHE_TTL_SEC if use_live_ttl else _RESULT_SYNC_INTERVAL_SEC
 
     applied = await apply_confirmed_results(db, slug)
 
     live_sync = {"updated": 0}
-    if slug == "worldcup-2026":
-        try:
-            from service.write_guard import is_heavy_job_running
-            heavy = is_heavy_job_running()
-        except ImportError:
-            heavy = False
-        if not heavy:
-            live_sync = await sync_live_scores(db, slug, network=False)
-            if int(live_sync.get("updated") or 0):
-                applied += await apply_confirmed_results(db, slug)
+    try:
+        from service.write_guard import is_heavy_job_running
+        heavy = is_heavy_job_running()
+    except ImportError:
+        heavy = False
+    if not heavy and use_live_ttl:
+        live_sync = await sync_live_scores(db, slug, network=False)
+        if int(live_sync.get("updated") or 0):
+            applied += await apply_confirmed_results(db, slug)
+            if slug == "worldcup-2026":
                 try:
                     from data.knockout_advance import advance_knockout_teams
                     await advance_knockout_teams(db, slug)

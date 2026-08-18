@@ -257,6 +257,9 @@ async def _sync_fixtures(
             if ra is not None and rb is not None:
                 current.result_a = ra
                 current.result_b = rb
+            if row.get("penalty_a") is not None and row.get("penalty_b") is not None:
+                current.penalty_a = row.get("penalty_a")
+                current.penalty_b = row.get("penalty_b")
             updated += 1
         else:
             db.add(Match(
