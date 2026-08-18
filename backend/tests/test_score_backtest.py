@@ -1,4 +1,5 @@
 """Tests for score backtest service."""
+import asyncio
 from datetime import datetime
 
 import pytest
@@ -10,6 +11,11 @@ from service.score_backtest import (
     _backtest_group_key_label,
     _resolve_kickoff,
     _odds_meta_from_history,
+    _collect_evaluated_rows,
+    _is_worldcup_competition,
+    _notes_for,
+    LEAGUE_NOTES,
+    NOTES,
 )
 from data.worldcup_schedule_lookup import canonical_kickoff_beijing
 from service.score_pick import score_matches_pick
@@ -229,4 +235,68 @@ def test_june18_daily_report_has_four_matches():
     assert june18["evaluated"] == 4
     teams = {(m["team_a"], m["team_b"]) for m in june18["matches"]}
     assert teams == j18_pairs
+
+
+class _EmptyQueryResult:
+    def scalars(self):
+        return self
+
+    def all(self):
+        return []
+
+    def scalar_one_or_none(self):
+        return None
+
+
+class _EmptySession:
+    async def execute(self, *args, **kwargs):
+        return _EmptyQueryResult()
+
+
+def test_league_notes_do_not_mention_knockout_seed():
+    assert _is_worldcup_competition("premier-league") is False
+    assert _is_worldcup_competition("worldcup-2026") is True
+    notes = _notes_for("la-liga")
+    assert notes == LEAGUE_NOTES
+    assert any("不混入世界杯" in n for n in notes)
+    assert _notes_for("worldcup-2026") == NOTES
+
+
+def test_league_backtest_does_not_seed_worldcup_matches():
+    """Club-league backtest must not fall back to World Cup 2026 history."""
+    from service.score_backtest import compute_score_backtest
+
+    async def _run():
+        evaluated, skipped, _ = await _collect_evaluated_rows(_EmptySession(), "premier-league")
+        report = await compute_score_backtest(_EmptySession(), "bundesliga")
+        return evaluated, skipped, report
+
+    evaluated, skipped, report = asyncio.run(_run())
+    assert evaluated == []
+    assert skipped == 0
+    assert report["matches_evaluated"] == 0
+    assert report["groups"] == []
+    assert report["notes"] == LEAGUE_NOTES
+    assert report["competition_slug"] == "bundesliga"
+
+
+def test_all_big_five_backtests_ignore_worldcup_history():
+    from data.competitions import COMPETITIONS
+
+    async def _run():
+        out = {}
+        for slug, meta in COMPETITIONS.items():
+            if meta.get("type") != "club":
+                continue
+            evaluated, _, _ = await _collect_evaluated_rows(_EmptySession(), slug)
+            out[slug] = evaluated
+        return out
+
+    by_slug = asyncio.run(_run())
+    assert by_slug
+    for slug, rows in by_slug.items():
+        assert rows == [], slug
+        nations = {r["team_a"] for r in rows} | {r["team_b"] for r in rows}
+        assert "葡萄牙" not in nations
+        assert "英格兰" not in nations
 

@@ -29,6 +29,8 @@ DISCLAIMER = (
     "赛果对比采用体彩 CRS 口径：常规时间（90分钟）比分，不含加时及点球进球。"
 )
 
+WORLDCUP_SLUG = "worldcup-2026"
+
 NOTES = [
     "首推：CRS 锚定管线输出的第一推荐比分。",
     "三选：首推、次推与冷门选项中任一命中即计为命中（含胜/平/负其它桶）。",
@@ -38,8 +40,25 @@ NOTES = [
     "加时赛果场次以 history 中 regulation_a/b 作为实际比分；无则使用终场比分。",
 ]
 
+LEAGUE_NOTES = [
+    "首推：CRS 锚定管线输出的第一推荐比分。",
+    "三选：首推、次推与冷门选项中任一命中即计为命中（含胜/平/负其它桶）。",
+    "所有推荐比分均为常规时间（90分钟）赛果，与体彩 CRS 结算一致。",
+    "仅回测当前联赛已完赛场次，不混入世界杯或其他赛事。",
+    "优先使用数据库中的赛前 CRS 与已发布预测；无 CRS 时用泊松合成赔率回测。",
+    "胜平负概率优先取自数据库预测记录，并与欧赔隐含概率做纠偏。",
+]
+
 DAILY_REPORT_CACHE_TTL = 300
-DAILY_REPORT_CACHE_PREFIX = "score_backtest_daily:v7:"
+DAILY_REPORT_CACHE_PREFIX = "score_backtest_daily:v8:"
+
+
+def _is_worldcup_competition(slug: str) -> bool:
+    return slug == WORLDCUP_SLUG
+
+
+def _notes_for(competition_slug: str) -> list[str]:
+    return NOTES if _is_worldcup_competition(competition_slug) else LEAGUE_NOTES
 
 
 def _history_row(team_a: str, team_b: str, year: int = 2026) -> dict | None:
@@ -354,14 +373,49 @@ def _best_odds_with_crs(odds_rows: list) -> tuple[object | None, dict[str, float
     return latest, _parse_score_odds(latest.score_odds if latest else None)
 
 
+def _seed_worldcup_history_rows(evaluated: list[dict]) -> None:
+    """Fill gaps from 2026 World Cup history seed. Must not run for club leagues."""
+    seen = {(r["team_a"], r["team_b"]) for r in evaluated}
+    for hist in HISTORICAL_MATCHES:
+        if hist.get("year") != 2026:
+            continue
+        ta, tb = hist["team_a"], hist["team_b"]
+        if (ta, tb) in seen:
+            continue
+        if hist.get("result_a") is None or hist.get("result_b") is None:
+            continue
+        crs = {str(k): float(v) for k, v in (hist.get("score_odds") or {}).items()}
+        euro = _odds_meta_from_history(hist)
+        wdl = _wdl_from_european(hist.get("european")) or (50.0, 25.0, 25.0)
+        from utils.score_prediction import actual_score_from_history
+        actual = actual_score_from_history(hist) or f"{hist['result_a']}:{hist['result_b']}"
+        row = _evaluate_match(
+            team_a=ta,
+            team_b=tb,
+            actual=actual,
+            crs=crs,
+            wdl=wdl,
+            odds_meta=euro,
+            match_time=_resolve_backtest_kickoff(ta, tb, None, hist),
+            stage=hist.get("stage") or "",
+            group_name=hist.get("group_name"),
+            matchday=hist.get("matchday"),
+            location=hist.get("location"),
+        )
+        if row:
+            evaluated.append(row)
+            seen.add((ta, tb))
+
+
 async def _collect_evaluated_rows(
     db: AsyncSession,
-    competition_slug: str = "worldcup-2026",
+    competition_slug: str = "premier-league",
 ) -> tuple[list[dict], int, dict[str, int]]:
     """Evaluate finished matches with CRS odds; returns (rows, skipped, skip_reasons)."""
+    is_worldcup = _is_worldcup_competition(competition_slug)
     ko_index: dict | None = None
-    if competition_slug == "worldcup-2026":
-        from data.knockout_advance import load_knockout_slot_index_cached, display_teams_for_match
+    if is_worldcup:
+        from data.knockout_advance import load_knockout_slot_index_cached
         ko_index = await load_knockout_slot_index_cached(db, competition_slug)
 
     rows = (await db.execute(
@@ -384,9 +438,11 @@ async def _collect_evaluated_rows(
             if not team_a or not team_b:
                 team_a = team_a or match.team_a
                 team_b = team_b or match.team_b
-        hist = _find_history_for_match(
-            team_a, team_b, stage=match.stage or "", match_time=match.match_time,
-        )
+        hist = None
+        if is_worldcup:
+            hist = _find_history_for_match(
+                team_a, team_b, stage=match.stage or "", match_time=match.match_time,
+            )
         from utils.score_prediction import actual_score_for_match
         actual = actual_score_for_match(
             result_a=int(match.result_a),
@@ -424,7 +480,10 @@ async def _collect_evaluated_rows(
             euro_wdl = _wdl_from_european(hist.get("european"))
             wdl = euro_wdl or (50.0, 25.0, 25.0)
 
-        kickoff = _resolve_backtest_kickoff(team_a, team_b, match.match_time, hist)
+        if is_worldcup:
+            kickoff = _resolve_backtest_kickoff(team_a, team_b, match.match_time, hist)
+        else:
+            kickoff = match.match_time
         published = _picks_from_db_prediction(pred_row)
 
         row = _evaluate_match(
@@ -449,36 +508,8 @@ async def _collect_evaluated_rows(
             reason = "no_crs_or_wdl" if not crs and not is_knockout_stage(match.stage or "") else "eval_failed"
             skip_reasons[reason] = skip_reasons.get(reason, 0) + 1
 
-    seen = {(r["team_a"], r["team_b"]) for r in evaluated}
-    for hist in HISTORICAL_MATCHES:
-        if hist.get("year") != 2026:
-            continue
-        ta, tb = hist["team_a"], hist["team_b"]
-        if (ta, tb) in seen:
-            continue
-        if hist.get("result_a") is None or hist.get("result_b") is None:
-            continue
-        crs = {str(k): float(v) for k, v in (hist.get("score_odds") or {}).items()}
-        euro = _odds_meta_from_history(hist)
-        wdl = _wdl_from_european(hist.get("european")) or (50.0, 25.0, 25.0)
-        from utils.score_prediction import actual_score_from_history
-        actual = actual_score_from_history(hist) or f"{hist['result_a']}:{hist['result_b']}"
-        row = _evaluate_match(
-            team_a=ta,
-            team_b=tb,
-            actual=actual,
-            crs=crs,
-            wdl=wdl,
-            odds_meta=euro,
-            match_time=_resolve_backtest_kickoff(ta, tb, None, hist),
-            stage=hist.get("stage") or "",
-            group_name=hist.get("group_name"),
-            matchday=hist.get("matchday"),
-            location=hist.get("location"),
-        )
-        if row:
-            evaluated.append(row)
-            seen.add((ta, tb))
+    if is_worldcup:
+        _seed_worldcup_history_rows(evaluated)
 
     evaluated.sort(key=lambda r: (r.get("match_time") or "", r.get("match_id") or 0))
     return evaluated, skipped, skip_reasons
@@ -656,14 +687,14 @@ def daily_report_cache_key(competition_slug: str, days: int) -> str:
     return f"{DAILY_REPORT_CACHE_PREFIX}{competition_slug}:{days}"
 
 
-async def invalidate_daily_report_cache(competition_slug: str = "worldcup-2026") -> None:
+async def invalidate_daily_report_cache(competition_slug: str = "premier-league") -> None:
     for days in (7, 14, 30):
         await cache_delete(daily_report_cache_key(competition_slug, days))
 
 
 async def compute_daily_score_report(
     db: AsyncSession,
-    competition_slug: str = "worldcup-2026",
+    competition_slug: str = "premier-league",
     *,
     days: int = 14,
 ) -> dict:
@@ -676,7 +707,7 @@ async def compute_daily_score_report(
         "matches_skipped": skipped,
         "skip_reasons": skip_reasons,
         **daily,
-        "notes": NOTES,
+        "notes": _notes_for(competition_slug),
         "disclaimer": DISCLAIMER,
         "model_version": "crs-anchored-v2",
         "computed_at": datetime.now().isoformat(timespec="seconds"),
@@ -685,7 +716,7 @@ async def compute_daily_score_report(
 
 async def get_or_compute_daily_report(
     db: AsyncSession,
-    competition_slug: str = "worldcup-2026",
+    competition_slug: str = "premier-league",
     *,
     days: int = 14,
     force: bool = False,
@@ -702,7 +733,7 @@ async def get_or_compute_daily_report(
 
 async def compute_score_backtest(
     db: AsyncSession,
-    competition_slug: str = "worldcup-2026",
+    competition_slug: str = "premier-league",
 ) -> dict:
     """Backtest score picks on all finished matches with CRS odds."""
     evaluated, skipped, skip_reasons = await _collect_evaluated_rows(db, competition_slug)
@@ -712,7 +743,7 @@ async def compute_score_backtest(
     n = len(evaluated)
 
     groups: dict[str, dict] = {}
-    prefer_date = competition_slug == "worldcup-2026"
+    prefer_date = _is_worldcup_competition(competition_slug)
     for row in evaluated:
         key, label = _backtest_group_key_label(row, prefer_date=prefer_date)
         md = row.get("matchday")
@@ -755,7 +786,7 @@ async def compute_score_backtest(
         "primary_hit_rate": round(primary_hits / n * 100, 1) if n else 0.0,
         "triple_hit_rate": round(triple_hits / n * 100, 1) if n else 0.0,
         "groups": group_list,
-        "notes": NOTES,
+        "notes": _notes_for(competition_slug),
         "disclaimer": DISCLAIMER,
         "model_version": "crs-anchored-v2",
         "computed_at": datetime.now().isoformat(timespec="seconds"),
