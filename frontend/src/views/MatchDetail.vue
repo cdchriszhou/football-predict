@@ -95,7 +95,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import AIPrediction from '@/components/AIPrediction.vue'
@@ -131,20 +131,27 @@ const predictModel = ref('auto')
 const scoreLines = computed(() => formatMatchScoreLines(match.value || {}))
 
 async function load() {
+  const matchId = Number(route.params.id)
+  if (!Number.isFinite(matchId)) return
   loading.value = true
   try {
-    const matchId = Number(route.params.id)
     match.value = await matchStore.fetchDetail(matchId)
-    await Promise.all([loadPrediction(false), loadOdds()])
+  } catch {
+    match.value = null
   } finally {
     loading.value = false
   }
+  loadPrediction(false)
+  loadOdds()
+  syncLivePolling()
 }
 
 async function loadPrediction(refresh = false) {
   predLoading.value = true
   try {
     prediction.value = await predStore.fetchPrediction(Number(route.params.id), predictModel.value, refresh)
+  } catch {
+    prediction.value = null
   } finally {
     predLoading.value = false
   }
@@ -156,7 +163,11 @@ function onModelChange() {
 
 async function loadOdds() {
   const id = Number(route.params.id)
-  odds.value = await oddsStore.fetchOdds(id, true)
+  try {
+    odds.value = await oddsStore.fetchOdds(id, true)
+  } catch {
+    odds.value = null
+  }
 }
 
 const seasonMeta = computed(() => {
@@ -187,9 +198,10 @@ function syncLivePolling() {
   }
 }
 
-onMounted(async () => {
-  await load()
-  syncLivePolling()
+onMounted(load)
+
+watch(() => route.params.id, () => {
+  load()
 })
 
 onUnmounted(() => {

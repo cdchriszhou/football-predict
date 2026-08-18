@@ -1,5 +1,6 @@
 <template>
-  <el-card class="match-card" shadow="hover" @click="goDetail">
+  <div class="match-card-wrap" @click="goDetail">
+  <el-card class="match-card" shadow="hover">
     <div class="match-header">
       <div class="match-tags">
         <el-tag :type="stageTagType" size="small">{{ stageLabel(t, match.stage) }}</el-tag>
@@ -133,11 +134,12 @@
       <span>{{ t('match.noSporttery') }}</span>
     </div>
   </el-card>
+  </div>
 </template>
 
 <script setup>
 import { computed } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { storeToRefs } from 'pinia'
 import TeamBadge from '@/components/TeamBadge.vue'
@@ -153,6 +155,7 @@ import { parseLikelyScores, parseUpsetScore } from '@/utils/scorePrediction'
 
 const { t } = useI18n()
 const router = useRouter()
+const route = useRoute()
 const compStore = useCompetitionStore()
 const authStore = useAuthStore()
 
@@ -162,7 +165,11 @@ const props = defineProps({
 })
 
 function goDetail() {
-  router.push(`${compStore.basePath}/matches/${props.match.id}`)
+  const id = props.match?.id
+  if (id == null || id === '') return
+  const slug = route.params.slug || compStore.slug
+  if (!slug) return
+  router.push({ name: 'MatchDetail', params: { slug, id: String(id) } })
 }
 
 const predStore = usePredictionsStore()
@@ -251,6 +258,7 @@ function formatLiveScore(m) {
 </script>
 
 <style scoped>
+.match-card-wrap { cursor: pointer; }
 .match-card {
   cursor: pointer;
   border-radius: 12px;

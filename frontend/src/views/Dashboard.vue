@@ -240,18 +240,21 @@ const beijingTodayKey = computed(() =>
   new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Shanghai' }),
 )
 
-/** Today's results: prefer finished/live matches; fall back to full schedule. */
+/** Today's results: prefer scored/live today; otherwise the latest finished round. */
 const displayTodayMatches = computed(() => {
   const todayKey = beijingTodayKey.value
+  const isScoredOrLive = (m) => (
+    isEffectiveMatchStatus(m, 'finished') || isEffectiveMatchStatus(m, 'live')
+  )
   const byId = new Map()
-  for (const m of store.todayMatches) {
-    if (beijingDateKey(m.match_time) === todayKey) byId.set(m.id, m)
-  }
-  // Rest day / empty today: show latest finished results, but keep one section only
-  // (exclude them from 「最近赛果」 via displayedRecentResults).
-  if (!byId.size && isFootball.value) {
+  const todays = store.todayMatches.filter((m) => beijingDateKey(m.match_time) === todayKey)
+  const todaysScored = todays.filter(isScoredOrLive)
+  if (todaysScored.length) {
+    for (const m of todays) byId.set(m.id, m)
+  } else {
+    // Rest day / only upcoming today: API already returns the latest finished matchday.
     for (const m of store.todayMatches) {
-      byId.set(m.id, m)
+      if (isScoredOrLive(m)) byId.set(m.id, m)
     }
   }
   if (!byId.size && isFootball.value) {
@@ -371,7 +374,7 @@ async function loadDashboard() {
   ]
   if (isFootball.value) {
     dataCalls.push(
-      { key: 'recentResults', p: store.fetchRecentResults(72, 12) },
+      { key: 'recentResults', p: store.fetchRecentResults(168, 16) },
     )
   }
   const settled = await Promise.allSettled([
@@ -520,7 +523,7 @@ async function refreshMatchScores() {
     await Promise.all([
       store.fetchToday(),
       store.fetchUpcoming(12),
-      isFootball.value ? store.fetchRecentResults(72, 12) : Promise.resolve(),
+      isFootball.value ? store.fetchRecentResults(168, 16) : Promise.resolve(),
     ])
   } catch {
     /* ignore transient poll errors */

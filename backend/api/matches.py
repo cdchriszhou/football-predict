@@ -73,6 +73,28 @@ def _season_ended(comp_slug: str) -> bool:
     return bool(closing and datetime.utcnow() > closing)
 
 
+def _matchday_bucket(match) -> tuple:
+    """Group club fixtures by round — 第1轮 spans Fri–Mon, not a single calendar day."""
+    md = getattr(match, "matchday", None)
+    try:
+        if md is not None and int(md) > 0:
+            return ("md", int(md))
+    except (TypeError, ValueError):
+        pass
+    return ("st", (getattr(match, "stage", None) or "").strip())
+
+
+def pick_latest_finished_matchday(matches: list) -> list:
+    """Keep every scored fixture from the latest completed round, not only the last date."""
+    scored = [m for m in matches if match_has_recorded_score(m)]
+    if not scored:
+        return []
+    latest = max(scored, key=lambda m: getattr(m, "match_time", None) or datetime.min)
+    bucket = _matchday_bucket(latest)
+    picked = [m for m in scored if _matchday_bucket(m) == bucket]
+    return sorted(picked, key=lambda m: getattr(m, "match_time", None) or datetime.min)
+
+
 def _as_match_row(m: Match | dict) -> Match | SimpleNamespace:
     if isinstance(m, dict):
         return SimpleNamespace(**m)
@@ -226,8 +248,8 @@ async def _ensure_knockout_display_ready(db: AsyncSession, comp_slug: str) -> No
 @router.get("/recent-results")
 async def get_recent_results(
     competition: str = Query("premier-league"),
-    hours: int = Query(48, ge=1, le=168),
-    limit: int = Query(12, ge=1, le=50),
+    hours: int = Query(168, ge=1, le=336),
+    limit: int = Query(16, ge=1, le=50),
     db: AsyncSession = Depends(get_db),
     current_user: str = Depends(get_current_user),
 ):
@@ -294,39 +316,35 @@ async def get_today_matches(
     )).scalars().all()
 
     kickoff_today = [m for m in matches if include_in_today_dashboard(m)]
+    scored_or_live_today = [
+        m for m in kickoff_today
+        if match_has_recorded_score(m) or resolve_public_match_status(m) == MATCH_LIVE
+    ]
     source = kickoff_today
-    # Rest day: 今日赛果 shows the latest finished matchday within a short lookback.
+    # Rest day / only upcoming today: show the latest finished round (may span several days).
     comp = get_competition(comp_slug)
     is_football = (comp or {}).get("type") == "club"
-    lookback_days = 5
-    if is_football and not kickoff_today:
+    used_matchday_fallback = False
+    lookback_days = 10
+    if is_football and not scored_or_live_today:
         lookback_start = today_start - timedelta(days=lookback_days)
         recent_rows = list((await db.execute(
             select(Match).where(
                 Match.competition_slug == comp_slug,
                 Match.match_time.isnot(None),
                 Match.match_time >= lookback_start,
-                Match.match_time < today_start,
+                Match.match_time < today_end,
                 *([season_filter] if season_filter is not None else []),
             ).order_by(Match.match_time.desc())
         )).scalars().all())
-        ko_index_preview = await _knockout_by_no(db, comp_slug)
-        scored: list[Match] = []
-        for m in recent_rows:
-            row = match_to_dict(m, knockout_by_no=ko_index_preview)
-            if row.get("result_a") is not None and row.get("result_b") is not None:
-                scored.append(m)
-        if scored:
-            # Keep the most recent calendar day that had finished fixtures.
-            last_day = scored[0].match_time.date()
-            source = sorted(
-                [m for m in scored if m.match_time and m.match_time.date() == last_day],
-                key=lambda m: m.match_time or today_start,
-            )
+        picked = pick_latest_finished_matchday(recent_rows)
+        if picked:
+            source = picked
+            used_matchday_fallback = True
 
     ko_index = await _knockout_by_no(db, comp_slug)
     data = [match_to_dict(m, knockout_by_no=ko_index) for m in source]
-    if is_football and not kickoff_today:
+    if is_football and used_matchday_fallback:
         # Dedupe by display teams in case placeholder + advanced rows both scored.
         seen: set[tuple] = set()
         deduped: list[dict] = []

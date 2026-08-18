@@ -48,3 +48,28 @@ def test_match_to_dict_hides_missing_scores():
     data = match_to_dict(m)
     assert data["result_a"] is None
     assert data["result_b"] is None
+
+
+def test_pick_latest_finished_matchday_keeps_whole_round():
+    from api.matches import pick_latest_finished_matchday
+
+    saturday = _match(
+        id=1, team_a="阿拉维斯", team_b="赫塔费",
+        match_time=datetime(2026, 8, 15, 23, 30),
+        status=MATCH_FINISHED, result_a=3, result_b=0, matchday=1,
+    )
+    sunday = _match(
+        id=2, team_a="西班牙人", team_b="莱万特",
+        match_time=datetime(2026, 8, 16, 23, 0),
+        status=MATCH_FINISHED, result_a=3, result_b=0, matchday=1,
+    )
+    monday_md2 = _match(
+        id=3, team_a="巴塞罗那", team_b="马洛卡",
+        match_time=datetime(2026, 8, 22, 3, 0),
+        status=MATCH_FINISHED, result_a=2, result_b=1, matchday=2, stage="第2轮",
+    )
+    picked = pick_latest_finished_matchday([saturday, sunday])
+    assert {m.id for m in picked} == {1, 2}
+
+    picked_latest = pick_latest_finished_matchday([saturday, sunday, monday_md2])
+    assert {m.id for m in picked_latest} == {3}
