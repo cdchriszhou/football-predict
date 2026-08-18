@@ -55,8 +55,7 @@ class RuleEngine:
     LOW_DRAW_ODDS = 3.5
 
     # Draw base rate for target_draw anchoring (overridable by CalibratedRuleEngine)
-    # Production uses calibrated_params.json (~26, typical Big Five draw rate)
-    DRAW_BASE = 28.0
+    DRAW_BASE = 25.0
 
     # Dixon-Coles low-score correlation (typical football value ~ -0.10 to -0.15)
     DIXON_COLES_RHO = -0.12
@@ -102,10 +101,11 @@ class RuleEngine:
         scores = {"a": 0.0, "b": 0.0, "draw": 0.0}
         active_weight = 0.0
 
-        # ── 1. League-table rank differential (Elo-like) ──
-        rank_a = _num(team_a, "rank", 50)
-        rank_b = _num(team_b, "rank", 50)
-        if rank_a and rank_b:
+        # ── 1. League-table rank differential (1–20, skip if either missing) ──
+        from service.league_rank import table_rank
+        rank_a = table_rank(team_a.get("rank"))
+        rank_b = table_rank(team_b.get("rank"))
+        if rank_a is not None and rank_b is not None:
             rank_diff = (rank_b - rank_a) * 8
             expected_a = 1.0 / (1.0 + math.pow(10, -rank_diff / 400))
             rank_score = expected_a * 100
@@ -260,11 +260,11 @@ class RuleEngine:
             ko_params = cfg.get("KO_ROUND_PARAMS", {}).get(stage, {})
             draw_boost = float(ko_params.get("draw_boost", 4.0))
             rank_gap = int(group_context.get("rank_gap") or 0)
-            if rank_gap >= 30:
+            if rank_gap >= 15:
                 draw_boost *= 0.30
-            elif rank_gap >= 20:
-                draw_boost *= 0.45
             elif rank_gap >= 12:
+                draw_boost *= 0.45
+            elif rank_gap >= 8:
                 draw_boost *= 0.60
             target_draw = min(32.0, target_draw + draw_boost)
 
@@ -285,8 +285,8 @@ class RuleEngine:
         if scores["draw"] >= max_wl - 8.0 and max_wl < 55.0:
             scores["draw"] = max(scores["draw"], max_wl)
         # Also: when draw is close to being the top pick, give it a slight edge
-        # reflecting the real-world tendency toward draws in tournament football
-        elif scores["draw"] >= max_wl - 4.0 and max_wl < 50.0:
+        # in knockout (tournament) football only — not Big Five league rounds.
+        elif is_knockout and scores["draw"] >= max_wl - 4.0 and max_wl < 50.0:
             scores["draw"] = max(scores["draw"], max_wl + 1.0)
 
         remaining = 100.0 - scores["draw"]

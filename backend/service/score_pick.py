@@ -17,6 +17,13 @@ from service.score_pick_config import (
     stage_draw_boost,
     get_config as _get_config,
 )
+from service.league_rank import (
+    GAP_LARGE,
+    GAP_MISMATCH,
+    is_minnow_rank,
+    rank_gap as league_rank_gap,
+    table_rank,
+)
 
 
 def _score_outcome(score: str) -> str:
@@ -240,7 +247,7 @@ def finalize_knockout_score_picks(
         picks = [s for s in (best_scores or []) if s and s != "?"][:2]
         return picks, None
 
-    rank_gap = abs(int(rank_a or 50) - int(rank_b or 50))
+    rank_gap = league_rank_gap(rank_a, rank_b)
     margin = expected_a - expected_b
     wdl_margin = abs(win_rate - lose_rate)
     fav_side = "win" if win_rate >= lose_rate + 3.0 else (
@@ -512,7 +519,7 @@ def ensure_knockout_underdog_upset(
     """When favourite is clear, cold pick should be underdog win — not another draw."""
     if not is_knockout_stage(stage) or not best_scores:
         return upset
-    rank_gap = abs(int(rank_a or 50) - int(rank_b or 50))
+    rank_gap = league_rank_gap(rank_a, rank_b)
     wdl_margin = abs(win_rate - lose_rate)
     if rank_gap < 8 and wdl_margin < 12.0:
         return upset
@@ -1035,7 +1042,7 @@ def boost_heavy_favorite_scores(
         sig.get("favorite_scoring_drought") and sig.get("opponent_defensive")
     ):
         return best_scores
-    gap = abs(int(rank_a or 50) - int(rank_b or 50))
+    gap = league_rank_gap(rank_a, rank_b)
     hcp = _parse_handicap_line(handicap)
     ranked = _rank_crs(score_odds, set())
     cmap = _crs_map(ranked)
@@ -1583,12 +1590,14 @@ def align_score_picks_to_wdl(
             return picks
         # Rank + deep handicap imply away fav: keep rout (Curacao +2 vs Côte d'Ivoire)
         rank_gap = int(ctx.get("rank_gap") or 0)
-        ra = int(ctx.get("rank_a") or 50)
-        rb = int(ctx.get("rank_b") or 50)
+        ra = table_rank(ctx.get("rank_a"))
+        rb = table_rank(ctx.get("rank_b"))
         hcp = _parse_handicap_line(ctx.get("handicap"))
         if (
-            rank_gap >= 30
-            and rb + 25 <= ra
+            rank_gap >= GAP_LARGE
+            and ra is not None and rb is not None
+            and is_minnow_rank(ra)
+            and rb <= 6
             and hcp >= 1.5
             and pri == "lose"
             and dom == "win"
@@ -2070,7 +2079,7 @@ def run_full_score_pipeline(
         expected_a=expected_a, expected_b=expected_b,
         win_rate=win_rate, lose_rate=lose_rate,
     )
-    gap = abs(int(rank_a or 50) - int(rank_b or 50))
+    gap = league_rank_gap(rank_a, rank_b)
     best = promote_knockout_blowout_scores(
         best, crs,
         expected_a=expected_a, expected_b=expected_b,
@@ -2108,7 +2117,7 @@ def run_full_score_pipeline(
         group_context={
             **(group_context or {}),
             **({"handicap": handicap} if handicap else {}),
-            **({"rank_a": rank_a, "rank_b": rank_b, "rank_gap": abs(int(rank_a or 50) - int(rank_b or 50))}
+            **({"rank_a": rank_a, "rank_b": rank_b, "rank_gap": league_rank_gap(rank_a, rank_b)}
                if rank_a is not None and rank_b is not None else {}),
         },
     )
@@ -2319,8 +2328,8 @@ def pick_crs_anchored_scores(
     if (
         pri_out == "lose"
         and away_market_fav
-        and int(rank_a or 50) >= 75
-        and abs(int(rank_a or 50) - int(rank_b or 50)) >= 35
+        and is_minnow_rank(rank_a)
+        and league_rank_gap(rank_a, rank_b) >= GAP_MISMATCH
     ):
         cmap = _crs_map(ranked)
         draw_pick = "0:0" if cmap.get("0:0") else _best_draw(ranked, {primary})
@@ -2494,7 +2503,7 @@ def ensure_rout_score_in_likely_pair(
     if win_rate < 56.0:
         return picks
     deep_sp = sp_win < 1.42
-    moderate_rout = sp_win < 1.60 and win_rate >= 58.0 and rank_gap >= 28
+    moderate_rout = sp_win < 1.60 and win_rate >= 58.0 and rank_gap >= GAP_LARGE
     if not deep_sp and not moderate_rout:
         return picks
     if _score_outcome(picks[0]) != "win":
@@ -2577,7 +2586,7 @@ def pick_upset_from_crs(
     dr = draw_rate if draw_rate is not None else max(0.0, 100.0 - win_rate - lose_rate)
     dr = _market_draw_rate(dr, sp_win, sp_draw, sp_lose)
     crs_map = _crs_map(ranked)
-    rank_gap = abs(int(rank_a or 50) - int(rank_b or 50))
+    rank_gap = league_rank_gap(rank_a, rank_b)
     hcp = _parse_handicap_line(handicap)
 
     from service.score_context import detect_resilience_signals, pick_resilience_upset
@@ -2646,7 +2655,7 @@ def pick_upset_from_crs(
             return crs_map.get(key)
 
     # 深盘热门闷平：0:0 / 1:1 作冷门（西班牙 0:0, 葡萄牙 1:1）
-    stalemate_gap = float(cfg.get("RANK_GAP_STALEMATE", 30.0))
+    stalemate_gap = float(cfg.get("RANK_GAP_STALEMATE", 12.0))
     deep_hcp = float(cfg.get("DEEP_HANDICAP_THRESHOLD", -1.5))
     stalemate_odd_limit = float(cfg.get("UPSET_DRAW_DEEP_FAV_LIMIT", 55.0))
 
@@ -2673,13 +2682,12 @@ def pick_upset_from_crs(
 
     if _is_heavy_fav_away(lose_rate, sp_lose):
         draw_pick = _best_draw(ranked, exclude)
-        minnow_rank = float(cfg.get("RANK_HIGH_MINNOW", 75.0))
-        minnow_gap = float(cfg.get("RANK_GAP_BLOWOUT", 35.0))
+        minnow_gap = float(cfg.get("RANK_GAP_BLOWOUT", 15.0))
         zero_zero_odd = float(cfg.get("UPSET_MINNOW_HOME_ZERO_ZERO_ODD", 12.0))
         draw_odd_cap = float(cfg.get("UPSET_DRAW_LOSE_RATE_CAP", 9.5))
 
         minnow_home = (
-            int(rank_a or 50) >= minnow_rank
+            is_minnow_rank(rank_a)
             and rank_gap >= minnow_gap
             and sp_lose is not None
             and sp_win is not None
@@ -2994,7 +3002,7 @@ def refine_wdl_after_score_pick(
     if not best_scores:
         return win_rate, draw_rate, lose_rate
     if _score_outcome(best_scores[0]) == "draw":
-        rank_gap = abs(int(rank_a or 50) - int(rank_b or 50))
+        rank_gap = league_rank_gap(rank_a, rank_b)
         fav_clear = win_rate >= lose_rate + 8.0 or lose_rate >= win_rate + 8.0
         if is_late_knockout_stage(stage):
             return align_wdl_to_crs_primary(
@@ -3040,11 +3048,11 @@ def ensure_extreme_mismatch_triple_coverage(
     if not crs or not picks:
         return picks, upset_val
 
-    gap = abs(int(rank_a or 50) - int(rank_b or 50))
+    gap = league_rank_gap(rank_a, rank_b)
     covered = set(picks) | ({upset_val} if upset_val else set())
 
-    # Deep home favourite: keep 0:0/1:1 cold path (Netherlands 0:0 Haiti)
-    if sp_win is not None and sp_win <= 1.18 and gap >= 38:
+    # Deep home favourite: keep 0:0/1:1 cold path
+    if sp_win is not None and sp_win <= 1.18 and gap >= GAP_MISMATCH:
         if _score_outcome(picks[0]) == "win":
             if upset_val == "1:1" and "0:0" in crs:
                 upset_val = "0:0"
@@ -3056,8 +3064,8 @@ def ensure_extreme_mismatch_triple_coverage(
                         covered.add(draw_score)
                         break
 
-    # Extreme rout: 胜其它 catches 5:0+ (Germany 7:1 Curacao)
-    if sp_win is not None and sp_win <= 1.10 and gap >= 48 and expected_a >= 2.0:
+    # Extreme rout: 胜其它 catches 5:0+
+    if sp_win is not None and sp_win <= 1.10 and gap >= GAP_MISMATCH and expected_a >= 2.0:
         if _score_outcome(picks[0]) == "win" and _has_crs_special(crs, "胜其它"):
             sec = picks[1] if len(picks) > 1 else picks[0]
             if sec == picks[0] or _score_outcome(sec) == "win":

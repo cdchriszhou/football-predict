@@ -77,7 +77,7 @@ class ScorePickConfig(TypedDict, total=False):
     RANK_GAP_HEAVY_BOOST: float       # Min rank gap for heavy fav boost
     LOW_TOTAL_THRESHOLD: float        # Over/under line for "low total" detection
     RANK_GAP_STALEMATE: float         # Rank gap for stalemate upset (0:0, 1:1)
-    RANK_HIGH_MINNOW: float           # FIFA rank threshold for minnow home upset
+    RANK_HIGH_MINNOW: float           # League table rank for relegation-zone home upset
 
     # ── Alignment thresholds ───────────────────────────────────────────────────
     ALIGN_MIN_MARGIN: float          # Min WDL margin to trigger alignment
@@ -205,11 +205,11 @@ DEFAULT_CONFIG: ScorePickConfig = {
 
     # Context thresholds
     "DEEP_HANDICAP_THRESHOLD": -1.5,
-    "RANK_GAP_BLOWOUT": 50.0,
-    "RANK_GAP_HEAVY_BOOST": 25.0,
+    "RANK_GAP_BLOWOUT": 15.0,
+    "RANK_GAP_HEAVY_BOOST": 8.0,
     "LOW_TOTAL_THRESHOLD": 2.5,
-    "RANK_GAP_STALEMATE": 30.0,
-    "RANK_HIGH_MINNOW": 75.0,
+    "RANK_GAP_STALEMATE": 12.0,
+    "RANK_HIGH_MINNOW": 16.0,
 
     # Alignment thresholds
     "ALIGN_MIN_MARGIN": 6.0,
@@ -421,9 +421,9 @@ def validate_config_bounds(config: ScorePickConfig | None = None) -> list[str]:
         warnings.append("RESILIENCE_DRAW_CAP outside reasonable range [25.0, 50.0]")
 
     # Context thresholds
-    rank_gap = cfg.get("RANK_GAP_BLOWOUT", 50.0)
-    if rank_gap < 15.0 or rank_gap > 100.0:
-        warnings.append("RANK_GAP_BLOWOUT outside reasonable range [15.0, 100.0]")
+    rank_gap = cfg.get("RANK_GAP_BLOWOUT", 15.0)
+    if rank_gap < 8.0 or rank_gap > 20.0:
+        warnings.append("RANK_GAP_BLOWOUT outside reasonable range [8.0, 20.0]")
 
     return warnings
 

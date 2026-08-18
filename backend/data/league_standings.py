@@ -10,6 +10,7 @@ from data.competitions import get_competition
 from data.match_status import season_label_for
 from data.status_constants import MATCH_FINISHED, match_status_in_db_values
 from db.models import Match, Team
+from service.league_rank import table_rank
 
 
 @dataclass
@@ -113,6 +114,57 @@ async def recompute_standings_from_matches(
     if updated:
         await db.flush()
     return updated
+
+
+def standing_row_from_team(team) -> dict:
+    return {
+        "team": getattr(team, "name", "") or "",
+        "rank": getattr(team, "rank", None),
+        "points": getattr(team, "points", None) or 0,
+        "played": getattr(team, "played", None) or 0,
+        "won": getattr(team, "won", None) or 0,
+        "draw": getattr(team, "draw", None) or 0,
+        "lost": getattr(team, "lost", None) or 0,
+        "goals_for": getattr(team, "goals_for", None) or 0,
+        "goals_against": getattr(team, "goals_against", None) or 0,
+    }
+
+
+async def load_club_standings_map(
+    db: AsyncSession,
+    slug: str,
+    season: str | None = None,
+) -> dict[str, dict]:
+    """Name → standing row for club-league table context (title / relegation)."""
+    comp = get_competition(slug)
+    if not comp or comp.get("type") != "club":
+        return {}
+
+    season = season or season_label_for(comp)
+    filters = [Team.competition_slug == slug]
+    if season:
+        filters.append(Team.season == season)
+    teams = (await db.execute(select(Team).where(*filters))).scalars().all()
+    if not teams:
+        teams = (await db.execute(
+            select(Team).where(Team.competition_slug == slug)
+        )).scalars().all()
+
+    out: dict[str, dict] = {}
+    for team in teams:
+        name = (team.name or "").strip()
+        if not name:
+            continue
+        out[name] = standing_row_from_team(team)
+    if out:
+        valid_ranks = [
+            table_rank(r.get("rank"))
+            for r in out.values()
+            if isinstance(r, dict)
+        ]
+        valid_ranks = [r for r in valid_ranks if r]
+        out["_size"] = max(valid_ranks, default=len(out)) or len(out)
+    return out
 
 
 async def ensure_league_standings_stats(

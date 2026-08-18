@@ -40,6 +40,7 @@ from service.prediction_service import (
     prepare_fused_odds,
     maybe_correct_odds_orientation,
     team_to_dict,
+    club_standings_for,
 )
 
 # 参考单注金额（元），体彩比分单关/过关常用 2 元起步
@@ -589,9 +590,9 @@ async def _build_match_analysis(
     group_context = build_group_context(
         db_match.stage, db_match.group_name or "", matchday,
         db_match.team_a, db_match.team_b,
-        team_a_dict.get("rank", 50), team_b_dict.get("rank", 50),
+        team_a_dict.get("rank"), team_b_dict.get("rank"),
         location=db_match.location or "",
-        standings=None,
+        standings=await club_standings_for(db, db_match),
         home_side_override=_club_home_override(db_match.competition_slug),
     )
 

@@ -463,6 +463,15 @@ def _club_home_override(competition_slug: str | None) -> str | None:
     return None
 
 
+async def club_standings_for(db: AsyncSession, match: Match) -> dict | None:
+    from data.competitions import is_club_competition
+    from data.league_standings import load_club_standings_map
+    slug = getattr(match, "competition_slug", None)
+    if not is_club_competition(slug):
+        return None
+    return await load_club_standings_map(db, slug)
+
+
 def _implied_wdl(win_win: float, draw: float, win_lose: float) -> dict | None:
     if not all(v and v > 1.01 for v in (win_win, draw, win_lose)):
         return None
@@ -661,9 +670,9 @@ class PredictionService:
         group_context = build_group_context(
             match.stage, match.group_name or "", matchday,
             match.team_a, match.team_b,
-            team_a_dict.get("rank", 50), team_b_dict.get("rank", 50),
+            team_a_dict.get("rank"), team_b_dict.get("rank"),
             location=match.location or "",
-            standings=None,
+            standings=await club_standings_for(db, match),
             home_side_override=_club_home_override(match.competition_slug),
         )
 

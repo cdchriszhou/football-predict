@@ -35,7 +35,15 @@ def test_league_round_is_not_worldcup_knockout_in_rule_engine():
         group_context={"stage": "1/8决赛", "rank_gap": 19},
     )
     assert league.expected_a + league.expected_b > knockout.expected_a + knockout.expected_b
-    assert league.draw_rate < knockout.draw_rate
+
+    mid_a = _club("维拉", 8)
+    mid_b = _club("布赖顿", 10)
+    league_draw = engine.evaluate(mid_a, mid_b, group_context=_league_ctx("第12轮", 12))
+    knockout_draw = engine.evaluate(
+        mid_a, mid_b,
+        group_context={"stage": "1/8决赛", "rank_gap": 2},
+    )
+    assert league_draw.draw_rate < knockout_draw.draw_rate
 
 
 def test_league_round_3_is_not_group_matchday_three():

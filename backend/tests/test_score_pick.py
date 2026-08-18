@@ -79,7 +79,7 @@ def test_reconcile_brazil_haiti_stored_bad_labels():
     picks, upset = repair_stored_score_picks(
         ["2:0", "4:0"], "3:0", crs,
         win_rate=86.9, lose_rate=8.5, draw_rate=4.6, handicap="-2",
-        rank_a=1, rank_b=87,
+        rank_a=1, rank_b=20,
     )
     assert picks[0] == "2:0"
     assert picks[1] == "3:0"
@@ -164,7 +164,7 @@ def test_align_preserves_draw_when_resilience_active():
         "standing_a": {"played": 1, "goals_for": 1, "goals_against": 1},
         "standing_b": {"played": 1, "goals_for": 0, "goals_against": 0},
     }
-    sig = detect_resilience_signals(ctx, None, 17, 64)
+    sig = detect_resilience_signals(ctx, None, 3, 18)
     crs = {"2:0": 4.6, "1:0": 4.95, "1:1": 7.3, "4:0": 18.0}
     out = align_score_picks_to_wdl(
         ["2:0", "1:1"], crs,
@@ -182,7 +182,7 @@ def test_extreme_fav_adds_stalemate_upset():
     }
     picks, upset = ensure_extreme_mismatch_triple_coverage(
         ["3:0", "4:0"], "2:0", crs,
-        sp_win=1.08, rank_a=7, rank_b=88, expected_a=2.8, expected_b=0.4,
+        sp_win=1.08, rank_a=1, rank_b=18, expected_a=2.8, expected_b=0.4,
     )
     assert upset in ("0:0", "1:1")
     assert picks[0] == "3:0"
@@ -195,7 +195,7 @@ def test_extreme_rout_promotes_win_other_secondary():
     }
     picks, _ = ensure_extreme_mismatch_triple_coverage(
         ["3:0", "4:0"], "1:1", crs,
-        sp_win=1.05, rank_a=5, rank_b=95, expected_a=3.2, expected_b=0.3,
+        sp_win=1.05, rank_a=1, rank_b=20, expected_a=3.2, expected_b=0.3,
     )
     assert picks[1] == "胜其它"
     assert score_matches_pick("7:1", "胜其它", crs)

@@ -17,6 +17,13 @@ from service.score_pick_config import (
     get_config,
     resilience_draw_bump,
 )
+from service.league_rank import (
+    GAP_LARGE,
+    GAP_MISMATCH,
+    is_minnow_rank,
+    rank_gap as league_rank_gap,
+    table_rank,
+)
 
 # FIFA 48-team R16: group winner vs paired group runner-up (BracketService)
 _R16_WINNER_VS_RUNNER: dict[str, str] = {
@@ -250,14 +257,14 @@ def detect_resilience_signals(
 ) -> dict:
     """R1 form + market flags when favourites often stall (0:0 / 2:2 / multi-goal away)."""
     ctx = group_context or {}
-    ra = int(rank_a or 50)
-    rb = int(rank_b or 50)
+    ra = table_rank(rank_a)
+    rb = table_rank(rank_b)
     market = market_score_profile(odds_dict)
     o = odds_dict or {}
     if o.get("win_win") and o.get("win_lose"):
         fav_a = market["fav_a"]
     else:
-        fav_a = ra <= rb
+        fav_a = (ra or 10) <= (rb or 10)
     sa = ctx.get("standing_a") or {}
     sb = ctx.get("standing_b") or {}
     opp = sb if fav_a else sa
@@ -266,12 +273,12 @@ def detect_resilience_signals(
     if not fav_a:
         opp_info = team_a if isinstance(team_a, dict) else {}
     tactic = str(opp_info.get("tactic") or "")
-    minnow_side = "a" if int(rank_a or 50) >= 75 else ("b" if int(rank_b or 50) >= 75 else "")
+    minnow_side = "a" if is_minnow_rank(rank_a) else ("b" if is_minnow_rank(rank_b) else "")
     minnow_st = sa if minnow_side == "a" else sb if minnow_side == "b" else {}
 
     return {
         "fav_a": fav_a,
-        "rank_gap": abs(ra - rb),
+        "rank_gap": league_rank_gap(rank_a, rank_b),
         "matchday": int(ctx.get("matchday") or 0),
         "opponent_clean_sheet": bool(opp.get("played")) and opp.get("goals_against", 1) == 0,
         "favorite_scoring_drought": (
@@ -338,7 +345,6 @@ def apply_resilience_to_likely_pair(
     resilient = (
         signals.get("opponent_clean_sheet")
         or (signals.get("favorite_scoring_drought") and signals.get("opponent_defensive"))
-        or signals.get("opponent_defensive")
     )
     blowout_primary = picks[0] in ("4:0", "5:0", "6:0", "4:1", "5:1")
 
@@ -364,7 +370,7 @@ def apply_resilience_to_likely_pair(
 
     if (
         not signals.get("fav_a")
-        and signals.get("rank_gap", 0) >= 45
+        and signals.get("rank_gap", 0) >= GAP_MISMATCH
         and (lose_rate >= 48 or signals.get("leaky_minnow"))
         and _score_outcome(picks[0]) == "lose"
     ):
@@ -557,11 +563,18 @@ def apply_md3_motivation_scores(
                 _set_secondary(sec)
             return picks[:2]
 
-    # Must-win minnow vs much stronger away favourite (Curacao 0:2 Ivory Coast)
+    # Must-win minnow vs much stronger away favourite
     rank_gap = int(ctx.get("rank_gap") or 0)
-    ra = int(ctx.get("rank_a") or 50)
-    rb = int(ctx.get("rank_b") or 50)
-    if ctx.get("must_win_a") and rank_gap >= 35 and rb + 25 <= ra and lose_rate >= 35:
+    ra = table_rank(ctx.get("rank_a"))
+    rb = table_rank(ctx.get("rank_b"))
+    if (
+        ctx.get("must_win_a")
+        and rank_gap >= GAP_MISMATCH
+        and ra is not None and rb is not None
+        and is_minnow_rank(ra)
+        and rb <= 6
+        and lose_rate >= 35
+    ):
         rout = _pick_from_crs(
             crs, outcome="lose", min_goals=2, prefer=["0:2", "0:3", "1:3", "0:1"],
         )
@@ -768,9 +781,14 @@ def apply_contextual_score_adjustments(
 
             if must_win and need_goals:
                 rank_gap = int(ctx.get("rank_gap") or 0)
-                ra = int(ctx.get("rank_a") or 50)
-                rb = int(ctx.get("rank_b") or 50)
-                minnow_home = rank_gap >= 30 and rb + 25 <= ra
+                ra = table_rank(ctx.get("rank_a"))
+                rb = table_rank(ctx.get("rank_b"))
+                minnow_home = (
+                    rank_gap >= GAP_LARGE
+                    and ra is not None and rb is not None
+                    and is_minnow_rank(ra)
+                    and rb <= 6
+                )
                 if is_a and fav_a and not minnow_home:
                     aggressive = _pick_from_crs(
                         crs, outcome="win", min_goals=3, prefer=["2:1", "3:1", "3:0"],

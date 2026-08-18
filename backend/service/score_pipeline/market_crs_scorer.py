@@ -105,10 +105,11 @@ class MarketCRSScorer(BaseScorer):
                     pass
 
         # Heavy away fav + minnow home → boost draw secondary (0:0)
+        from service.league_rank import GAP_MISMATCH, MINNOW_RANK, rank_gap as league_rank_gap, is_minnow_rank
         if (pri_out == "lose" and inp.sp_lose is not None and inp.sp_win is not None
                 and inp.sp_lose < inp.sp_win
-                and int(inp.rank_a or 50) >= 75
-                and abs(int(inp.rank_a or 50) - int(inp.rank_b or 50)) >= 35):
+                and is_minnow_rank(inp.rank_a)
+                and league_rank_gap(inp.rank_a, inp.rank_b) >= GAP_MISMATCH):
             draw_pick = "0:0" if cmap.get("0:0") else self._best_draw(ranked, {primary})
             if draw_pick and cmap.get(draw_pick, 99) <= 12.0:
                 result[draw_pick] += result.get(draw_pick, 0) * 0.50

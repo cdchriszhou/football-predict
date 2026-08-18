@@ -133,7 +133,7 @@ def test_uruguay_cape_verde_resilience_keeps_draw_secondary():
         "standing_a": {"team": "乌拉圭", "played": 1, "goals_for": 1, "goals_against": 1},
         "standing_b": {"team": "佛得角", "played": 1, "goals_for": 0, "goals_against": 0},
     }
-    sig = detect_resilience_signals(ctx, None, 17, 64)
+    sig = detect_resilience_signals(ctx, None, 3, 18)
     assert sig["opponent_clean_sheet"]
     crs = {"2:0": 4.6, "1:0": 4.95, "1:1": 7.3, "2:2": 28.0, "4:0": 18.0}
     best = apply_resilience_to_likely_pair(["2:0", "4:0"], crs, sig, win_rate=62.0)
@@ -150,7 +150,7 @@ def test_egypt_nz_multi_goal_away_secondary():
         "standing_a": {"team": "新西兰", "played": 1, "goals_for": 2, "goals_against": 2},
         "standing_b": {"team": "埃及", "played": 1, "goals_for": 1, "goals_against": 1},
     }
-    sig = detect_resilience_signals(ctx, {"win_lose": 1.42, "over_under": 2.5}, 89, 29)
+    sig = detect_resilience_signals(ctx, {"win_lose": 1.42, "over_under": 2.5}, 18, 3)
     assert sig["leaky_minnow"]
     crs = {"0:1": 5.75, "1:2": 5.8, "1:3": 11.0, "0:3": 11.0, "1:1": 6.8}
     best = apply_resilience_to_likely_pair(["0:1", "1:2"], crs, sig, lose_rate=59.7)

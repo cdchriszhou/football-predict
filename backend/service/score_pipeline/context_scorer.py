@@ -19,24 +19,27 @@ class ContextAdjustmentScorer(BaseScorer):
     def score(self, inp: ScorerInput) -> ScorerResult:
         ctx = inp.group_context or {}
         md = int(ctx.get("matchday") or 0)
-        if md < 2 or ctx.get("stage") != "小组赛":
+        stage = ctx.get("stage") or ""
+        from service.match_context import _is_league_matchday
+        is_group = stage == "小组赛"
+        is_league = _is_league_matchday(stage)
+        if is_group and md < 2:
+            return ScorerResult(scores={}, confidence=1.0, rationale="no context needed", source=self.label)
+        if not is_group and not is_league:
             return ScorerResult(scores={}, confidence=1.0, rationale="no context needed", source=self.label)
 
-        from service.score_context import market_score_profile, detect_resilience_signals
+        from service.score_context import market_score_profile
         market = market_score_profile(inp.odds_dict)
 
         adjustments: dict[str, float] = {}
-
-        # ── Market + handicap alignment ──
         adjustments = self._apply_market_alignment(adjustments, inp, market)
-        # ── Group standings motivation ──
-        adjustments = self._apply_standings_motivation(adjustments, inp, ctx)
-        # ── MD3 must-win / collusion ──
-        adjustments = self._apply_md3_rules(adjustments, inp, ctx, market)
-        # ── Knockout path pressure ──
-        adjustments = self._apply_knockout_pressure(adjustments, inp, ctx)
-        # ── Hot attacking form ──
-        adjustments = self._apply_attacking_form(adjustments, inp, ctx)
+        if is_league:
+            adjustments = self._apply_league_table_scores(adjustments, inp, ctx)
+        else:
+            adjustments = self._apply_standings_motivation(adjustments, inp, ctx)
+            adjustments = self._apply_md3_rules(adjustments, inp, ctx, market)
+            adjustments = self._apply_knockout_pressure(adjustments, inp, ctx)
+            adjustments = self._apply_attacking_form(adjustments, inp, ctx)
 
         return ScorerResult(
             scores=adjustments,
@@ -213,6 +216,33 @@ class ContextAdjustmentScorer(BaseScorer):
                     if s in inp.score_odds:
                         result[s] = result.get(s, 0) + 0.12
 
+        return result
+
+    def _apply_league_table_scores(
+        self, adj: dict[str, float], inp: ScorerInput, ctx: dict,
+    ) -> dict[str, float]:
+        """Title six-pointers and relegation scraps vs late-season dead rubber."""
+        result = dict(adj)
+        if ctx.get("dead_rubber"):
+            for s in ("1:1", "0:0"):
+                if s in inp.score_odds:
+                    result[s] = result.get(s, 0) + 0.12
+            return result
+        if ctx.get("both_must_win"):
+            for s in ("2:1", "1:2", "2:0", "0:2"):
+                if s in inp.score_odds:
+                    result[s] = result.get(s, 0) + 0.14
+            return result
+        if ctx.get("must_win_a"):
+            for s in ("2:1", "2:0", "1:0"):
+                if s in inp.score_odds:
+                    result[s] = result.get(s, 0) + 0.12
+                    break
+        if ctx.get("must_win_b"):
+            for s in ("1:2", "0:2", "0:1"):
+                if s in inp.score_odds:
+                    result[s] = result.get(s, 0) + 0.12
+                    break
         return result
 
     # ── Helpers ─────────────────────────────────────────────────────────

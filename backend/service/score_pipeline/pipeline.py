@@ -146,7 +146,8 @@ class ScorePredictionPipeline:
         # ── Post-processing ──
         # Ensure rout representation for deep favourites
         from service.score_pick import ensure_rout_score_in_likely_pair
-        gap = abs(int(rank_a or 50) - int(rank_b or 50))
+        from service.league_rank import rank_gap as league_rank_gap
+        gap = league_rank_gap(rank_a, rank_b)
         best = ensure_rout_score_in_likely_pair(
             best, crs,
             sp_win=sp_win, sp_lose=sp_lose,

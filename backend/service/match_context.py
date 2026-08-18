@@ -7,7 +7,16 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-# 2026 World Cup co-hosts
+from service.league_rank import (
+    GAP_CLEAR,
+    GAP_LARGE,
+    GAP_MISMATCH,
+    MINNOW_RANK,
+    rank_gap as league_rank_gap,
+    table_rank,
+)
+
+# 2026 World Cup co-hosts (unused for club leagues; kept for leftover WC stage labels)
 HOST_NATIONS_2026 = frozenset({"墨西哥", "美国", "加拿大"})
 
 _HOST_LOCATION_KEYWORDS: dict[str, tuple[str, ...]] = {
@@ -68,15 +77,16 @@ def build_group_context(
     matchday: int = 0,
     team_a: str = "",
     team_b: str = "",
-    rank_a: int = 50,
-    rank_b: int = 50,
+    rank_a: int | None = None,
+    rank_b: int | None = None,
     location: str = "",
     standings: dict | None = None,
     home_side_override: str | None = None,
 ) -> dict:
-    """Build group-stage / league context for rule engine.
+    """Build league / group context for the rule engine.
 
-    For club leagues, pass home_side_override='a' (team_a is always home in sync).
+    For club leagues, pass home_side_override='a' (team_a is always home in sync)
+    and a name→standing map from load_club_standings_map().
     """
     if home_side_override in ("a", "b"):
         home_side = home_side_override
@@ -88,13 +98,14 @@ def build_group_context(
     home_xg_boost = 0.0
     if home_side:
         if is_league:
-            # Typical club home advantage (weaker than WC host opener)
             home_win_boost = 5.0
             home_xg_boost = 0.35
         else:
             home_win_boost = 6.0 if is_group_opener else 4.0
             home_xg_boost = 0.55 if is_group_opener else 0.28
 
+    ra = table_rank(rank_a)
+    rb = table_rank(rank_b)
     ctx = {
         "stage": stage,
         "group_name": group_name,
@@ -120,11 +131,85 @@ def build_group_context(
         "form_xg_b": 0.0,
         "defense_leak_a": 0.0,
         "defense_leak_b": 0.0,
-        "rank_a": rank_a,
-        "rank_b": rank_b,
-        "rank_gap": abs(rank_a - rank_b),
+        "rank_a": ra,
+        "rank_b": rb,
+        "rank_gap": league_rank_gap(ra, rb),
     }
+    if is_league and standings:
+        _apply_league_table_motivation(ctx, team_a, team_b, standings)
     return ctx
+
+
+def _standing_row(standings: dict, name: str) -> dict | None:
+    if not standings or not name:
+        return None
+    row = standings.get(name)
+    if isinstance(row, dict) and not name.startswith("_"):
+        return row
+    return None
+
+
+def _apply_league_table_motivation(
+    ctx: dict,
+    team_a: str,
+    team_b: str,
+    standings: dict,
+) -> None:
+    """Title race / relegation / dead-rubber flags from the current table."""
+    sa = _standing_row(standings, team_a)
+    sb = _standing_row(standings, team_b)
+    if not sa or not sb:
+        return
+
+    ctx["standing_a"] = sa
+    ctx["standing_b"] = sb
+    size = int(standings.get("_size") or 0) or 20
+    ctx["table_size"] = size
+
+    ra = table_rank(sa.get("rank")) or 99
+    rb = table_rank(sb.get("rank")) or 99
+    pa = int(sa.get("points") or 0)
+    pb = int(sb.get("points") or 0)
+    played = min(int(sa.get("played") or 0), int(sb.get("played") or 0))
+    md = int(ctx.get("matchday") or 0)
+
+    # Table is noisy until both sides have a handful of games.
+    if played < 6 and md < 8:
+        return
+
+    title_cut = 4
+    releg_cut = max(title_cut + 1, size - 2)
+    late = md >= 30 or played >= 30
+    very_late = md >= 34 or played >= 34
+
+    in_title_a = ra <= title_cut
+    in_title_b = rb <= title_cut
+    in_releg_a = ra >= releg_cut
+    in_releg_b = rb >= releg_cut
+
+    if in_title_a and in_title_b and abs(pa - pb) <= 6:
+        ctx["both_must_win"] = True
+        ctx["need_goals_a"] = True
+        ctx["need_goals_b"] = True
+    if in_releg_a and in_releg_b:
+        ctx["both_must_win"] = True
+        ctx["must_win_a"] = True
+        ctx["must_win_b"] = True
+
+    if late:
+        if in_releg_a and not in_releg_b:
+            ctx["must_win_a"] = True
+        if in_releg_b and not in_releg_a:
+            ctx["must_win_b"] = True
+        if in_title_a and not in_title_b and ra <= 2:
+            ctx["must_win_a"] = True
+        if in_title_b and not in_title_a and rb <= 2:
+            ctx["must_win_b"] = True
+
+    mid_a = 6 <= ra <= size - 5
+    mid_b = 6 <= rb <= size - 5
+    if very_late and mid_a and mid_b and not ctx["both_must_win"]:
+        ctx["dead_rubber"] = True
 
 
 def analyze_match_context(
@@ -140,15 +225,17 @@ def analyze_match_context(
     fund = fundamentals or {}
     result = ContextAnalysis(group_context=ctx)
 
-    rank_a = team_a.get("rank", 50) or 50
-    rank_b = team_b.get("rank", 50) or 50
-    rank_gap = abs(rank_a - rank_b)
+    rank_a = table_rank(team_a.get("rank"))
+    rank_b = table_rank(team_b.get("rank"))
+    rank_gap = league_rank_gap(rank_a, rank_b)
+    ra = rank_a if rank_a is not None else 10
+    rb = rank_b if rank_b is not None else 10
 
     fund_win = fund.get("win_pct", 50.0)
     market_win = fund.get("market_win_pct", 50.0)
 
-    # ── Upset detection (冷门) ──
-    fav_is_a = rank_a < rank_b
+    # ── Upset detection (冷门) — league 1–20 table, not FIFA 1–200 ──
+    fav_is_a = ra < rb
     underdog = "b" if fav_is_a else "a"
     home_side = ctx.get("home_side", "")
     fav_at_home = (
@@ -157,9 +244,8 @@ def analyze_match_context(
         home_side == "b" and not fav_is_a
     )
 
-    if rank_gap >= 20:
-        # Historical WC: ~25% of 20+ rank-gap group games are upsets or draws
-        base_upset = 0.12 + min(0.18, rank_gap / 200)
+    if rank_gap >= GAP_CLEAR:
+        base_upset = 0.10 + min(0.16, rank_gap / 40)
         if market_win > fund_win + 12:
             base_upset += 0.10
             result.alerts.append("市场热度高于实力：强队存在翻车风险")
@@ -170,22 +256,21 @@ def analyze_match_context(
         ):
             base_upset += 0.08
             result.alerts.append("出线队末轮可能轮换：冷门概率上升")
-        # Host favorite at home: opener curse already priced in market, reduce cold risk
         if fav_at_home:
-            base_upset = max(0.06, base_upset - 0.14)
+            base_upset = max(0.06, base_upset - 0.10)
             if ctx.get("is_group_opener"):
                 base_upset = max(0.05, base_upset - 0.08)
                 result.alerts.append("东道主揭幕战主场作战：适度降低冷门权重")
-        if rank_gap >= 35 and fav_at_home:
+        if rank_gap >= GAP_MISMATCH and fav_at_home:
             base_upset = min(base_upset, 0.12)
         result.upset_risk = min(0.38, base_upset)
-        result.underdog_side = underdog if fav_is_a else ("a" if rank_b < rank_a else "")
+        result.underdog_side = underdog if fav_is_a else ("a" if rb < ra else "")
 
     # Knockout underdog with defensive style (not club league matchdays)
     stage = ctx.get("stage", "")
     from service.score_pick import is_knockout_stage
-    if is_knockout_stage(stage) and rank_gap >= 10:
-        def_style = team_b.get("tactic", "") if rank_a < rank_b else team_a.get("tactic", "")
+    if is_knockout_stage(stage) and rank_gap >= GAP_CLEAR:
+        def_style = team_b.get("tactic", "") if ra < rb else team_a.get("tactic", "")
         if any(t in def_style for t in ("防守", "防反", "铁桶", "硬朗")):
             result.upset_risk = min(0.40, result.upset_risk + 0.08)
             result.alerts.append("淘汰赛防守型弱队：拖入加时/点球概率高")
@@ -217,13 +302,30 @@ def analyze_match_context(
         result.draw_adjustment += 5
         result.alerts.append("无关痛痒之战：双方无进攻动力")
 
+    # ── League table motivation (title / relegation) ──
+    if _is_league_matchday(stage):
+        name_a = team_a.get("name", "")
+        name_b = team_b.get("name", "")
+        if ctx.get("both_must_win") or ctx.get("must_win_a") or ctx.get("must_win_b"):
+            result.draw_adjustment -= 5.0
+            if ctx.get("must_win_a"):
+                result.alerts.append(f"{name_a} 联赛积分形势需抢分，平局权重下调")
+            if ctx.get("must_win_b"):
+                result.alerts.append(f"{name_b} 联赛积分形势需抢分，平局权重下调")
+            if ctx.get("both_must_win") and not (ctx.get("must_win_a") or ctx.get("must_win_b")):
+                result.alerts.append("联赛六分之战：双方都需要胜场")
+        if ctx.get("need_goals_a"):
+            result.alerts.append(f"{name_a} 净胜球/积分落后，可能加强进攻")
+        if ctx.get("need_goals_b"):
+            result.alerts.append(f"{name_b} 净胜球/积分落后，可能加强进攻")
+
     # ── Group-stage motivation (round 2+) ──
     if ctx.get("stage") == "小组赛" and ctx.get("matchday", 0) >= 2:
         name_a = team_a.get("name", "")
         name_b = team_b.get("name", "")
         sa = ctx.get("standing_a") or {}
         sb = ctx.get("standing_b") or {}
-        fav_is_a = rank_a < rank_b
+        fav_is_a = ra < rb
         opp_st = sb if fav_is_a else sa
         fav_st = sa if fav_is_a else sb
         def_team = team_b if fav_is_a else team_a
@@ -259,10 +361,21 @@ def analyze_match_context(
         if ctx.get("need_goals_b"):
             result.alerts.append(f"{name_b} 净胜球落后，可能加强进攻")
 
-    # Minnow home vs away favourite — park-the-bus draw (Curacao 0:0 Ecuador)
-    home_rank = rank_a if home_side != "b" else rank_b
-    away_rank = rank_b if home_side != "b" else rank_a
+    # Weak home side vs away favourite — park-the-bus (league relegation zone)
+    home_rank = ra if home_side != "b" else rb
+    away_rank = rb if home_side != "b" else ra
     if (
+        _is_league_matchday(stage)
+        and home_rank >= MINNOW_RANK
+        and away_rank <= 6
+        and rank_gap >= GAP_LARGE
+        and not fav_at_home
+    ):
+        result.draw_adjustment += 6.0
+        result.favourite_lose_shift = 0.12
+        result.upset_risk = min(0.38, result.upset_risk + 0.05)
+        result.alerts.append("保级队主场守平：平局权重上调")
+    elif (
         ctx.get("stage") == "小组赛"
         and ctx.get("matchday", 0) >= 2
         and home_rank >= 75

@@ -12,6 +12,7 @@ from service.prediction_service import (
     prepare_fused_odds,
     infer_matchday,
     _club_home_override,
+    club_standings_for,
 )
 from service.calibration_service import CalibratedRuleEngine
 from service.score_backtest import compute_score_backtest, get_or_compute_daily_report
@@ -142,9 +143,9 @@ async def get_predictions_batch(
             group_context = build_group_context(
                 match.stage, match.group_name or "", matchday,
                 match.team_a, match.team_b,
-                ta_dict.get("rank", 50), tb_dict.get("rank", 50),
+                ta_dict.get("rank"), tb_dict.get("rank"),
                 location=match.location or "",
-                standings=None,
+                standings=await club_standings_for(db, match),
                 home_side_override=_club_home_override(match.competition_slug),
             )
 

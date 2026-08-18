@@ -1,8 +1,8 @@
 """
-Historical backtesting and automatic parameter calibration.
+League-prior parameter store for the rule engine.
 
-Uses 2014/2018/2022 World Cup matches with European + Macau odds to tune
-rule engine parameters for result accuracy and score prediction.
+World Cup 2014/18/22 grid-search is retired. These priors match typical
+Big Five rates (~23–26% draws, ~2.7 goals/game) and trust league markets.
 """
 from __future__ import annotations
 
@@ -21,24 +21,26 @@ from service.rule_engine import RuleEngine
 PARAMS_PATH = Path(__file__).resolve().parent.parent / "data" / "calibrated_params.json"
 
 DEFAULT_PARAMS = {
+    "source": "big-five-league",
     "weights": {
-        "rank": 0.12,
-        "ability": 0.18,
-        "tactic": 0.10,
-        "h2h": 0.08,
-        "odds": 0.38,
-        "players": 0.14,
+        "rank": 0.10,
+        "ability": 0.16,
+        "tactic": 0.08,
+        "h2h": 0.06,
+        "odds": 0.45,
+        "players": 0.15,
     },
-    "avg_goals": 2.68,
-    "knockout_goal_reduction": 0.84,
-    "dixon_coles_rho": -0.13,
-    "market_blend": 0.28,
-    "draw_base": 30.0,
-    "score_odds_blend": 0.32,
+    "avg_goals": 2.72,
+    "knockout_goal_reduction": 1.0,
+    "dixon_coles_rho": -0.10,
+    "market_blend": 0.40,
+    "draw_base": 25.0,
+    "score_odds_blend": 0.38,
     "upset_weight": 1.0,
-    "collusion_weight": 1.2,
-    "manipulation_dampen": 0.15,
-    "low_draw_odds": 3.6,
+    "collusion_weight": 1.0,
+    "manipulation_dampen": 0.12,
+    "low_draw_odds": 3.5,
+    "KO_ROUND_PARAMS": {},
     "calibrated_at": None,
     "backtest": {},
 }
@@ -294,11 +296,10 @@ class CalibratedRuleEngine(RuleEngine):
             if tga == tgb:
                 return model_scores
 
-        rank_a = int((team_a or {}).get("rank") or 50)
-        rank_b = int((team_b or {}).get("rank") or 50)
-        rank_gap = abs(rank_a - rank_b)
+        from service.league_rank import GAP_LARGE, GAP_MISMATCH, rank_gap as league_rank_gap
+        rank_gap = league_rank_gap((team_a or {}).get("rank"), (team_b or {}).get("rank"))
 
-        if rank_gap >= 35:
+        if rank_gap >= GAP_MISMATCH:
             from service.score_pick import _rank_crs
             crs_ranked = _rank_crs(score_odds, set())
             if crs_ranked:
@@ -328,7 +329,7 @@ class CalibratedRuleEngine(RuleEngine):
         if top_crs and ":" in top_crs:
             tga, tgb = map(int, top_crs.split(":"))
             fav_win = (home_side == "a" and tga > tgb) or (home_side == "b" and tgb > tga)
-            if fav_win and rank_gap >= 18:
+            if fav_win and rank_gap >= GAP_LARGE:
                 high = "4:1" if result.expected_a >= 2.0 else "3:1"
                 return [high, top_crs]
 

@@ -13,6 +13,7 @@ import math
 from typing import Optional
 
 from .base import BaseScorer, ScorerInput, ScorerResult
+from service.league_rank import GAP_CLEAR, rank_gap as league_rank_gap
 
 
 class PoissonModelScorer(BaseScorer):
@@ -56,7 +57,7 @@ class PoissonModelScorer(BaseScorer):
         dist = self._apply_host_opener_blowout(dist, inp)
 
         # 3. Preserve the top draw score — ensure draws are not suppressed
-        dist = self._preserve_top_draw(dist)
+        dist = self._preserve_top_draw(dist, inp)
 
         # 4. Normalize to [0, 1] range
         normalized = self._normalize(dist)
@@ -176,8 +177,7 @@ class PoissonModelScorer(BaseScorer):
 
     def _apply_rout_boost(self, dist: dict[str, float], inp: ScorerInput) -> dict[str, float]:
         """Boost high-margin win scores for clear favourites — strong enough to flip rankings."""
-        rank_gap = abs(int(inp.rank_a or 50) - int(inp.rank_b or 50))
-        hcp = self._parse_handicap(inp.handicap)
+        gap = league_rank_gap(inp.rank_a, inp.rank_b)
 
         # Determine favourite side and strength
         is_home_fav = inp.win_rate >= inp.lose_rate
@@ -189,7 +189,8 @@ class PoissonModelScorer(BaseScorer):
             return dist
         if sp_fav is not None and sp_fav >= 1.80:
             return dist
-        if rank_gap < 20 and sp_fav is not None and sp_fav >= 1.55:
+        # Close table (gap < 8) + not-deep favourite: don't force 3:0/4:0
+        if gap < GAP_CLEAR and sp_fav is not None and sp_fav >= 1.55:
             return dist
 
         result = dict(dist)
@@ -343,22 +344,23 @@ class PoissonModelScorer(BaseScorer):
                 result[s] *= 1.22
         return result
 
-    def _preserve_top_draw(self, dist: dict[str, float]) -> dict[str, float]:
-        """Ensure the top draw score is not suppressed below 85% of the top overall score.
+    def _preserve_top_draw(self, dist: dict[str, float], inp: ScorerInput) -> dict[str, float]:
+        """Keep draws visible in balanced matches; do not flatten deep-favourite blowouts.
 
-        This prevents the shutout bias from completely eliminating draws from
-        consideration, which was causing the system to predict draws only 2% of the time
-        vs the actual 28% draw rate in the 2026 World Cup.
+        World Cup calibration forced the top draw to 85% of the top score to match
+        a ~28% tournament draw rate. Big Five deep favourites should not get that.
         """
         if not dist:
             return dist
-        result = dict(dist)
+        fav_rate = max(inp.win_rate, inp.lose_rate)
+        sp_fav = inp.sp_win if inp.win_rate >= inp.lose_rate else inp.sp_lose
+        gap = league_rank_gap(inp.rank_a, inp.rank_b)
+        if fav_rate >= 58.0 or (sp_fav is not None and sp_fav < 1.55) or gap >= GAP_CLEAR:
+            return dist
 
-        # Find top overall score
+        result = dict(dist)
         top_score = max(result, key=result.get)
         top_weight = result[top_score]
-
-        # Find top draw score
         top_draw = None
         top_draw_weight = 0.0
         for s, w in result.items():
@@ -369,11 +371,8 @@ class PoissonModelScorer(BaseScorer):
             if ga == gb and w > top_draw_weight:
                 top_draw = s
                 top_draw_weight = w
-
-        # Ensure top draw gets at least 85% of top overall weight
-        if top_draw and top_weight > 0 and top_draw_weight < top_weight * 0.85:
-            result[top_draw] = top_weight * 0.85
-
+        if top_draw and top_weight > 0 and top_draw_weight < top_weight * 0.70:
+            result[top_draw] = top_weight * 0.70
         return result
 
     # ── Helpers ─────────────────────────────────────────────────────────
@@ -390,6 +389,6 @@ class PoissonModelScorer(BaseScorer):
     def _compute_confidence(self, inp: ScorerInput) -> float:
         """Higher confidence when xG and rank gap are clear."""
         gap = abs(inp.expected_a - inp.expected_b)
-        rank_gap = abs(int(inp.rank_a or 50) - int(inp.rank_b or 50))
-        conf = 0.5 + min(0.4, gap * 0.15 + rank_gap / 200)
+        table_gap = league_rank_gap(inp.rank_a, inp.rank_b)
+        conf = 0.5 + min(0.4, gap * 0.15 + table_gap / 40)
         return round(min(1.0, conf), 2)
