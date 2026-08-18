@@ -513,7 +513,7 @@ async def get_calibration_params(current_user: str = Depends(get_current_admin_u
 
 @router.get("/calibration/backtest")
 async def get_backtest_results(current_user: str = Depends(get_current_admin_user)):
-    """Run backtest on 2014/2018/2022 historical matches."""
+    """Return stored league-prior calibration metrics."""
     params = load_calibrated_params()
     result = run_backtest(params)
     return success({
@@ -528,7 +528,7 @@ async def run_calibration(
     iterations: int = Query(80, ge=20, le=200),
     current_user: str = Depends(get_current_admin_user),
 ):
-    """Auto-calibrate model parameters using historical World Cup data."""
+    """Keep current league priors; grid-search calibration is retired."""
     logger.info(f"Starting calibration with {iterations} iterations")
     params = calibrate(iterations=iterations)
 

@@ -7,15 +7,11 @@ Big Five rates (~23–26% draws, ~2.7 goals/game) and trust league markets.
 from __future__ import annotations
 
 import json
-import math
-import os
 from copy import deepcopy
-from datetime import datetime
 from pathlib import Path
 
-from utils.score_prediction import normalize_score_prediction
-from service.odds_fusion import fuse_multi_market_odds, fused_odds_to_dict, score_distribution_from_odds
-from service.match_context import build_group_context, analyze_match_context, apply_context_to_rates
+from service.odds_fusion import score_distribution_from_odds
+from service.match_context import apply_context_to_rates
 from service.rule_engine import RuleEngine
 
 PARAMS_PATH = Path(__file__).resolve().parent.parent / "data" / "calibrated_params.json"
@@ -65,29 +61,6 @@ def save_calibrated_params(params: dict) -> None:
     PARAMS_PATH.parent.mkdir(parents=True, exist_ok=True)
     with open(PARAMS_PATH, "w", encoding="utf-8") as f:
         json.dump(params, f, ensure_ascii=False, indent=2)
-
-
-def _actual_winner(result_a: int, result_b: int) -> str:
-    if result_a > result_b:
-        return "a"
-    if result_b > result_a:
-        return "b"
-    return "draw"
-
-
-def _predict_winner(win_rate: float, draw_rate: float, lose_rate: float) -> str:
-    if win_rate >= draw_rate and win_rate >= lose_rate:
-        return "a"
-    if lose_rate >= win_rate and lose_rate >= draw_rate:
-        return "b"
-    return "draw"
-
-
-def _brier_score(probs: tuple, actual: str) -> float:
-    labels = {"a": 0, "draw": 1, "b": 2}
-    actual_idx = labels[actual]
-    p = (probs[0] / 100, probs[1] / 100, probs[2] / 100)
-    return sum((p[i] - (1 if i == actual_idx else 0)) ** 2 for i in range(3))
 
 
 class CalibratedRuleEngine(RuleEngine):
@@ -348,107 +321,6 @@ class CalibratedRuleEngine(RuleEngine):
         return picked[:2] if picked else model_scores
 
 
-def predict_historical_match(engine: CalibratedRuleEngine, match: dict) -> dict:
-    """Run full prediction pipeline on a historical match."""
-    from crawler.odds_scraper import derive_score_odds
-
-    ta = match_to_team_dict(match["team_a"], match["rank_a"])
-    tb = match_to_team_dict(match["team_b"], match["rank_b"])
-
-    standings = None
-    group_name = match.get("group_name") or ""
-    if match.get("stage") == "小组赛" and group_name:
-        mt = match.get("match_time")
-        if isinstance(mt, str):
-            mt = datetime.fromisoformat(mt.replace("Z", "+00:00"))
-        year = match.get("year")
-        hist_rows = [
-            m for m in HISTORICAL_MATCHES
-            if m.get("year") == year and m.get("group_name") == group_name
-        ]
-        standings = load_standings_from_history(hist_rows, group_name, before_time=mt)
-
-    group_ctx = build_group_context(
-        match["stage"], group_name,
-        match.get("matchday", 0),
-        match["team_a"], match["team_b"],
-        match["rank_a"], match["rank_b"],
-        location=match.get("location", ""),
-        standings=standings,
-    )
-    if "collusion" in match.get("tags", []):
-        group_ctx["both_need_draw"] = True
-        group_ctx["is_final_group_match"] = True
-
-    euro = match.get("european", {})
-    macau = match.get("macau", {})
-    score_odds = match.get("score_odds") or derive_score_odds(
-        euro.get("win_win", 2.5), euro.get("draw", 3.2), euro.get("win_lose", 3.0)
-    )
-
-    pre = engine.evaluate(ta, tb, odds=None, group_context=group_ctx)
-    fund_win = pre.win_rate
-
-    fused = fuse_multi_market_odds(
-        european=euro, macau=macau, fundamentals_win_pct=fund_win
-    )
-    odds_dict = fused_odds_to_dict(fused)
-    odds_dict["score_odds"] = score_odds
-
-    context = analyze_match_context(
-        ta, tb, group_ctx, fused.market_signals,
-        {
-            "win_pct": fund_win,
-            "market_win_pct": fused.imp_win,
-            "market_draw_pct": fused.imp_draw,
-        },
-    )
-    tags = match.get("tags", [])
-    if "upset" in tags:
-        context.upset_risk = max(context.upset_risk, 0.22)
-        fav_rank = min(match["rank_a"], match["rank_b"])
-        if fav_rank <= 10:
-            context.upset_risk = max(context.upset_risk, 0.28)
-    if "collusion" in tags:
-        context.collusion_risk = max(context.collusion_risk, 0.30)
-        context.draw_adjustment = max(context.draw_adjustment, 8.0)
-
-    result = engine.evaluate(
-        ta, tb, odds=odds_dict, group_context=group_ctx,
-        context_analysis=context,
-        score_odds=score_odds,
-    )
-
-    upset = result.upset_score if result.upset_score and result.upset_score != "?" else None
-    from utils.score_prediction import reconcile_prediction_view
-    view = reconcile_prediction_view(
-        result.best_scores, upset, result.win_rate, result.draw_rate, result.lose_rate,
-    )
-
-    return {
-        "win_rate": view["win_rate"],
-        "draw_rate": view["draw_rate"],
-        "lose_rate": view["lose_rate"],
-        "best_scores": view["best_scores"],
-        "score_picks": view,
-        "upset_score": view.get("upset_score"),
-        "actual": f"{match['result_a']}:{match['result_b']}",
-        "actual_winner": _actual_winner(match["result_a"], match["result_b"]),
-        "predicted_winner": _predict_winner(view["win_rate"], view["draw_rate"], view["lose_rate"]),
-        "context_alerts": context.alerts,
-        "w_d_l": f"{view['win_rate']}/{view['draw_rate']}/{view['lose_rate']}",
-    }
-
-
-def _predicted_score_lines(pred: dict) -> list[str]:
-    """All predicted scorelines: two likely + optional upset."""
-    picks = list(pred.get("score_picks", {}).get("best_scores") or pred.get("best_scores") or [])
-    upset = pred.get("upset_score") or pred.get("score_picks", {}).get("upset_score")
-    if upset and upset not in picks:
-        picks.append(upset)
-    return picks
-
-
 def run_backtest(params: dict = None, matches: list = None) -> dict:
     """Return stored metrics. World Cup historical replay has been removed."""
     params = params or load_calibrated_params()
@@ -463,81 +335,6 @@ def run_backtest(params: dict = None, matches: list = None) -> dict:
         "collusion_detection_rate": stored.get("collusion_detection_rate", 0),
         "details": stored.get("details") or [],
     }
-    engine = CalibratedRuleEngine(params)
-    data = matches or HISTORICAL_MATCHES
-
-    correct_result = 0
-    correct_score = 0
-    brier_sum = 0.0
-    upset_detected = 0
-    upset_total = 0
-    collusion_detected = 0
-    collusion_total = 0
-    details = []
-
-    for m in data:
-        pred = predict_historical_match(engine, m)
-        actual_score = pred["actual"]
-        actual_w = pred["actual_winner"]
-        pred_w = pred["predicted_winner"]
-
-        if actual_w == pred_w:
-            correct_result += 1
-        if actual_score in _predicted_score_lines(pred):
-            correct_score += 1
-
-        brier_sum += _brier_score(
-            (pred["win_rate"], pred["draw_rate"], pred["lose_rate"]), actual_w
-        )
-
-        tags = m.get("tags", [])
-        if "upset" in tags:
-            upset_total += 1
-            underdog = "b" if m["rank_a"] < m["rank_b"] else "a"
-            if (underdog == "a" and pred["win_rate"] > pred["lose_rate"]) or \
-               (underdog == "b" and pred["lose_rate"] > pred["win_rate"]):
-                upset_detected += 1
-
-        if "collusion" in tags and actual_w == "draw":
-            collusion_total += 1
-            if pred["draw_rate"] >= max(pred["win_rate"], pred["lose_rate"]):
-                collusion_detected += 1
-
-        score_lines = _predicted_score_lines(pred)
-        details.append({
-            "match": f"{m['team_a']} vs {m['team_b']} ({m['year']})",
-            "actual": actual_score,
-            "predicted_top3": pred["best_scores"],
-            "predicted_scores": score_lines,
-            "w_d_l": f"{pred['win_rate']}/{pred['draw_rate']}/{pred['lose_rate']}",
-            "correct_result": actual_w == pred_w,
-            "correct_score": actual_score in score_lines,
-            "alerts": pred["context_alerts"][:2],
-        })
-
-    n = len(data)
-    return {
-        "total_matches": n,
-        "result_accuracy": round(correct_result / n * 100, 1) if n else 0,
-        "score_pick_accuracy": round(correct_score / n * 100, 1) if n else 0,
-        "score_top3_accuracy": round(correct_score / n * 100, 1) if n else 0,
-        "brier_score": round(brier_sum / n, 4) if n else 0,
-        "upset_detection_rate": round(upset_detected / upset_total * 100, 1) if upset_total else 0,
-        "collusion_detection_rate": round(collusion_detected / collusion_total * 100, 1) if collusion_total else 0,
-        "details": details,
-    }
-
-
-def _score_params(params: dict) -> float:
-    """Objective: maximize result accuracy + score hit rate, minimize Brier."""
-    bt = run_backtest(params)
-    return (
-        bt["result_accuracy"] * 0.45
-        + bt["score_top3_accuracy"] * 0.35
-        + bt["upset_detection_rate"] * 0.10
-        + bt["collusion_detection_rate"] * 0.05
-        - bt["brier_score"] * 30
-    )
 
 
 def calibrate(iterations: int = 80) -> dict:
@@ -545,47 +342,3 @@ def calibrate(iterations: int = 80) -> dict:
     params = load_calibrated_params()
     save_calibrated_params(params)
     return params
-    best_params = deepcopy(DEFAULT_PARAMS)
-    best_score = _score_params(best_params)
-
-    search_space = {
-        "avg_goals": [2.55, 2.65, 2.75, 2.85],
-        "dixon_coles_rho": [-0.10, -0.13, -0.16],
-        "market_blend": [0.30, 0.40, 0.50, 0.55],
-        "odds_weight": [0.38, 0.45, 0.52],
-        "draw_base": [24.0, 27.0, 30.0],
-        "score_odds_blend": [0.35, 0.45, 0.55],
-        "upset_weight": [0.8, 1.0, 1.2, 1.4],
-        "collusion_weight": [1.0, 1.4, 1.8],
-        "knockout_reduction": [0.82, 0.85, 0.88],
-    }
-
-    import random
-    rng = random.Random(42)
-
-    for i in range(iterations):
-        trial = deepcopy(best_params)
-        trial["avg_goals"] = rng.choice(search_space["avg_goals"])
-        trial["dixon_coles_rho"] = rng.choice(search_space["dixon_coles_rho"])
-        trial["market_blend"] = rng.choice(search_space["market_blend"])
-        trial["knockout_goal_reduction"] = rng.choice(search_space["knockout_reduction"])
-        trial["draw_base"] = rng.choice(search_space["draw_base"])
-        trial["score_odds_blend"] = rng.choice(search_space["score_odds_blend"])
-        trial["upset_weight"] = rng.choice(search_space["upset_weight"])
-        trial["collusion_weight"] = rng.choice(search_space["collusion_weight"])
-        trial["weights"]["odds"] = rng.choice(search_space["odds_weight"])
-        remaining = 1.0 - trial["weights"]["odds"]
-        other_keys = [k for k in trial["weights"] if k != "odds"]
-        base_sum = sum(DEFAULT_PARAMS["weights"][k] for k in other_keys)
-        for k in other_keys:
-            trial["weights"][k] = round(remaining * DEFAULT_PARAMS["weights"][k] / base_sum, 3)
-
-        score = _score_params(trial)
-        if score > best_score:
-            best_score = score
-            best_params = trial
-
-    best_params["calibrated_at"] = datetime.now().isoformat()
-    best_params["backtest"] = run_backtest(best_params)
-    save_calibrated_params(best_params)
-    return best_params

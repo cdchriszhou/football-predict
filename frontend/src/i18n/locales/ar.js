@@ -147,7 +147,7 @@ export default {
     finished: 'انتهت'
   },
   dashboard: {
-    title: 'لوحة كأس العالم',
+    title: 'لوحة التوقعات',
     titleWithCompetition: 'لوحة {name}',
     subtitle: 'بيانات فورية وتوقعات بالذكاء الاصطناعي',
     subtitleLeague: '{league} · بيانات فورية وتوقعات AI',
@@ -191,7 +191,7 @@ export default {
   },
   match: {
     listTitle: 'جميع المباريات',
-    listSubtitle: 'من دور المجموعات إلى النهائي',
+    listSubtitle: 'جدول الدوري الكامل',
     listSubtitleLeague: 'جدول {league} الكامل',
     selectStage: 'المرحلة',
     selectMatchday: 'الجولة',
@@ -231,6 +231,6 @@ export default {
   },
   team: {
     listTitle: 'الفرق',
-    listSubtitle: '48 فريقاً في كأس العالم 2026'
+    listSubtitle: 'الأندية'
   }
 }

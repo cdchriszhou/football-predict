@@ -169,7 +169,7 @@ export default {
     upcoming: '即将开始',
     upcomingWorldCup: '即将开始（预览）',
     viewFullSchedule: '全部赛程',
-    worldCupScheduleHint: '仪表盘仅预览 {shown} 场，共 {total} 场小组赛/赛程在「全部赛程」中查看与筛选。',
+    worldCupScheduleHint: '仪表盘仅预览 {shown} 场，共 {total} 场赛程在「全部赛程」中查看与筛选。',
     accuracy: '预测准确率',
     resultAccuracy: '胜负预测准确率',
     scoreAccuracy: '比分准确率',
@@ -213,7 +213,7 @@ export default {
   },
   match: {
     listTitle: '全部赛程',
-    listSubtitle: '小组赛 - 淘汰赛完整赛程',
+    listSubtitle: '完整联赛赛程',
     listSubtitleLeague: '{league} 完整联赛赛程',
     selectStage: '选择阶段',
     selectMatchday: '选择轮次',
@@ -261,7 +261,7 @@ export default {
   },
   team: {
     listTitle: '球队数据',
-    listSubtitle: '2026 世界杯 48 支参赛球队',
+    listSubtitle: '参赛俱乐部',
     listSubtitleLeague: '{league} 参赛俱乐部',
     leagueRank: '联赛第 {n} 名',
   },

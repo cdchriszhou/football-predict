@@ -26,17 +26,6 @@ DISCLAIMER = (
     "赛果对比采用体彩 CRS 口径：常规时间（90分钟）比分，不含加时及点球进球。"
 )
 
-WORLDCUP_SLUG = "worldcup-2026"
-
-NOTES = [
-    "首推：CRS 锚定管线输出的第一推荐比分。",
-    "三选：首推、次推与冷门选项中任一命中即计为命中（含胜/平/负其它桶）。",
-    "所有推荐比分均为常规时间（90分钟）赛果，与体彩 CRS 结算一致。",
-    "小组赛优先使用数据库或历史种子中的 CRS；淘汰赛无 CRS 时用 Poisson 合成赔率回测。",
-    "胜平负概率优先取自数据库预测记录，并与欧赔隐含概率做纠偏。",
-    "加时赛果场次以 history 中 regulation_a/b 作为实际比分；无则使用终场比分。",
-]
-
 LEAGUE_NOTES = [
     "首推：CRS 锚定管线输出的第一推荐比分。",
     "三选：首推、次推与冷门选项中任一命中即计为命中（含胜/平/负其它桶）。",
@@ -59,22 +48,7 @@ def _is_worldcup_competition(slug: str) -> bool:
 
 
 def _notes_for(competition_slug: str) -> list[str]:
-    return NOTES if _is_worldcup_competition(competition_slug) else LEAGUE_NOTES
-
-
-def _history_row(team_a: str, team_b: str, year: int = 2026) -> dict | None:
-    return None
-
-
-def _find_history_for_match(
-    team_a: str,
-    team_b: str,
-    *,
-    stage: str = "",
-    match_time: datetime | None = None,
-    year: int = 2026,
-) -> dict | None:
-    return None
+    return LEAGUE_NOTES
 
 
 def _wdl_from_european(euro: dict | None) -> tuple[float, float, float] | None:
@@ -183,19 +157,6 @@ def _parse_score_odds(raw: str | None) -> dict[str, float]:
         except (TypeError, ValueError):
             continue
     return out
-
-
-def _odds_meta_from_history(hist: dict | None) -> dict:
-    if not hist:
-        return {}
-    euro = hist.get("european") or {}
-    macau = hist.get("macau") or {}
-    return {
-        "win_win": euro.get("win_win"),
-        "draw": euro.get("draw"),
-        "win_lose": euro.get("win_lose"),
-        "handicap": macau.get("handicap"),
-    }
 
 
 def _poisson_model_hints(exp_a: float, exp_b: float, draw_rate: float) -> list[str]:
@@ -354,42 +315,6 @@ def _best_odds_with_crs(odds_rows: list) -> tuple[object | None, dict[str, float
     return latest, _parse_score_odds(latest.score_odds if latest else None)
 
 
-def _seed_worldcup_history_rows(evaluated: list[dict]) -> None:
-    return
-    """Fill gaps from 2026 World Cup history seed. Must not run for club leagues."""
-    seen = {(r["team_a"], r["team_b"]) for r in evaluated}
-    for hist in HISTORICAL_MATCHES:
-        if hist.get("year") != 2026:
-            continue
-        ta, tb = hist["team_a"], hist["team_b"]
-        if (ta, tb) in seen:
-            continue
-        if hist.get("result_a") is None or hist.get("result_b") is None:
-            continue
-        crs = {str(k): float(v) for k, v in (hist.get("score_odds") or {}).items()}
-        euro = _odds_meta_from_history(hist)
-        wdl = _wdl_from_european(hist.get("european")) or (50.0, 25.0, 25.0)
-        from utils.score_prediction import actual_score_from_history
-        actual = actual_score_from_history(hist) or f"{hist['result_a']}:{hist['result_b']}"
-        row = _evaluate_match(
-            team_a=ta,
-            team_b=tb,
-            actual=actual,
-            crs=crs,
-            wdl=wdl,
-            odds_meta=euro,
-            match_time=_resolve_backtest_kickoff(ta, tb, None, hist),
-            stage=hist.get("stage") or "",
-            group_name=hist.get("group_name"),
-            matchday=hist.get("matchday"),
-            location=hist.get("location"),
-            competition_slug=WORLDCUP_SLUG,
-        )
-        if row:
-            evaluated.append(row)
-            seen.add((ta, tb))
-
-
 async def _collect_evaluated_rows(
     db: AsyncSession,
     competition_slug: str = "premier-league",
@@ -409,14 +334,12 @@ async def _collect_evaluated_rows(
 
     for match in rows:
         team_a, team_b = match.team_a, match.team_b
-        hist = None
         from utils.score_prediction import actual_score_for_match
         actual = actual_score_for_match(
             result_a=int(match.result_a),
             result_b=int(match.result_b),
             team_a=team_a,
             team_b=team_b,
-            hist=hist,
         )
         all_odds = (await db.execute(
             select(Odds).where(Odds.match_id == match.id).order_by(Odds.id.desc())
@@ -439,13 +362,6 @@ async def _collect_evaluated_rows(
             }
         if pred_row:
             wdl = (pred_row.win_rate, pred_row.draw_rate, pred_row.lose_rate)
-
-        if not crs and hist:
-            crs = {str(k): float(v) for k, v in (hist.get("score_odds") or {}).items()}
-            odds_meta = odds_meta or _odds_meta_from_history(hist)
-        if not wdl and hist:
-            euro_wdl = _wdl_from_european(hist.get("european"))
-            wdl = euro_wdl or (50.0, 25.0, 25.0)
 
         kickoff = match.match_time
         published = _picks_from_db_prediction(pred_row)
@@ -503,28 +419,6 @@ def _resolve_kickoff(
         parsed = _parse_match_time(hist.get("match_time"))
         if parsed:
             return parsed
-    return None
-
-
-def _resolve_backtest_kickoff(
-    team_a: str,
-    team_b: str,
-    db_time: datetime | None = None,
-    hist: dict | None = None,
-) -> datetime | None:
-    if db_time:
-        return db_time
-    if hist and hist.get("match_time"):
-        parsed = _parse_match_time(hist.get("match_time"))
-        if parsed:
-            return parsed
-    return None
-    if hist and hist.get("match_time"):
-        parsed = _parse_match_time(hist.get("match_time"))
-        if parsed:
-            return parsed
-    if db_time:
-        return db_time
     return None
 
 
@@ -708,9 +602,8 @@ async def compute_score_backtest(
     n = len(evaluated)
 
     groups: dict[str, dict] = {}
-    prefer_date = _is_worldcup_competition(competition_slug)
     for row in evaluated:
-        key, label = _backtest_group_key_label(row, prefer_date=prefer_date)
+        key, label = _backtest_group_key_label(row, prefer_date=False)
         md = row.get("matchday")
         if key not in groups:
             groups[key] = {
@@ -734,12 +627,7 @@ async def compute_score_backtest(
         g["primary_hit_rate"] = round(g["primary_hits"] / ev * 100, 1)
         g["triple_hit_rate"] = round(g["triple_hits"] / ev * 100, 1)
         group_list.append(g)
-    if prefer_date:
-        # Sort by ISO date key (dYYYY-MM-DD), NOT Chinese labels — "7月8日" > "7月20日"
-        # lexicographically and wrongly surfaces mid-July as the newest group.
-        group_list.sort(key=lambda x: x["group_key"], reverse=True)
-    else:
-        group_list.sort(key=lambda x: (x.get("matchday") or 99, x["label"]))
+    group_list.sort(key=lambda x: (x.get("matchday") or 99, x["label"]))
 
     return {
         "competition_slug": competition_slug,

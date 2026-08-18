@@ -283,101 +283,6 @@ async def reopen_prematurely_finished_matches(db: AsyncSession, slug: str) -> in
     return updated
 
 
-async def _find_history_match_by_kickoff(
-    db: AsyncSession,
-    slug: str,
-    item: dict,
-) -> tuple[Match | None, bool]:
-    """Match knockout placeholders by official kickoff window."""
-    mt_raw = item.get("match_time")
-    if not mt_raw:
-        return None, False
-    if isinstance(mt_raw, str):
-        mt = datetime.fromisoformat(mt_raw.replace("Z", ""))
-    else:
-        mt = mt_raw
-    stage = item.get("stage", "小组赛")
-    window = timedelta(minutes=45)
-    rows = list((await db.execute(
-        select(Match).where(
-            Match.competition_slug == slug,
-            Match.stage == stage,
-            Match.match_time.isnot(None),
-            Match.match_time >= mt - window,
-            Match.match_time <= mt + window,
-        )
-    )).scalars().all())
-    if not rows:
-        return None, False
-    if len(rows) == 1:
-        m = rows[0]
-        reversed_match = m.team_a == item["team_b"] and m.team_b == item["team_a"]
-        return m, reversed_match
-    ta, tb = item["team_a"], item["team_b"]
-    for m in rows:
-        if m.team_a == ta and m.team_b == tb:
-            return m, False
-        if m.team_a == tb and m.team_b == ta:
-            return m, True
-    rows.sort(key=lambda m: abs((m.match_time - mt).total_seconds()))
-    return rows[0], False
-
-
-def _parse_history_match_time(item: dict) -> datetime | None:
-    mt_raw = item.get("match_time")
-    if not mt_raw:
-        return None
-    if isinstance(mt_raw, str):
-        return datetime.fromisoformat(mt_raw.replace("Z", ""))
-    return mt_raw
-
-
-def _history_item_in_window(item: dict, recent_days: int | None) -> bool:
-    if recent_days is None:
-        return True
-    mt = _parse_history_match_time(item)
-    if mt is None:
-        return True
-    from utils.datetime_helpers import china_today
-
-    start = china_today() - timedelta(days=recent_days)
-    end = china_today() + timedelta(days=1)
-    d = mt.date()
-    return start <= d <= end
-
-
-def _find_history_match_by_kickoff_cached(
-    rows: list[Match],
-    item: dict,
-) -> tuple[Match | None, bool]:
-    """Match knockout placeholders by official kickoff window (in-memory)."""
-    mt = _parse_history_match_time(item)
-    if not mt:
-        return None, False
-    stage = item.get("stage", "小组赛")
-    window = timedelta(minutes=45)
-    candidates = [
-        m for m in rows
-        if m.stage == stage
-        and m.match_time is not None
-        and mt - window <= m.match_time <= mt + window
-    ]
-    if not candidates:
-        return None, False
-    if len(candidates) == 1:
-        m = candidates[0]
-        reversed_match = m.team_a == item["team_b"] and m.team_b == item["team_a"]
-        return m, reversed_match
-    ta, tb = item["team_a"], item["team_b"]
-    for m in candidates:
-        if m.team_a == ta and m.team_b == tb:
-            return m, False
-        if m.team_a == tb and m.team_b == ta:
-            return m, True
-    candidates.sort(key=lambda m: abs((m.match_time - mt).total_seconds()))
-    return candidates[0], False
-
-
 async def apply_confirmed_results(
     db: AsyncSession,
     slug: str,
@@ -385,163 +290,13 @@ async def apply_confirmed_results(
     recent_days: int | None = None,
     flush: bool = True,
 ) -> int:
-    """Apply known final scores from worldcup_history into live fixtures."""
+    """World Cup history score overlay retired."""
     return 0
-    from data.worldcup_history import HISTORICAL_MATCHES
-
-    fixture_query = select(Match).where(Match.competition_slug == slug)
-    if recent_days is not None:
-        from utils.datetime_helpers import china_today
-
-        window_start = datetime.combine(
-            china_today() - timedelta(days=recent_days),
-            datetime.min.time(),
-        )
-        window_end = datetime.combine(
-            china_today() + timedelta(days=2),
-            datetime.min.time(),
-        )
-        fixture_query = fixture_query.where(
-            Match.match_time.isnot(None),
-            Match.match_time >= window_start,
-            Match.match_time < window_end,
-        )
-    fixture_rows = list((await db.execute(fixture_query)).scalars().all())
-    by_exact = {(m.team_a, m.team_b, m.stage): m for m in fixture_rows}
-    by_reversed = {(m.team_b, m.team_a, m.stage): m for m in fixture_rows}
-
-    updated = 0
-    for item in HISTORICAL_MATCHES:
-        if item.get("year") != 2026:
-            continue
-        if item.get("result_a") is None or item.get("result_b") is None:
-            continue
-        if not _history_item_in_window(item, recent_days):
-            continue
-        stage = item.get("stage", "小组赛")
-        ta, tb = item["team_a"], item["team_b"]
-        match = by_exact.get((ta, tb, stage))
-        reversed_match = False
-        if not match:
-            match = by_reversed.get((ta, tb, stage))
-            reversed_match = match is not None
-        if not match:
-            match, reversed_match = _find_history_match_by_kickoff_cached(fixture_rows, item)
-        if not match:
-            continue
-        ra, rb = int(item["result_a"]), int(item["result_b"])
-        pa = item.get("penalty_a")
-        pb = item.get("penalty_b")
-        if reversed_match:
-            ra, rb = rb, ra
-            if pa is not None and pb is not None:
-                pa, pb = pb, pa
-        new_ta = item["team_b"] if reversed_match else item["team_a"]
-        new_tb = item["team_a"] if reversed_match else item["team_b"]
-        changed = False
-        if match.team_a != new_ta or match.team_b != new_tb:
-            match.team_a, match.team_b = new_ta, new_tb
-            changed = True
-        if not match_has_recorded_score(match):
-            if match.result_a != ra or match.result_b != rb:
-                match.result_a, match.result_b = ra, rb
-                changed = True
-            if pa is not None and pb is not None:
-                ipa, ipb = int(pa), int(pb)
-                if match.penalty_a != ipa or match.penalty_b != ipb:
-                    match.penalty_a, match.penalty_b = ipa, ipb
-                    changed = True
-        if match.status != MATCH_FINISHED:
-            match.status = MATCH_FINISHED
-            changed = True
-        from data.worldcup_venues import venue_for_match, canonical_team_order
-        ca, cb = canonical_team_order(item["team_a"], item["team_b"])
-        vn = venue_for_match(ca, cb)
-        if vn:
-            loc, stadium = vn
-            if match.location != loc or match.stadium != stadium:
-                match.location, match.stadium = loc, stadium
-                changed = True
-        elif item.get("location") and match.location != item["location"]:
-            match.location = item["location"]
-            changed = True
-        if not vn and item.get("stadium") and match.stadium != item["stadium"]:
-            match.stadium = item["stadium"]
-            changed = True
-        if changed:
-            updated += 1
-    if updated and flush:
-        await flush_session(db)
-    return updated
 
 
 async def backfill_historical_odds(db: AsyncSession, slug: str) -> int:
-    """Seed pre-match sporttery/euro odds from worldcup_history for fixtures missing Odds rows."""
+    """World Cup history odds seed retired."""
     return 0
-    from data.worldcup_history import HISTORICAL_MATCHES
-    import json
-    from db.models import Odds
-    from data.worldcup_history import HISTORICAL_MATCHES
-
-    updated = 0
-    for item in HISTORICAL_MATCHES:
-        if item.get("year") != 2026:
-            continue
-        if not item.get("score_odds") and not item.get("european"):
-            continue
-        row = await db.execute(
-            select(Match).where(
-                Match.competition_slug == slug,
-                Match.team_a == item["team_a"],
-                Match.team_b == item["team_b"],
-                Match.stage == item.get("stage", "小组赛"),
-            )
-        )
-        match = row.scalar_one_or_none()
-        if not match:
-            continue
-        existing = (await db.execute(select(Odds).where(Odds.match_id == match.id))).scalar_one_or_none()
-        if existing and existing.score_odds and existing.win_win:
-            continue
-
-        euro = item.get("european") or {}
-        macau = item.get("macau") or {}
-        score_odds = dict(item.get("score_odds") or {})
-        score_odds["_meta"] = {"european": euro, "macau": macau}
-        win_win = euro.get("win_win")
-        draw = euro.get("draw")
-        win_lose = euro.get("win_lose")
-
-        if existing:
-            if not existing.score_odds:
-                existing.score_odds = json.dumps(score_odds, ensure_ascii=False)
-            if not existing.win_win and win_win:
-                existing.win_win = win_win
-                existing.draw = draw
-                existing.win_lose = win_lose
-                existing.handicap = macau.get("handicap")
-                existing.handicap_win = macau.get("handicap_win")
-                existing.handicap_draw = macau.get("handicap_draw")
-                existing.handicap_lose = macau.get("handicap_lose")
-                existing.source = existing.source or "sporttery.cn+history"
-            updated += 1
-        else:
-            db.add(Odds(
-                match_id=match.id,
-                win_win=win_win,
-                draw=draw,
-                win_lose=win_lose,
-                handicap=macau.get("handicap"),
-                handicap_win=macau.get("handicap_win"),
-                handicap_draw=macau.get("handicap_draw"),
-                handicap_lose=macau.get("handicap_lose"),
-                score_odds=json.dumps(score_odds, ensure_ascii=False),
-                source="worldcup_history",
-            ))
-            updated += 1
-    if updated:
-        await flush_session(db)
-    return updated
 
 
 async def refresh_predictions_for_matches(db: AsyncSession, match_ids: list[int]) -> int:
@@ -781,69 +536,13 @@ def _mirror_best_score_value(val):
 
 
 async def repair_canonical_team_order(db: AsyncSession, slug: str) -> int:
-    """Swap team_a/team_b to FIFA official home/away order when stored reversed."""
+    """World Cup FIFA home/away order repair retired."""
     return 0
-
-    rows = (
-        await db.execute(
-            select(Match).where(
-                Match.competition_slug == slug,
-                Match.stage == "小组赛",
-            )
-        )
-    ).scalars().all()
-    fixed = 0
-    swapped_ids: list[int] = []
-    for m in rows:
-        if await _apply_canonical_team_swap(db, m):
-            fixed += 1
-            swapped_ids.append(m.id)
-    if swapped_ids:
-        from service.prediction_consistency import invalidate_prediction_cache
-        for mid in swapped_ids:
-            await invalidate_prediction_cache(mid)
-    if fixed:
-        await flush_session(db)
-        logger.info("Canonical team order repair [%s]: %d fixture(s)", slug, fixed)
-    return fixed
 
 
 async def repair_canonical_kickoffs(db: AsyncSession, slug: str) -> int:
     """World Cup canonical kickoff repair retired."""
     return 0
-    """Align stored kickoff/status with official schedule (any status, incl. wrong finished)."""
-    if slug != "worldcup-2026":
-        return 0
-    from data.worldcup_schedule_lookup import canonical_kickoff_beijing
-
-    rows = (
-        await db.execute(
-            select(Match).where(
-                Match.competition_slug == slug,
-                Match.match_time.isnot(None),
-            )
-        )
-    ).scalars().all()
-    fixed = 0
-    reopened = 0
-    now = china_now().replace(tzinfo=None)
-    for m in rows:
-        canon = canonical_kickoff_beijing(m.team_a, m.team_b)
-        if not canon:
-            continue
-        if m.match_time != canon:
-            m.match_time = canon
-            fixed += 1
-        raw = normalize_match_status(m.status)
-        if raw == MATCH_FINISHED and not match_has_recorded_score(m) and now < canon + MATCH_FINISH_BUFFER:
-            m.status = MATCH_UPCOMING
-            reopened += 1
-    if fixed or reopened:
-        await flush_session(db)
-        logger.info(
-            f"Canonical kickoff repair [{slug}]: {fixed} time(s), {reopened} reopened"
-        )
-    return fixed + reopened
 
 
 def effective_kickoff_naive(match) -> datetime | None:
@@ -1062,105 +761,11 @@ def match_has_recorded_score(match) -> bool:
 def confirmed_scores_from_history(match) -> dict | None:
     """World Cup history overlay retired."""
     return None
-    if match_has_recorded_score(match):
-        return None
-    item, reversed_match = _best_history_item_for_match(match)
-    if not item:
-        return None
-    ra, rb = int(item["result_a"]), int(item["result_b"])
-    pa, pb = item.get("penalty_a"), item.get("penalty_b")
-    if reversed_match:
-        ra, rb = rb, ra
-        if pa is not None and pb is not None:
-            pa, pb = pb, pa
-    out = {
-        "result_a": ra,
-        "result_b": rb,
-        "penalty_a": int(pa) if pa is not None else None,
-        "penalty_b": int(pb) if pb is not None else None,
-    }
-    if item.get("extra_time"):
-        out["extra_time"] = True
-    if item.get("regulation_a") is not None and item.get("regulation_b") is not None:
-        rga, rgb = int(item["regulation_a"]), int(item["regulation_b"])
-        if reversed_match:
-            rga, rgb = rgb, rga
-        out["regulation_a"] = rga
-        out["regulation_b"] = rgb
-    return out
-
-
-def _best_history_item_for_match(match) -> tuple[dict | None, bool]:
-    """World Cup history overlay retired."""
-    return None, False
-
-    stage = getattr(match, "stage", "") or "小组赛"
-    mt = effective_kickoff_naive(match) or getattr(match, "match_time", None)
-    if mt is None:
-        return None, False
-    window = timedelta(minutes=45)
-    ma, mb = getattr(match, "team_a", "") or "", getattr(match, "team_b", "") or ""
-
-    best: dict | None = None
-    best_reversed = False
-    best_delta = window.total_seconds() + 1
-    for item in HISTORICAL_MATCHES:
-        if item.get("year") != 2026:
-            continue
-        if item.get("result_a") is None or item.get("result_b") is None:
-            continue
-        if item.get("stage", "小组赛") != stage:
-            continue
-        item_mt = _parse_history_match_time(item)
-        if item_mt is None:
-            continue
-        delta = abs((mt - item_mt).total_seconds())
-        if delta > window.total_seconds():
-            continue
-        ta, tb = item["team_a"], item["team_b"]
-        reversed_match = False
-        placeholders = ma.startswith("第") or mb.startswith("第")
-        if not placeholders:
-            if ma == ta and mb == tb:
-                reversed_match = False
-            elif ma == tb and mb == ta:
-                reversed_match = True
-            elif delta > 60:
-                continue
-        if delta <= best_delta:
-            best_delta = delta
-            best = item
-            best_reversed = reversed_match
-    return best, best_reversed
 
 
 def history_match_overlay(match) -> dict:
     """World Cup history overlay retired."""
     return {}
-    item, reversed_match = _best_history_item_for_match(match)
-    if not item:
-        return {}
-    ra = getattr(match, "result_a", None)
-    rb = getattr(match, "result_b", None)
-    pa = getattr(match, "penalty_a", None)
-    pb = getattr(match, "penalty_b", None)
-    out: dict = {}
-    if ra is not None and rb is not None and ra == rb and (pa is None or pb is None):
-        ipa, ipb = item.get("penalty_a"), item.get("penalty_b")
-        if ipa is not None and ipb is not None:
-            if reversed_match:
-                ipa, ipb = ipb, ipa
-            out["penalty_a"] = int(ipa)
-            out["penalty_b"] = int(ipb)
-    if item.get("extra_time"):
-        out["extra_time"] = True
-    if item.get("regulation_a") is not None and item.get("regulation_b") is not None:
-        rga, rgb = int(item["regulation_a"]), int(item["regulation_b"])
-        if reversed_match:
-            rga, rgb = rgb, rga
-        out["regulation_a"] = rga
-        out["regulation_b"] = rgb
-    return out
 
 
 def match_has_display_score(match) -> bool:

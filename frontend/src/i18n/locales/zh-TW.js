@@ -147,7 +147,7 @@ export default {
     finished: '已結束'
   },
   dashboard: {
-    title: '世界盃預測儀表板',
+    title: '預測儀表板',
     titleWithCompetition: '{name}預測儀表板',
     subtitle: '即時數據驅動，AI 智能預測',
     subtitleLeague: '{league} · 即時數據與 AI 比分預測',
@@ -191,7 +191,7 @@ export default {
   },
   match: {
     listTitle: '全部賽程',
-    listSubtitle: '小組賽 - 淘汰賽完整賽程',
+    listSubtitle: '完整聯賽賽程',
     listSubtitleLeague: '{league} 完整聯賽賽程',
     selectStage: '選擇階段',
     selectMatchday: '選擇輪次',
@@ -232,7 +232,7 @@ export default {
   },
   team: {
     listTitle: '球隊數據',
-    listSubtitle: '2026 世界盃 48 支參賽球隊'
+    listSubtitle: '參賽俱樂部',
   },
   pailie: {
     title: '排列3 / 排列5 / 七星彩 / 雙色球 / 大樂透 / 福彩3D',

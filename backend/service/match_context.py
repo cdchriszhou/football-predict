@@ -16,19 +16,6 @@ from service.league_rank import (
     table_rank,
 )
 
-# 2026 World Cup co-hosts (unused for club leagues; kept for leftover WC stage labels)
-HOST_NATIONS_2026 = frozenset({"墨西哥", "美国", "加拿大"})
-
-_HOST_LOCATION_KEYWORDS: dict[str, tuple[str, ...]] = {
-    "墨西哥": ("墨西哥", "墨西哥城", "萨波潘", "蒙特雷", "阿兹特克", "阿克伦", "BBVA"),
-    "美国": (
-        "纽约", "新泽西", "洛杉矶", "英格尔伍德", "波士顿", "费城", "迈阿密", "亚特兰大",
-        "达拉斯", "休斯顿", "堪萨斯", "西雅图", "旧金山", "索菲", "李维斯",
-        "流明", "大都会", "吉列", "林肯金融", "硬石", "梅赛德斯", "AT&T", "NRG", "箭头",
-    ),
-    "加拿大": ("多伦多", "温哥华", "蒙特利尔", "BMO", "卑诗"),
-}
-
 
 @dataclass
 class ContextAnalysis:
@@ -44,24 +31,8 @@ class ContextAnalysis:
 
 
 def infer_matchday(stage: str, group_name: str, match_time=None) -> int:
-    """Infer group matchday (1/2/3) from stage label."""
-    if stage != "小组赛":
-        return 0
-    return 0  # filled by caller when available
-
-
-def detect_home_side(team_a: str, team_b: str, location: str = "") -> str:
-    """Return 'a' / 'b' when a 2026 host plays in its home country venue."""
-    loc = location or ""
-    if not loc:
-        return ""
-    for side, name in (("a", team_a), ("b", team_b)):
-        if name not in HOST_NATIONS_2026:
-            continue
-        for kw in _HOST_LOCATION_KEYWORDS.get(name, ()):
-            if kw in loc:
-                return side
-    return ""
+    """World Cup group MD1-3 inference retired; league matchday comes from the caller."""
+    return 0
 
 
 def _is_league_matchday(stage: str | None) -> bool:
@@ -379,18 +350,6 @@ def analyze_match_context(
         result.favourite_lose_shift = 0.12
         result.upset_risk = min(0.38, result.upset_risk + 0.05)
         result.alerts.append("保级队主场守平：平局权重上调")
-    elif (
-        ctx.get("stage") == "小组赛"
-        and ctx.get("matchday", 0) >= 2
-        and home_rank >= 75
-        and away_rank <= 35
-        and rank_gap >= 35
-        and not fav_at_home
-    ):
-        result.draw_adjustment += 14.0
-        result.favourite_lose_shift = 0.26
-        result.upset_risk = min(0.38, result.upset_risk + 0.06)
-        result.alerts.append("弱队主场守平：平局与闷平比分权重上调")
 
     # ── Market manipulation (资本/盘口操控) ──
     result.manipulation_risk = market.get("manipulation_risk", 0.0)

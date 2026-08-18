@@ -147,7 +147,7 @@ export default {
     finished: 'Завершён'
   },
   dashboard: {
-    title: 'Панель ЧМ-2026',
+    title: 'Панель прогнозов',
     titleWithCompetition: 'Панель: {name}',
     subtitle: 'Данные в реальном времени и AI-прогнозы',
     subtitleLeague: '{league} · данные и AI-прогноз счёта',
@@ -191,7 +191,7 @@ export default {
   },
   match: {
     listTitle: 'Все матчи',
-    listSubtitle: 'От группового этапа до финала',
+    listSubtitle: 'Полное расписание лиги',
     listSubtitleLeague: '{league} — полное расписание лиги',
     selectStage: 'Этап',
     selectMatchday: 'Тур',
@@ -231,6 +231,6 @@ export default {
   },
   team: {
     listTitle: 'Команды',
-    listSubtitle: '48 команд ЧМ-2026'
+    listSubtitle: 'Клубы'
   }
 }

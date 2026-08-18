@@ -147,7 +147,7 @@ export default {
     finished: '終了'
   },
   dashboard: {
-    title: 'W杯予測ダッシュボード',
+    title: '予測ダッシュボード',
     titleWithCompetition: '{name} 予測ダッシュボード',
     subtitle: 'リアルタイムデータとAI予測',
     subtitleLeague: '{league} · リアルタイムデータとAI予測',
@@ -191,7 +191,7 @@ export default {
   },
   match: {
     listTitle: '全試合',
-    listSubtitle: 'グループから決勝まで',
+    listSubtitle: 'リーグ全試合',
     listSubtitleLeague: '{league} リーグ全試合',
     selectStage: 'ステージ',
     selectMatchday: '節を選択',
@@ -231,6 +231,6 @@ export default {
   },
   team: {
     listTitle: 'チーム',
-    listSubtitle: '2026 W杯 48チーム'
+    listSubtitle: 'クラブ'
   }
 }

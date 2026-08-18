@@ -1051,7 +1051,7 @@ def boost_heavy_favorite_scores(
     win_other: str | None = "胜其它" if _has_crs_special(score_odds, "胜其它") else None
 
     boost: str | None = None
-    if gap >= 50 and win_rate >= 70.0:
+    if gap >= GAP_MISMATCH and win_rate >= 70.0:
         five_nil: str | None = None
         multi_goal: str | None = None
         for score, _ in ranked:
@@ -1067,7 +1067,7 @@ def boost_heavy_favorite_scores(
                 elif ga >= 4 and gb <= 1 and multi_goal is None:
                     multi_goal = score
         boost = five_nil or multi_goal or win_other
-    elif gap >= 25 and win_rate >= 58.0 and _score_outcome(primary) == "win":
+    elif gap >= GAP_LARGE and win_rate >= 58.0 and _score_outcome(primary) == "win":
         for score, _ in ranked:
             if score == primary or ":" not in score:
                 continue
@@ -1103,7 +1103,7 @@ def boost_heavy_favorite_scores(
         return [primary, secondary]
     if boost == secondary:
         return [primary, secondary]
-    if hcp <= -2 and win_rate >= 75.0 and gap < 50 and secondary and secondary in cmap:
+    if hcp <= -2 and win_rate >= 75.0 and gap < GAP_MISMATCH and secondary and secondary in cmap:
         sec_odd = cmap[secondary]
         boost_odd = cmap.get(boost, 99.0)
         if boost_odd > sec_odd + 1.0:

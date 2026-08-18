@@ -107,7 +107,7 @@ export default {
     tacticStyle: '戰術風格',
     tactic: '戰術',
     marketValue: '身價',
-    fifaRank: 'FIFA 排名',
+    fifaRank: '聯賽排名',
     roster: '球員名單',
     colNumber: '號碼',
     colName: '姓名',
@@ -147,7 +147,7 @@ export default {
   },
   tournament: {
     title: '賽事預測',
-    subtitle: 'AI 綜合 48 隊資料、FIFA 排名、球員能力與淘汰賽對陣路徑，預測冠亞軍與四強',
+    subtitle: 'AI 綜合積分榜、球員能力與盤口，預測聯賽走勢',
     refresh: '重新整理預測',
     noData: '暫無預測資料，請點擊重新整理取得 AI 預測',
     champion: '冠軍預測',
@@ -161,7 +161,7 @@ export default {
   },
   bracket: {
     title: '淘汰賽對陣圖',
-    subtitle: '小組賽後自動產生，隨賽果動態更新',
+    subtitle: '聯賽賽季無需淘汰賽對陣圖',
     empty: '小組賽結束後自動產生淘汰賽對陣',
     tbd: '待定'
   },
@@ -214,7 +214,7 @@ export default {
     apiConfigTitle: '大模型 API 設定',
     currentModel: '目前',
     applyKey: '申請 Key ↗',
-    applyKeyWorldCup: '申請 Key（世界盃盤口）↗',
+    applyKeyWorldCup: '申請 Key（歐盤/亞盤）↗',
     oddsApiTitle: 'The Odds API（歐盤/亞盤）',
     footballDataApiTitle: 'football-data.org（聯賽真實數據）',
     applyKeyFootballData: '申請 Key（賽程/積分榜/球員）↗',
@@ -301,7 +301,7 @@ export default {
   sportteryPlan: {
     title: '中國體彩購買方案',
     titleWithCompetition: '{name}體彩購買方案',
-    subtitle: '當日世界盃在售賽事 · 單關與過關玩法參考',
+    subtitle: '當日可購聯賽場次 · 單關與過關玩法參考',
     subtitleWithCompetition: '當日{name}在售賽事 · 單關與過關玩法參考',
     subtitleLeague: '當日{league}在售賽事 · 單關與過關玩法參考',
     refresh: '刷新方案',
@@ -332,9 +332,9 @@ export default {
     refsAlerts: '風險提示',
     combinedOdds: '過關賠率約',
     avgConfidence: '平均置信度',
-    emptyTitle: '今日暫無世界盃在售場次',
+    emptyTitle: '今日暫無可購場次',
     emptyTitleWithCompetition: '今日暫無{name}在售場次',
-    emptyHint: '體彩官方尚未開售當日世界盃賽事，或已全部完場。請稍後再試。',
+    emptyHint: '體彩官方尚未開售當日賽事，或已全部完場。請稍後再試。',
     emptyHintWithCompetition: '體彩官方尚未開售當日{name}賽事，或已全部完場。請稍後再試。',
     emptyHintLeague: '體彩官方尚未開售當日{league}賽事，或已全部完場。請稍後再試或查看聯賽賽程。',
     disclaimer: '本方案基於體彩官方在售數據與 AI 預測生成，僅供觀賽參考，不構成投注建議。',
@@ -347,7 +347,7 @@ export default {
     parlayReasons: {
       stableReason: '選取 AI 置信度較高、賠率適中的兩場組合',
       valueReason: '綜合 AI 勝率與賠率差異，追求更高回報',
-      tripleReason: '當日三場世界盃賽事組合過關（回報更高、風險更大）'
+      tripleReason: '當日三場賽事組合過關（回報更高、風險更大）'
     }
   },
   messages: {

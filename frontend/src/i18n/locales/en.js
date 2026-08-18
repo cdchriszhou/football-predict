@@ -212,7 +212,7 @@ export default {
   },
   match: {
     listTitle: 'All Matches',
-    listSubtitle: 'Group stage through final',
+    listSubtitle: 'Full league schedule',
     listSubtitleLeague: '{league} full league schedule',
     selectStage: 'Stage',
     selectMatchday: 'Matchday',
@@ -258,7 +258,7 @@ export default {
   },
   team: {
     listTitle: 'Teams',
-    listSubtitle: '48 teams at 2026 World Cup'
+    listSubtitle: 'Clubs',
   },
   scoreBacktest: {
     title: 'Model Backtest',
