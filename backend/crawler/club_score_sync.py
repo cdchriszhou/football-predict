@@ -9,8 +9,13 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from crawler.football_data_client import _api_key, fetch_competition_matches, map_match_status
-from crawler.worldcup_score_sync import _normalize_ext_id, _perspective_scores
+from crawler.football_data_client import (
+    _api_key,
+    fetch_competition_matches,
+    map_match_status,
+    normalize_ext_id,
+    perspective_scores,
+)
 from data.club_name_map import resolve_club_cn
 from data.competitions import get_competition
 from data.match_status import MATCH_FINISH_BUFFER, effective_kickoff_naive
@@ -93,14 +98,14 @@ async def refresh_club_score_cache(slug: str) -> list[dict]:
 
 def find_club_match(rows: list[Match], fd_row: dict) -> tuple[Match | None, bool]:
     """Locate DB fixture for a football-data row. Prefer external_id, then names."""
-    ext_id = _normalize_ext_id(fd_row.get("external_id"))
+    ext_id = normalize_ext_id(fd_row.get("external_id"))
     home = resolve_club_cn(fd_id=fd_row.get("home_id"), name_en=fd_row.get("home_name_en"))
     away = resolve_club_cn(fd_id=fd_row.get("away_id"), name_en=fd_row.get("away_name_en"))
     kickoff = fd_row.get("kickoff_beijing") or fd_row.get("utc_date")
 
     if ext_id is not None:
         for m in rows:
-            if _normalize_ext_id(getattr(m, "external_id", None)) == ext_id:
+            if normalize_ext_id(getattr(m, "external_id", None)) == ext_id:
                 a_is_home = True
                 if home in (m.team_a, m.team_b):
                     a_is_home = m.team_a == home
@@ -145,7 +150,7 @@ def apply_club_fd_scores(matches: list[Match], fd_rows: list[dict]) -> dict:
         if not match:
             continue
         status = map_match_status(fd.get("status_raw"))
-        ra, rb, pa, pb = _perspective_scores(fd, a_is_home)
+        ra, rb, pa, pb = perspective_scores(fd, a_is_home)
         kickoff = effective_kickoff_naive(match) or match.match_time
         if (
             status == MATCH_FINISHED
@@ -168,8 +173,8 @@ def apply_club_fd_scores(matches: list[Match], fd_rows: list[dict]) -> dict:
                 match.penalty_a = pa
                 match.penalty_b = pb
                 changed = True
-        ext_id = _normalize_ext_id(fd.get("external_id"))
-        if ext_id is not None and _normalize_ext_id(getattr(match, "external_id", None)) != ext_id:
+        ext_id = normalize_ext_id(fd.get("external_id"))
+        if ext_id is not None and normalize_ext_id(getattr(match, "external_id", None)) != ext_id:
             match.external_id = ext_id
             changed = True
         if not changed:

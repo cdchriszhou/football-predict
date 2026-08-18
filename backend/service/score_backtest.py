@@ -7,10 +7,7 @@ from datetime import datetime, timedelta
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from crawler.team_crawler import TEAM_DATA
 from db.redis_client import cache_delete, cache_get, cache_set
-from data.worldcup_history import HISTORICAL_MATCHES, rank_to_abilities
-from data.worldcup_schedule_lookup import canonical_kickoff_beijing
 from db.models import Match, Odds, Prediction
 from utils.datetime_helpers import CHINA_TZ, china_today, format_beijing_iso
 from utils.score_prediction import normalize_score_prediction
@@ -58,7 +55,7 @@ LEAGUE_AWAY_XG = 1.20
 
 
 def _is_worldcup_competition(slug: str) -> bool:
-    return slug == WORLDCUP_SLUG
+    return False
 
 
 def _notes_for(competition_slug: str) -> list[str]:
@@ -66,9 +63,6 @@ def _notes_for(competition_slug: str) -> list[str]:
 
 
 def _history_row(team_a: str, team_b: str, year: int = 2026) -> dict | None:
-    for m in HISTORICAL_MATCHES:
-        if m.get("year") == year and m.get("team_a") == team_a and m.get("team_b") == team_b:
-            return m
     return None
 
 
@@ -80,29 +74,7 @@ def _find_history_for_match(
     match_time: datetime | None = None,
     year: int = 2026,
 ) -> dict | None:
-    """Exact team match, then kickoff window for same stage (knockout placeholders)."""
-    row = _history_row(team_a, team_b, year)
-    if row:
-        return row
-    if not match_time:
-        return None
-    window = timedelta(minutes=45)
-    best: dict | None = None
-    best_delta = window.total_seconds() + 1
-    for item in HISTORICAL_MATCHES:
-        if item.get("year") != year:
-            continue
-        if stage and item.get("stage", "小组赛") != stage:
-            continue
-        mt = _parse_match_time(item.get("match_time"))
-        if mt is None:
-            continue
-        delta = abs((match_time - mt).total_seconds())
-        if delta <= window.total_seconds() and delta < best_delta:
-            ta, tb = item["team_a"], item["team_b"]
-            if {ta, tb} == {team_a, team_b} or not team_a.startswith("第"):
-                best, best_delta = item, delta
-    return best
+    return None
 
 
 def _wdl_from_european(euro: dict | None) -> tuple[float, float, float] | None:
@@ -165,21 +137,11 @@ def _ensure_crs_for_backtest(
 
 
 def _pipeline_ranks(team_a: str, team_b: str, competition_slug: str = "") -> tuple[int, int]:
-    """FIFA ranks only for World Cup replay; league sides stay rank-neutral."""
-    if competition_slug and not _is_worldcup_competition(competition_slug):
-        return 10, 10
-    return (
-        int(TEAM_DATA.get(team_a, {}).get("rank", 50) or 50),
-        int(TEAM_DATA.get(team_b, {}).get("rank", 50) or 50),
-    )
+    return 10, 10
 
 
 def _expected_goals(team_a: str, team_b: str, competition_slug: str = "") -> tuple[float, float]:
-    if competition_slug and not _is_worldcup_competition(competition_slug):
-        return LEAGUE_HOME_XG, LEAGUE_AWAY_XG
-    a = rank_to_abilities(TEAM_DATA.get(team_a, {}).get("rank", 50))
-    b = rank_to_abilities(TEAM_DATA.get(team_b, {}).get("rank", 50))
-    return round((a["attack"] + b["defend"]) / 80, 2), round((b["attack"] + a["defend"]) / 80, 2)
+    return LEAGUE_HOME_XG, LEAGUE_AWAY_XG
 
 
 def _correct_draw(wr: float, dr: float, lr: float, sp: dict | None) -> tuple[float, float, float]:
@@ -393,6 +355,7 @@ def _best_odds_with_crs(odds_rows: list) -> tuple[object | None, dict[str, float
 
 
 def _seed_worldcup_history_rows(evaluated: list[dict]) -> None:
+    return
     """Fill gaps from 2026 World Cup history seed. Must not run for club leagues."""
     seen = {(r["team_a"], r["team_b"]) for r in evaluated}
     for hist in HISTORICAL_MATCHES:
@@ -432,12 +395,6 @@ async def _collect_evaluated_rows(
     competition_slug: str = "premier-league",
 ) -> tuple[list[dict], int, dict[str, int]]:
     """Evaluate finished matches with CRS odds; returns (rows, skipped, skip_reasons)."""
-    is_worldcup = _is_worldcup_competition(competition_slug)
-    ko_index: dict | None = None
-    if is_worldcup:
-        from data.knockout_advance import load_knockout_slot_index_cached
-        ko_index = await load_knockout_slot_index_cached(db, competition_slug)
-
     rows = (await db.execute(
         select(Match).where(
             Match.competition_slug == competition_slug,
@@ -452,17 +409,7 @@ async def _collect_evaluated_rows(
 
     for match in rows:
         team_a, team_b = match.team_a, match.team_b
-        if ko_index is not None:
-            from data.knockout_advance import display_teams_for_match
-            team_a, team_b = display_teams_for_match(match, ko_index)
-            if not team_a or not team_b:
-                team_a = team_a or match.team_a
-                team_b = team_b or match.team_b
         hist = None
-        if is_worldcup:
-            hist = _find_history_for_match(
-                team_a, team_b, stage=match.stage or "", match_time=match.match_time,
-            )
         from utils.score_prediction import actual_score_for_match
         actual = actual_score_for_match(
             result_a=int(match.result_a),
@@ -500,10 +447,7 @@ async def _collect_evaluated_rows(
             euro_wdl = _wdl_from_european(hist.get("european"))
             wdl = euro_wdl or (50.0, 25.0, 25.0)
 
-        if is_worldcup:
-            kickoff = _resolve_backtest_kickoff(team_a, team_b, match.match_time, hist)
-        else:
-            kickoff = match.match_time
+        kickoff = match.match_time
         published = _picks_from_db_prediction(pred_row)
 
         row = _evaluate_match(
@@ -528,9 +472,6 @@ async def _collect_evaluated_rows(
             skipped += 1
             reason = "no_crs_or_wdl" if not crs and not is_knockout_stage(match.stage or "") else "eval_failed"
             skip_reasons[reason] = skip_reasons.get(reason, 0) + 1
-
-    if is_worldcup:
-        _seed_worldcup_history_rows(evaluated)
 
     evaluated.sort(key=lambda r: (r.get("match_time") or "", r.get("match_id") or 0))
     return evaluated, skipped, skip_reasons
@@ -562,7 +503,7 @@ def _resolve_kickoff(
         parsed = _parse_match_time(hist.get("match_time"))
         if parsed:
             return parsed
-    return canonical_kickoff_beijing(team_a, team_b)
+    return None
 
 
 def _resolve_backtest_kickoff(
@@ -571,10 +512,13 @@ def _resolve_backtest_kickoff(
     db_time: datetime | None = None,
     hist: dict | None = None,
 ) -> datetime | None:
-    """Prefer official Beijing schedule, then history seed, then DB wall-clock."""
-    canon = canonical_kickoff_beijing(team_a, team_b)
-    if canon:
-        return canon
+    if db_time:
+        return db_time
+    if hist and hist.get("match_time"):
+        parsed = _parse_match_time(hist.get("match_time"))
+        if parsed:
+            return parsed
+    return None
     if hist and hist.get("match_time"):
         parsed = _parse_match_time(hist.get("match_time"))
         if parsed:

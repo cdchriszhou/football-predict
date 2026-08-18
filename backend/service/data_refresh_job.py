@@ -7,7 +7,8 @@ from typing import Any
 
 from db import async_session
 from db.sqlite_write import IS_SQLITE, write_lock, _commit_with_retry
-from crawler import run_schedule_crawler, run_team_crawler, run_all_odds_crawlers
+from crawler import run_all_odds_crawlers
+from crawler.league_crawler import run_all_league_crawlers
 from service.prediction_service import PredictionService
 from service.write_guard import claim_heavy_job, is_heavy_job_running, release_heavy_job
 from utils.logger import logger
@@ -76,8 +77,7 @@ async def run_data_refresh_job(predict_model: str | None = None) -> None:
         })
 
     try:
-        await _run_crawler_phase("schedule", run_schedule_crawler)
-        await _run_crawler_phase("team", run_team_crawler)
+        await _run_crawler_phase("leagues", run_all_league_crawlers)
         await _run_crawler_phase("odds", run_all_odds_crawlers)
 
         _refresh_state["phase"] = "predictions"

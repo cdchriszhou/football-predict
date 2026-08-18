@@ -77,8 +77,7 @@ def test_swap_match_results():
     assert (m.result_a, m.result_b) == (0, 1)
 
 
-async def _test_apply_canonical_team_swap_mirrors_all_fields():
-    """佛得角 vs 乌拉圭 reversed row should become 乌拉圭 vs 佛得角 with mirrored 2:0 → 0:2."""
+def test_apply_canonical_team_swap_is_retired():
     match = SimpleNamespace(
         id=99,
         team_a="佛得角",
@@ -87,49 +86,12 @@ async def _test_apply_canonical_team_swap_mirrors_all_fields():
         result_b=2,
         stage="小组赛",
     )
-    pred = SimpleNamespace(
-        best_score='{"scores": ["0:2", "1:2"], "upset": "2:0"}',
-        win_rate=22.0,
-        lose_rate=58.0,
-    )
-    odds = SimpleNamespace(
-        win_win=4.5,
-        win_lose=1.55,
-        handicap="-1",
-        handicap_win=2.1,
-        handicap_lose=1.7,
-        score_odds=json.dumps({"0:2": 6.5, "2:0": 18.0, "胜其它": 120.0}),
-        half_full_odds=json.dumps({"胜胜": 8.0, "负负": 2.5}),
-    )
-    db = _FakeSession(preds=[pred], odds=[odds])
-
-    changed = await _apply_canonical_team_swap(db, match)
-
-    assert changed is True
-    assert match.team_a == "乌拉圭"
-    assert match.team_b == "佛得角"
-    assert (match.result_a, match.result_b) == (2, 0)
-    pred_out = json.loads(pred.best_score)
-    assert pred_out["scores"] == ["2:0", "2:1"]
-    assert pred_out["upset"] == "0:2"
-    assert pred.win_rate == 58.0
-    assert pred.lose_rate == 22.0
-    assert odds.win_win == 1.55
-    assert odds.win_lose == 4.5
-    assert odds.handicap == "+1"
-    crs = json.loads(odds.score_odds)
-    assert crs["2:0"] == 6.5
-    assert crs["0:2"] == 18.0
-    hf = json.loads(odds.half_full_odds)
-    assert hf["负负"] == 8.0
-    assert hf["胜胜"] == 2.5
+    db = _FakeSession()
+    assert asyncio.run(_apply_canonical_team_swap(db, match)) is False
+    assert (match.team_a, match.team_b) == ("佛得角", "乌拉圭")
 
 
-def test_apply_canonical_team_swap_mirrors_all_fields():
-    asyncio.run(_test_apply_canonical_team_swap_mirrors_all_fields())
-
-
-async def _test_apply_canonical_team_swap_idempotent():
+def test_apply_canonical_team_swap_idempotent():
     match = SimpleNamespace(
         id=1,
         team_a="乌拉圭",
@@ -139,10 +101,6 @@ async def _test_apply_canonical_team_swap_idempotent():
         stage="小组赛",
     )
     db = _FakeSession()
-    assert await _apply_canonical_team_swap(db, match) is False
+    assert asyncio.run(_apply_canonical_team_swap(db, match)) is False
     assert (match.team_a, match.team_b) == ("乌拉圭", "佛得角")
     assert (match.result_a, match.result_b) == (2, 0)
-
-
-def test_apply_canonical_team_swap_idempotent():
-    asyncio.run(_test_apply_canonical_team_swap_idempotent())

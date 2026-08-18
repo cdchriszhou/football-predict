@@ -14,7 +14,6 @@
 
 <script setup>
 import { ref, computed, watch } from 'vue'
-import { useCompetitionStore } from '@/stores/competition'
 import { useTeamsStore } from '@/stores/teams'
 import { resolveTeamAvatarUrl, isTeamCrest, teamAvatarFallback } from '@/utils/teamAvatar'
 
@@ -25,7 +24,6 @@ const props = defineProps({
   inline: { type: Boolean, default: true },
 })
 
-const compStore = useCompetitionStore()
 const teamsStore = useTeamsStore()
 const failed = ref(false)
 
@@ -36,12 +34,11 @@ const teamRecord = computed(() => teamsStore.teamsByName?.[props.name])
 const avatarOpts = computed(() => ({
   name: props.name,
   flag_url: props.flagUrl || teamRecord.value?.flag_url,
-  isWorldCup: compStore.isWorldCup,
 }))
 
 const src = computed(() => resolveTeamAvatarUrl(avatarOpts.value))
 const isCrest = computed(() => isTeamCrest(avatarOpts.value))
-const fallback = computed(() => teamAvatarFallback(props.name, compStore.isWorldCup))
+const fallback = computed(() => teamAvatarFallback(props.name))
 
 const imgStyle = computed(() => {
   if (isCrest.value) {

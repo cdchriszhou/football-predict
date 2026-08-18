@@ -81,7 +81,7 @@ def build_group_context(
     if home_side_override in ("a", "b"):
         home_side = home_side_override
     else:
-        home_side = detect_home_side(team_a, team_b, location)
+        home_side = ""
     is_group_opener = stage == "小组赛" and matchday == 1 and bool(home_side)
     is_league = _is_league_matchday(stage)
     home_win_boost = 0.0
@@ -113,7 +113,7 @@ def build_group_context(
         "draw_suits_a": False,
         "draw_suits_b": False,
         "dead_rubber": False,
-        "is_final_group_match": stage == "小组赛" and matchday == 3,
+        "is_final_group_match": False,
         "need_goals_a": False,
         "need_goals_b": False,
         "form_xg_a": 0.0,
@@ -124,23 +124,6 @@ def build_group_context(
         "rank_b": rank_b,
         "rank_gap": abs(rank_a - rank_b),
     }
-
-    if stage == "小组赛" and standings and matchday >= 2:
-        from data.worldcup_group_standings import enrich_group_context
-        enrich_group_context(ctx, team_a, team_b, standings, matchday)
-        return ctx
-
-    if stage != "小组赛" or matchday < 3:
-        return ctx
-
-    # Round 3 fallback when no live standings: rank-based heuristics
-    rank_gap = abs(rank_a - rank_b)
-    if rank_gap <= 15:
-        ctx["both_need_draw"] = True
-    if rank_gap >= 40:
-        ctx["qualified_a"] = rank_a < rank_b and rank_a <= 20
-        ctx["qualified_b"] = rank_b < rank_a and rank_b <= 20
-
     return ctx
 
 

@@ -121,12 +121,6 @@ async def backfill_team_seasons(db: AsyncSession, slug: str) -> int:
 
 def _dedupe_fixture_key(slug: str, m: Match) -> tuple:
     """Grouping key for duplicate fixture detection."""
-    if slug == "worldcup-2026":
-        # Knockout: same official kickoff slot = same fixture (seed placeholder vs advanced names).
-        if m.stage and m.stage != "小组赛" and m.match_time is not None:
-            return ("ko_kickoff", m.stage, m.match_time.replace(microsecond=0))
-        pair = tuple(sorted([m.team_a or "", m.team_b or ""]))
-        return (m.stage, m.group_name or "", pair)
     return (m.stage, m.group_name or "", m.team_a, m.team_b)
 
 
@@ -144,11 +138,8 @@ async def dedupe_duplicate_fixtures(db: AsyncSession, slug: str) -> int:
     for items in groups.values():
         if len(items) <= 1:
             continue
-        from data.worldcup_venues import is_canonical_team_order
-
         items.sort(
             key=lambda m: (
-                1 if slug == "worldcup-2026" and is_canonical_team_order(m.team_a, m.team_b) else 0,
                 1 if m.status == MATCH_FINISHED and m.result_a is not None else 0,
                 1 if m.status == MATCH_LIVE else 0,
                 1 if m.external_id is not None else 0,
@@ -157,8 +148,6 @@ async def dedupe_duplicate_fixtures(db: AsyncSession, slug: str) -> int:
             ),
             reverse=True,
         )
-        if slug == "worldcup-2026" and items[0].stage == "小组赛":
-            await _apply_canonical_team_swap(db, items[0])
         for dup in items[1:]:
             await db.execute(delete(Prediction).where(Prediction.match_id == dup.id))
             await db.execute(delete(Odds).where(Odds.match_id == dup.id))
@@ -397,8 +386,7 @@ async def apply_confirmed_results(
     flush: bool = True,
 ) -> int:
     """Apply known final scores from worldcup_history into live fixtures."""
-    if slug != "worldcup-2026":
-        return 0
+    return 0
     from data.worldcup_history import HISTORICAL_MATCHES
 
     fixture_query = select(Match).where(Match.competition_slug == slug)
@@ -489,8 +477,8 @@ async def apply_confirmed_results(
 
 async def backfill_historical_odds(db: AsyncSession, slug: str) -> int:
     """Seed pre-match sporttery/euro odds from worldcup_history for fixtures missing Odds rows."""
-    if slug != "worldcup-2026":
-        return 0
+    return 0
+    from data.worldcup_history import HISTORICAL_MATCHES
     import json
     from db.models import Odds
     from data.worldcup_history import HISTORICAL_MATCHES
@@ -577,9 +565,7 @@ async def refresh_predictions_for_matches(db: AsyncSession, match_ids: list[int]
 
 async def refresh_missed_finished_predictions(db: AsyncSession, slug: str) -> int:
     """Re-predict finished fixtures whose stored picks missed the actual scoreline."""
-    if slug != "worldcup-2026":
-        return 0
-    import json
+    return 0
     from db.models import Prediction
     from service.prediction_service import PredictionService
 
@@ -764,16 +750,8 @@ async def _mirror_match_sidecar_rows(db: AsyncSession, match: Match) -> None:
 
 
 async def _apply_canonical_team_swap(db: AsyncSession, match: Match) -> bool:
-    """Swap fixture to FIFA home/away order and mirror all team-relative fields."""
-    from data.worldcup_venues import canonical_team_order, is_canonical_team_order
-
-    if is_canonical_team_order(match.team_a, match.team_b):
-        return False
-    ca, cb = canonical_team_order(match.team_a, match.team_b)
-    match.team_a, match.team_b = ca, cb
-    _swap_match_results_for_side_swap(match)
-    await _mirror_match_sidecar_rows(db, match)
-    return True
+    """World Cup FIFA home/away order repair retired."""
+    return False
 
 
 def _mirror_best_score_value(val):
@@ -804,8 +782,7 @@ def _mirror_best_score_value(val):
 
 async def repair_canonical_team_order(db: AsyncSession, slug: str) -> int:
     """Swap team_a/team_b to FIFA official home/away order when stored reversed."""
-    if slug != "worldcup-2026":
-        return 0
+    return 0
 
     rows = (
         await db.execute(
@@ -832,6 +809,8 @@ async def repair_canonical_team_order(db: AsyncSession, slug: str) -> int:
 
 
 async def repair_canonical_kickoffs(db: AsyncSession, slug: str) -> int:
+    """World Cup canonical kickoff repair retired."""
+    return 0
     """Align stored kickoff/status with official schedule (any status, incl. wrong finished)."""
     if slug != "worldcup-2026":
         return 0
@@ -872,15 +851,6 @@ def effective_kickoff_naive(match) -> datetime | None:
     kickoff = getattr(match, "match_time", None)
     if kickoff is None:
         return None
-    if getattr(match, "competition_slug", None) == "worldcup-2026":
-        ta = getattr(match, "team_a", None)
-        tb = getattr(match, "team_b", None)
-        if ta and tb:
-            from data.worldcup_schedule_lookup import canonical_kickoff_beijing
-
-            canon = canonical_kickoff_beijing(ta, tb)
-            if canon:
-                return canon
     return kickoff
 
 
@@ -907,20 +877,7 @@ def include_in_today_dashboard(match) -> bool:
 
 
 async def sync_live_scores(db: AsyncSession, slug: str, *, network: bool = False) -> dict:
-    """Fetch real-time scores from football-data.org (World Cup + club leagues)."""
-    if slug == "worldcup-2026":
-        try:
-            from crawler.worldcup_score_sync import sync_worldcup_scores_from_football_data
-            return await sync_worldcup_scores_from_football_data(db, network=network)
-        except IntegrityError as exc:
-            logger.warning(f"Live score sync integrity error [{slug}]: {exc}")
-            await db.rollback()
-            return {"status": "failed", "error": "integrity_error"}
-        except Exception as exc:
-            logger.warning(f"Live score sync failed [{slug}]: {exc}")
-            await db.rollback()
-            return {"status": "failed", "error": str(exc)}
-
+    """Fetch real-time scores from football-data.org for club leagues."""
     from data.competitions import get_competition
     comp = get_competition(slug)
     if not comp or comp.get("type") != "club":
@@ -963,7 +920,7 @@ async def sync_match_results_throttled(db: AsyncSession, slug: str) -> int:
     elapsed = now - _last_result_sync_at.get(slug, 0)
     from data.competitions import get_competition
     comp = get_competition(slug)
-    use_live_ttl = slug == "worldcup-2026" or (comp or {}).get("type") == "club"
+    use_live_ttl = (comp or {}).get("type") == "club"
     ttl = _LIVE_CACHE_TTL_SEC if use_live_ttl else _RESULT_SYNC_INTERVAL_SEC
 
     applied = await apply_confirmed_results(db, slug)
@@ -978,12 +935,6 @@ async def sync_match_results_throttled(db: AsyncSession, slug: str) -> int:
         live_sync = await sync_live_scores(db, slug, network=False)
         if int(live_sync.get("updated") or 0):
             applied += await apply_confirmed_results(db, slug)
-            if slug == "worldcup-2026":
-                try:
-                    from data.knockout_advance import advance_knockout_teams
-                    await advance_knockout_teams(db, slug)
-                except Exception:
-                    pass
 
     fd_updated = int(live_sync.get("updated") or 0)
     if elapsed < ttl:
@@ -1003,12 +954,7 @@ async def sync_match_results_throttled(db: AsyncSession, slug: str) -> int:
         kickoffs += await repair_canonical_kickoffs(db, slug)
         applied += await apply_confirmed_results(db, slug)
 
-        try:
-            from data.knockout_advance import advance_knockout_teams
-            advanced = await advance_knockout_teams(db, slug)
-        except Exception as exc:
-            logger.warning("Knockout advance skipped for %s: %s", slug, exc)
-            advanced = 0
+        advanced = 0
         if advanced:
             logger.info("Knockout teams advanced [%s]: %d fixtures", slug, advanced)
 
@@ -1051,9 +997,8 @@ async def maintain_competition_matches(db: AsyncSession, slug: str) -> dict:
     reopened = await reopen_prematurely_finished_matches(db, slug)
     confirmed = await apply_confirmed_results(db, slug)
     live_scores = await sync_live_scores(db, slug, network=True)
-    from crawler.schedule_crawler import _build_expected_matches, _repair_misaligned_fixtures
-    repaired_ids = await _repair_misaligned_fixtures(db, _build_expected_matches())
-    fixtures_repaired = len(repaired_ids)
+    repaired_ids: list[int] = []
+    fixtures_repaired = 0
     if fixtures_repaired:
         confirmed += await apply_confirmed_results(db, slug)
     odds_backfill = await backfill_historical_odds(db, slug)
@@ -1115,9 +1060,8 @@ def match_has_recorded_score(match) -> bool:
 
 
 def confirmed_scores_from_history(match) -> dict | None:
-    """Fallback scores from worldcup_history when DB row is finished but empty."""
-    if getattr(match, "competition_slug", None) != "worldcup-2026":
-        return None
+    """World Cup history overlay retired."""
+    return None
     if match_has_recorded_score(match):
         return None
     item, reversed_match = _best_history_item_for_match(match)
@@ -1147,10 +1091,8 @@ def confirmed_scores_from_history(match) -> dict | None:
 
 
 def _best_history_item_for_match(match) -> tuple[dict | None, bool]:
-    """Find the closest worldcup_history row for a fixture (kickoff window)."""
-    if getattr(match, "competition_slug", None) != "worldcup-2026":
-        return None, False
-    from data.worldcup_history import HISTORICAL_MATCHES
+    """World Cup history overlay retired."""
+    return None, False
 
     stage = getattr(match, "stage", "") or "小组赛"
     mt = effective_kickoff_naive(match) or getattr(match, "match_time", None)
@@ -1193,7 +1135,8 @@ def _best_history_item_for_match(match) -> tuple[dict | None, bool]:
 
 
 def history_match_overlay(match) -> dict:
-    """Overlay penalties / extra-time metadata from history onto an existing row."""
+    """World Cup history overlay retired."""
+    return {}
     item, reversed_match = _best_history_item_for_match(match)
     if not item:
         return {}

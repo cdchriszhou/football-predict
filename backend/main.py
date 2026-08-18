@@ -59,13 +59,13 @@ async def _background_startup():
         async with async_session() as session:
             n = (await session.execute(select(func.count(Match.id)))).scalar() or 0
         if n == 0:
-            logger.warning("Database has no matches — running initial schedule crawl")
+            logger.warning("Database has no matches — running initial league crawl")
             async with write_lock:
                 async with async_session() as session:
-                    from crawler.schedule_crawler import run_schedule_crawler
-                    result = await run_schedule_crawler(session)
+                    from crawler.league_crawler import run_all_league_crawlers
+                    result = await run_all_league_crawlers(session)
                     await commit_session(session)
-                    logger.info(f"Initial schedule crawl: {result}")
+                    logger.info(f"Initial league crawl: {result}")
     except Exception as e:
         logger.warning(f"Initial schedule crawl skipped: {e}")
 
@@ -201,7 +201,6 @@ from api.predictions import router as predictions_router
 from api.odds import router as odds_router
 from api.admin import router as admin_router
 from api.auth import router as auth_router
-from api.tournament import router as tournament_router
 from api.data import router as data_router
 from api.competitions import router as competitions_router
 from api.sporttery import router as sporttery_router
@@ -218,7 +217,6 @@ app.include_router(odds_router, prefix="/api/v1/odds", tags=["盘口"])
 app.include_router(sporttery_router, prefix="/api/v1/sporttery", tags=["体彩方案"])
 app.include_router(pailie_router, prefix="/api/v1/pailie", tags=["排列3/5"])
 app.include_router(admin_router, prefix="/api/v1/admin", tags=["管理"])
-app.include_router(tournament_router, prefix="/api/v1/tournament", tags=["赛事预测"])
 app.include_router(data_router, prefix="/api/v1/data", tags=["数据"])
 
 
@@ -235,7 +233,7 @@ INDEX_HTML = os.path.join(FRONTEND_DIST, "index.html")
 if os.path.isdir(FRONTEND_DIST):
     _ROOT_FILES = frozenset([
         "manifest.webmanifest", "registerSW.js", "sw.js",
-        "workbox-e4022e15.js", "worldcup2026-logo.svg", "worldcup2026-logo.png",
+        "workbox-e4022e15.js", "app-logo.svg", "app-logo.png",
     ])
 
     @app.get("/{filename:path}", include_in_schema=False)

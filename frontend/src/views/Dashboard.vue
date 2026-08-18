@@ -138,75 +138,6 @@
       </el-row>
     </el-card>
 
-    <!-- Daily score backtest report (World Cup) -->
-    <el-card v-if="compStore.isWorldCup" class="section-card daily-report-card" style="margin-top: 20px">
-      <template #header>
-        <div class="flex-between">
-          <div>
-            <span class="card-title">{{ t('dashboard.dailyReportTitle') }}</span>
-            <span v-if="dailyReport?.computed_at" class="report-updated">
-              {{ t('dashboard.dailyReportUpdated', { time: formatReportTime(dailyReport.computed_at) }) }}
-            </span>
-          </div>
-          <el-button text type="primary" @click="goBacktest">{{ t('dashboard.dailyReportDetail') }}</el-button>
-        </div>
-      </template>
-      <div v-loading="dailyReportLoading">
-        <el-empty
-          v-if="!dailyReportLoading && !dailyReportDays.length"
-          :description="t('dashboard.dailyReportEmpty')"
-          :image-size="72"
-        />
-        <template v-else-if="dailyReport">
-          <div class="daily-summary">
-            <div class="summary-item">
-              <span class="summary-label">{{ t('dashboard.dailyReportRolling7d') }}</span>
-              <span class="summary-value highlight">{{ dailyReport.summary?.rolling_7d_triple_hit_rate ?? 0 }}%</span>
-              <span class="summary-sub">{{ t('scoreBacktest.tripleHitRate') }}</span>
-            </div>
-            <div class="summary-item">
-              <span class="summary-label">{{ t('dashboard.dailyReportRolling7d') }}</span>
-              <span class="summary-value">{{ dailyReport.summary?.rolling_7d_primary_hit_rate ?? 0 }}%</span>
-              <span class="summary-sub">{{ t('scoreBacktest.primaryHitRate') }}</span>
-            </div>
-            <div class="summary-item" v-if="dailyReport.today">
-              <span class="summary-label">{{ t('dashboard.dailyReportToday') }}</span>
-              <span class="summary-value highlight">{{ dailyReport.today.triple_hit_rate }}%</span>
-              <span class="summary-sub">
-                {{ t('dashboard.dailyReportTodaySub', {
-                  primary: dailyReport.today.primary_hits,
-                  triple: dailyReport.today.triple_hits,
-                  total: dailyReport.today.evaluated,
-                }) }}
-              </span>
-            </div>
-          </div>
-          <div class="table-responsive">
-            <el-table :data="dailyReportDays" stripe size="small" class="daily-table">
-              <el-table-column :label="t('dashboard.dailyReportColDate')" min-width="108">
-                <template #default="{ row }">{{ formatReportDate(row.date) }}</template>
-              </el-table-column>
-              <el-table-column :label="t('dashboard.dailyReportColMatches')" width="72" align="center">
-                <template #default="{ row }">{{ row.evaluated }}</template>
-              </el-table-column>
-              <el-table-column :label="t('scoreBacktest.primaryHitRate')" width="100" align="center">
-                <template #default="{ row }">
-                  {{ row.primary_hits }}/{{ row.evaluated }} ({{ row.primary_hit_rate }}%)
-                </template>
-              </el-table-column>
-              <el-table-column :label="t('scoreBacktest.tripleHitRate')" width="100" align="center">
-                <template #default="{ row }">
-                  <el-tag :type="row.triple_hit_rate >= 50 ? 'success' : 'info'" size="small">
-                    {{ row.triple_hits }}/{{ row.evaluated }} ({{ row.triple_hit_rate }}%)
-                  </el-tag>
-                </template>
-              </el-table-column>
-            </el-table>
-          </div>
-        </template>
-      </div>
-    </el-card>
-
     <!-- Upcoming matches -->
     <el-card class="section-card" style="margin-top: 20px">
       <template #header>
@@ -215,9 +146,6 @@
           <el-button text type="primary" @click="goMatches">{{ t('dashboard.viewFullSchedule') }}</el-button>
         </div>
       </template>
-      <p v-if="compStore.isWorldCup && scheduleTotal > 0" class="schedule-hint">
-        {{ t('dashboard.worldCupScheduleHint', { shown: displayedUpcoming.length, total: scheduleTotal }) }}
-      </p>
       <el-empty
         v-if="seasonEnded"
         :description="t('dashboard.seasonEnded')"
@@ -257,7 +185,6 @@ import { useCompetitionStore } from '@/stores/competition'
 import { getTeamStandings } from '@/api/teams'
 import { refreshAllData, getDataRefreshStatus } from '@/api/admin'
 import { refreshLeagueData } from '@/api/competitions'
-import { getDailyScoreBacktest } from '@/api/predictions'
 import { useRouter } from 'vue-router'
 import { effectiveMatchStatus, hasMatchScore, isEffectiveMatchStatus } from '@/utils/matchStatus'
 
@@ -282,49 +209,6 @@ function goTeamDetail(id) {
   router.push(`${compStore.basePath}/teams/${id}`)
 }
 
-function goBacktest() {
-  router.push(`${compStore.basePath}/backtest`)
-}
-
-const dailyReport = ref(null)
-const dailyReportLoading = ref(false)
-
-const dailyReportDays = computed(() => {
-  const days = dailyReport.value?.days
-  if (!Array.isArray(days)) return []
-  return [...days].reverse()
-})
-
-function formatReportDate(dateStr) {
-  if (!dateStr) return '—'
-  const d = new Date(`${dateStr}T12:00:00`)
-  if (Number.isNaN(d.getTime())) return dateStr
-  return d.toLocaleDateString(locale.value, { month: 'short', day: 'numeric' })
-}
-
-function formatReportTime(iso) {
-  if (!iso) return '—'
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return iso
-  return d.toLocaleString(locale.value, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
-}
-
-async function loadDailyReport() {
-  if (!compStore.isWorldCup) {
-    dailyReport.value = null
-    return
-  }
-  dailyReportLoading.value = true
-  try {
-    const res = await getDailyScoreBacktest(30)
-    dailyReport.value = res.data || null
-  } catch {
-    dailyReport.value = null
-  } finally {
-    dailyReportLoading.value = false
-  }
-}
-
 const dashboardTitle = computed(() => {
   const key = compStore.current?.name_key
   if (!key) return t('dashboard.title')
@@ -334,14 +218,13 @@ const dashboardTitle = computed(() => {
 })
 
 const dashboardSubtitle = computed(() => {
-  if (compStore.isWorldCup) return t('dashboard.subtitle')
   const league = compStore.current?.short_name
   return league ? t('dashboard.subtitleLeague', { league }) : t('dashboard.subtitle')
 })
 
 const seasonEnded = computed(() => compStore.current?.season_status === 'ended')
 const isClubLeague = computed(() => compStore.current?.type === 'club')
-const isFootball = computed(() => isClubLeague.value || compStore.isWorldCup)
+const isFootball = computed(() => isClubLeague.value)
 const showRecentResults = computed(() => isFootball.value)
 
 const scheduleTotal = computed(() => Number(statValues.value.total) || 0)
@@ -413,16 +296,13 @@ const displayedRecentResults = computed(() => {
   })
 })
 
-const upcomingPreviewLimit = computed(() => (compStore.isWorldCup ? 12 : 6))
+const upcomingPreviewLimit = computed(() => 6)
 
 const displayedUpcoming = computed(() =>
   store.upcomingMatches.slice(0, upcomingPreviewLimit.value),
 )
 
-const upcomingSectionTitle = computed(() => {
-  if (compStore.isWorldCup) return t('dashboard.upcomingWorldCup')
-  return t('dashboard.upcoming')
-})
+const upcomingSectionTitle = computed(() => t('dashboard.upcoming'))
 
 const standings = ref([])
 const standingsLoading = ref(false)
@@ -486,7 +366,7 @@ async function loadDashboard() {
   // Separate data calls (all must succeed for meaningful dashboard) from setup calls
   const dataCalls = [
     { key: 'today', p: store.fetchToday() },
-    { key: 'upcoming', p: store.fetchUpcoming(compStore.isWorldCup ? 50 : 12) },
+    { key: 'upcoming', p: store.fetchUpcoming(12) },
     { key: 'accuracy', p: predStore.fetchAccuracy(30) },
   ]
   if (isFootball.value) {
@@ -494,10 +374,6 @@ async function loadDashboard() {
       { key: 'recentResults', p: store.fetchRecentResults(72, 12) },
     )
   }
-  if (compStore.isWorldCup) {
-    dataCalls.push({ key: 'dailyReport', p: loadDailyReport() })
-  }
-
   const settled = await Promise.allSettled([
     ...dataCalls.map((d) => d.p),
     compStore.fetchCurrent().catch(() => null),
@@ -643,9 +519,8 @@ async function refreshMatchScores() {
   try {
     await Promise.all([
       store.fetchToday(),
-      store.fetchUpcoming(compStore.isWorldCup ? 50 : 12),
+      store.fetchUpcoming(12),
       isFootball.value ? store.fetchRecentResults(72, 12) : Promise.resolve(),
-      compStore.isWorldCup ? loadDailyReport() : Promise.resolve(),
     ])
   } catch {
     /* ignore transient poll errors */

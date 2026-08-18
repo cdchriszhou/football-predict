@@ -2,22 +2,16 @@
 import asyncio
 from datetime import datetime
 
-import pytest
-
 from service.score_backtest import (
     run_score_prediction,
     _evaluate_match,
     build_daily_report,
     _backtest_group_key_label,
-    _resolve_kickoff,
-    _odds_meta_from_history,
     _collect_evaluated_rows,
     _is_worldcup_competition,
     _notes_for,
     LEAGUE_NOTES,
-    NOTES,
 )
-from data.worldcup_schedule_lookup import canonical_kickoff_beijing
 from service.score_pick import score_matches_pick
 
 
@@ -38,37 +32,30 @@ def _sample_row(date: str, primary_hit: bool, triple_hit: bool, matchday: int = 
 
 def test_build_daily_report_groups_by_date():
     rows = [
-        _sample_row("2026-06-17", True, True),
-        _sample_row("2026-06-17", False, True),
-        _sample_row("2026-06-18", False, False),
+        _sample_row("2026-08-16", True, True),
+        _sample_row("2026-08-16", False, True),
+        _sample_row("2026-08-17", False, False),
     ]
     report = build_daily_report(rows, days=14)
     assert len(report["days"]) == 2
-    june17 = next(d for d in report["days"] if d["date"] == "2026-06-17")
-    assert june17["evaluated"] == 2
-    assert june17["primary_hits"] == 1
-    assert june17["triple_hits"] == 2
-    assert june17["primary_hit_rate"] == 50.0
-    assert june17["triple_hit_rate"] == 100.0
+    day16 = next(d for d in report["days"] if d["date"] == "2026-08-16")
+    assert day16["evaluated"] == 2
+    assert day16["primary_hits"] == 1
+    assert day16["triple_hits"] == 2
+    assert day16["primary_hit_rate"] == 50.0
+    assert day16["triple_hit_rate"] == 100.0
     assert report["summary"]["total_evaluated"] == 3
 
 
 def test_build_daily_report_respects_days_limit():
     rows = [
-        _sample_row("2026-06-15", True, True),
-        _sample_row("2026-06-16", True, True),
-        _sample_row("2026-06-17", True, True),
+        _sample_row("2026-08-15", True, True),
+        _sample_row("2026-08-16", True, True),
+        _sample_row("2026-08-17", True, True),
     ]
     report = build_daily_report(rows, days=2)
     assert len(report["days"]) == 2
-    assert report["days"][-1]["date"] == "2026-06-17"
-
-
-def test_backtest_prefers_date_for_worldcup_rows():
-    row = _sample_row("2026-06-17", True, True, matchday=1)
-    key, label = _backtest_group_key_label(row, prefer_date=True)
-    assert key == "d2026-06-17"
-    assert label == "6月17日"
+    assert report["days"][-1]["date"] == "2026-08-17"
 
 
 def test_canada_draw_primary():
@@ -81,41 +68,6 @@ def test_canada_draw_primary():
     p1, p2, _, _ = run_score_prediction("加拿大", "波黑", crs, wdl, odds)
     assert p1 == "1:1"
     assert score_matches_pick("1:1", p1, crs)
-
-
-def test_uzbekistan_colombia_cluster_prefers_concession():
-    from data.worldcup_history import HISTORICAL_MATCHES
-    from service.score_pick import refine_favorite_score_cluster
-
-    hist = next(
-        m for m in HISTORICAL_MATCHES
-        if m.get("year") == 2026 and m["team_a"] == "乌兹别克斯坦" and m["team_b"] == "哥伦比亚"
-    )
-    crs = {str(k): float(v) for k, v in hist["score_odds"].items()}
-    base = ["0:2", "1:1"]
-    refined = refine_favorite_score_cluster(
-        base, crs, win_rate=12.0, lose_rate=66.9, sp_win=7.5, sp_lose=1.35,
-    )
-    assert refined == ["0:2", "1:3"]
-    moderate = refine_favorite_score_cluster(
-        base, crs, win_rate=33.0, lose_rate=56.0, sp_win=7.5, sp_lose=1.35,
-    )
-    assert moderate == ["0:2", "1:2"]
-
-
-def test_evaluate_knockout_without_book_crs():
-    row = _evaluate_match(
-        team_a="巴拉圭",
-        team_b="法国",
-        actual="0:1",
-        crs={},
-        wdl=(35.0, 28.0, 37.0),
-        odds_meta=None,
-        stage="1/8决赛",
-    )
-    assert row is not None
-    assert row["crs_source"] == "synthetic_ko"
-    assert row["primary_pick"]
 
 
 def test_evaluate_match_uses_published_picks():
@@ -138,103 +90,28 @@ def test_evaluate_match_uses_published_picks():
     ) is None
 
 
-def test_ghana_panama_kickoff_is_june18_beijing():
-    kickoff = canonical_kickoff_beijing("加纳", "巴拿马")
-    assert kickoff is not None
-    assert kickoff.strftime("%Y-%m-%d") == "2026-06-18"
-    assert kickoff.hour == 7
-
-
-def test_worldcup_groups_sort_by_iso_date_not_chinese_label():
+def test_groups_sort_by_iso_date_not_chinese_label():
     """Chinese labels like 7月8日 sort after 7月20日 lexicographically — must use ISO keys."""
-    from service.score_backtest import _backtest_group_key_label
-
     rows = [
-        {"match_time": "2026-07-08T00:00:00", "stage": "1/8决赛", "matchday": None},
-        {"match_time": "2026-07-12T05:00:00", "stage": "1/4决赛", "matchday": None},
-        {"match_time": "2026-07-20T03:00:00", "stage": "决赛", "matchday": None},
-        {"match_time": "2026-07-15T02:00:00", "stage": "半决赛", "matchday": None},
+        {"match_time": "2026-08-08T00:00:00", "stage": "第1轮", "matchday": 1},
+        {"match_time": "2026-08-12T05:00:00", "stage": "第2轮", "matchday": 2},
+        {"match_time": "2026-08-20T03:00:00", "stage": "第3轮", "matchday": 3},
+        {"match_time": "2026-08-15T02:00:00", "stage": "第2轮", "matchday": 2},
     ]
     groups: dict[str, dict] = {}
     for row in rows:
         key, label = _backtest_group_key_label(row, prefer_date=True)
         groups[key] = {"group_key": key, "label": label, "matchday": None}
     group_list = list(groups.values())
-    # Reproduce the bug path then the fix
     wrong = sorted(group_list, key=lambda x: x["label"], reverse=True)
-    assert wrong[0]["group_key"] == "d2026-07-08"
+    assert wrong[0]["group_key"] == "d2026-08-08"
     fixed = sorted(group_list, key=lambda x: x["group_key"], reverse=True)
     assert [g["group_key"] for g in fixed] == [
-        "d2026-07-20",
-        "d2026-07-15",
-        "d2026-07-12",
-        "d2026-07-08",
+        "d2026-08-20",
+        "d2026-08-15",
+        "d2026-08-12",
+        "d2026-08-08",
     ]
-
-
-def test_july_knockout_groups_use_beijing_date():
-    from service.score_backtest import _resolve_backtest_kickoff, _backtest_group_key_label
-
-    kickoff = _resolve_backtest_kickoff("科特迪瓦", "挪威", datetime(2026, 6, 30, 17, 0))
-    assert kickoff.strftime("%Y-%m-%d") == "2026-07-01"
-    row = {
-        "match_time": kickoff.isoformat(),
-        "stage": "1/16决赛",
-        "matchday": None,
-    }
-    key, label = _backtest_group_key_label(row, prefer_date=True)
-    assert key == "d2026-07-01"
-    assert "7月1日" in label
-    assert "1/16" in label
-
-    hist_kickoff = _resolve_backtest_kickoff(
-        "巴拉圭",
-        "法国",
-        datetime(2026, 6, 30, 17, 0),
-        {"match_time": "2026-07-05T05:00:00"},
-    )
-    assert hist_kickoff.strftime("%Y-%m-%d") == "2026-07-05"
-
-
-def test_june18_daily_report_has_four_matches():
-    """Official schedule has 4 group-stage fixtures on 2026-06-18 (Beijing)."""
-    from data.worldcup_history import HISTORICAL_MATCHES
-    from service.score_backtest import _evaluate_match, _resolve_kickoff, build_daily_report
-
-    rows = []
-    j18_pairs = {
-        ("葡萄牙", "刚果(金)"),
-        ("乌兹别克斯坦", "哥伦比亚"),
-        ("英格兰", "克罗地亚"),
-        ("加纳", "巴拿马"),
-    }
-    for hist in HISTORICAL_MATCHES:
-        if hist.get("year") != 2026:
-            continue
-        if (hist["team_a"], hist["team_b"]) not in j18_pairs:
-            continue
-        crs = {str(k): float(v) for k, v in hist["score_odds"].items()}
-        kickoff = _resolve_kickoff(hist["team_a"], hist["team_b"], None, hist)
-        row = _evaluate_match(
-            team_a=hist["team_a"],
-            team_b=hist["team_b"],
-            actual=f"{hist['result_a']}:{hist['result_b']}",
-            crs=crs,
-            wdl=(50.0, 25.0, 25.0),
-            odds_meta=_odds_meta_from_history(hist),
-            match_time=kickoff,
-            stage=hist.get("stage") or "",
-            group_name=hist.get("group_name"),
-            matchday=hist.get("matchday"),
-        )
-        assert row is not None
-        rows.append(row)
-
-    report = build_daily_report(rows, days=14)
-    june18 = next(d for d in report["days"] if d["date"] == "2026-06-18")
-    assert june18["evaluated"] == 4
-    teams = {(m["team_a"], m["team_b"]) for m in june18["matches"]}
-    assert teams == j18_pairs
 
 
 class _EmptyQueryResult:
@@ -255,15 +132,13 @@ class _EmptySession:
 
 def test_league_notes_do_not_mention_knockout_seed():
     assert _is_worldcup_competition("premier-league") is False
-    assert _is_worldcup_competition("worldcup-2026") is True
+    assert _is_worldcup_competition("worldcup-2026") is False
     notes = _notes_for("la-liga")
     assert notes == LEAGUE_NOTES
     assert any("不混入世界杯" in n for n in notes)
-    assert _notes_for("worldcup-2026") == NOTES
 
 
 def test_league_backtest_does_not_seed_worldcup_matches():
-    """Club-league backtest must not fall back to World Cup 2026 history."""
     from service.score_backtest import compute_score_backtest
 
     async def _run():
@@ -307,4 +182,3 @@ def test_all_big_five_backtests_ignore_worldcup_history():
         nations = {r["team_a"] for r in rows} | {r["team_b"] for r in rows}
         assert "葡萄牙" not in nations
         assert "英格兰" not in nations
-

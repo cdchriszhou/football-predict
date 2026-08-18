@@ -1,7 +1,6 @@
 """League score-prediction must not reuse World Cup knockout / group-MD3 heuristics."""
 from service.match_context import analyze_match_context, build_group_context
 from service.rule_engine import RuleEngine
-from data.worldcup_group_standings import format_group_situation
 from llm.base_client import BaseLLMClient, PredictionInput
 
 
@@ -80,7 +79,6 @@ def test_league_prompt_does_not_include_knockout_instructions():
     assert "俱乐部联赛" in prompt
     assert "不要套用世界杯淘汰赛" in prompt
     assert "拖入加时赛" not in prompt
-    assert format_group_situation(_league_ctx("第2轮", 2), "巴萨", "马拉加") == ""
 
 
 def test_empty_stage_prompt_defaults_to_league():
@@ -133,38 +131,3 @@ def test_score_job_defaults_are_premier_league():
     assert inspect.signature(get_today_sporttery_plan).parameters["competition_slug"].default == "premier-league"
     assert inspect.signature(_find_db_match).parameters["competition_slug"].default == "premier-league"
 
-
-def test_knockout_scorer_skips_league_rounds():
-    from service.score_pipeline.base import ScorerInput
-    from service.score_pipeline.knockout_scorer import KnockoutMarketScorer
-
-    scorer = KnockoutMarketScorer()
-    inp = ScorerInput(
-        score_odds={"1:0": 5.0, "1:1": 6.0, "0:1": 7.0},
-        win_rate=52.0,
-        draw_rate=26.0,
-        lose_rate=22.0,
-        expected_a=1.5,
-        expected_b=1.1,
-        stage="第3轮",
-        group_context={"stage": "第3轮"},
-        sp_win=1.85,
-        sp_draw=3.4,
-        sp_lose=4.2,
-    )
-    result = scorer.score(inp)
-    assert result.scores == {}
-    assert "league" in result.rationale
-
-
-def test_worldcup_group_md3_collusion_still_applies():
-    ctx = build_group_context(
-        "小组赛", "A", 3, "巴西", "克罗地亚", 5, 12,
-    )
-    assert ctx["is_final_group_match"] is True
-    analysis = analyze_match_context(
-        {"name": "巴西", "rank": 5, "tactic": "传控"},
-        {"name": "克罗地亚", "rank": 12, "tactic": "防反"},
-        ctx,
-    )
-    assert analysis.draw_adjustment > 0

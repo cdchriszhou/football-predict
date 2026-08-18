@@ -23,7 +23,6 @@ export const useCompetitionStore = defineStore('competition', {
 
   getters: {
     features: (state) => state.current?.features || {},
-    isWorldCup: (state) => state.slug === 'worldcup-2026',
     basePath: (state) => `/competition/${state.slug}`,
   },
 

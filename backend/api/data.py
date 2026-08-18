@@ -3,7 +3,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from db import get_db
 from db.sqlite_write import IS_SQLITE, commit_session, write_lock
 from api.auth import get_current_admin_user
-from crawler import run_schedule_crawler, run_team_crawler, run_all_odds_crawlers
+from crawler import run_all_odds_crawlers
+from crawler.league_crawler import run_all_league_crawlers
 from service.prediction_service import PredictionService
 from service.data_refresh_job import get_refresh_state, start_data_refresh_job
 from utils.response import success, error
@@ -16,17 +17,11 @@ async def _refresh_sync(db: AsyncSession, predict_model: str | None) -> dict:
     results = {}
 
     try:
-        logger.info("Sync data refresh: schedule")
-        results["schedule"] = await run_schedule_crawler(db)
+        logger.info("Sync data refresh: leagues")
+        results["leagues"] = await run_all_league_crawlers(db)
     except Exception as e:
-        logger.warning(f"Schedule crawler failed: {e}")
-        results["schedule"] = {"status": "failed", "error": str(e)}
-
-    try:
-        results["team"] = await run_team_crawler(db)
-    except Exception as e:
-        logger.warning(f"Team crawler failed: {e}")
-        results["team"] = {"status": "failed", "error": str(e)}
+        logger.warning(f"League crawler failed: {e}")
+        results["leagues"] = {"status": "failed", "error": str(e)}
 
     try:
         results["odds"] = await run_all_odds_crawlers(db)

@@ -1,5 +1,5 @@
 """
-The Odds API client — real European + Asian handicap markets for FIFA World Cup.
+The Odds API client — European 1X2 + Asian handicap for club leagues.
 
 Docs: https://the-odds-api.com/liveapi/guides/v4/
 Requires ODDS_API_KEY in environment (.env).
@@ -13,12 +13,12 @@ from typing import Optional
 
 import httpx
 
-from crawler.team_crawler import TEAM_NAME_MAP, EN_TO_CN_TEAM, WIKIPEDIA_NAME_ALIASES
+from data.club_name_map import resolve_club_cn
+from data.league_seed import LEAGUE_TEAMS
 from utils.logger import logger
 from utils.http_client import get_crawler_proxy
 
 ODDS_API_BASE = "https://api.the-odds-api.com/v4"
-SPORT_KEY = "soccer_fifa_world_cup"
 
 # Prefer sharp EU books for 1X2; AU/EU for Asian handicap
 EU_H2H_BOOKS = {"pinnacle", "betfair_ex_eu", "williamhill", "unibet_eu", "bet365"}
@@ -51,23 +51,18 @@ def _normalize_api_team(name: str) -> str:
 
 
 def cn_to_en(team_cn: str) -> str:
-    return TEAM_NAME_MAP.get(team_cn, team_cn)
+    for teams in LEAGUE_TEAMS.values():
+        for cn, en, _rank in teams:
+            if cn == team_cn:
+                return en
+    return team_cn
 
 
 def en_to_cn(team_en: str) -> str:
     team_en = _normalize_api_team(team_en)
-    if team_en in EN_TO_CN_TEAM:
-        return EN_TO_CN_TEAM[team_en]
-    alias = WIKIPEDIA_NAME_ALIASES.get(team_en)
-    if alias and alias in EN_TO_CN_TEAM:
-        return EN_TO_CN_TEAM[alias]
-    try:
-        from data.club_name_map import resolve_club_cn
-        cn = resolve_club_cn(name_en=team_en)
-        if cn and cn != team_en:
-            return cn
-    except Exception:
-        pass
+    cn = resolve_club_cn(name_en=team_en)
+    if cn and cn != team_en:
+        return cn
     return team_en
 
 
@@ -340,11 +335,6 @@ async def fetch_sport_odds(sport_key: str, label: str = "") -> list[dict]:
     tag = label or sport_key
     logger.info(f"The Odds API [{tag}]: {len(parsed)} events with real odds")
     return parsed
-
-
-async def fetch_world_cup_odds() -> list[dict]:
-    """Fetch all upcoming World Cup fixtures with real bookmaker odds."""
-    return await fetch_sport_odds(SPORT_KEY, "World Cup")
 
 
 def find_odds_api_match(

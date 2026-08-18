@@ -223,34 +223,14 @@ class BaseLLMClient(ABC):
         group_section = ""
         stage = ((input.group_context or {}).get("stage") or "").strip()
         is_league = _is_league_prompt_stage(stage)
-        if input.group_context and not is_league:
-            from data.worldcup_group_standings import format_group_situation
-            group_section = format_group_situation(
-                input.group_context,
-                a.get("name", ""),
-                b.get("name", ""),
-            )
-            if group_section and not group_section.endswith("\n"):
-                group_section += "\n"
 
         match_ctx_section = self._format_match_context_section(input)
-        role = "五大联赛" if is_league else "国际足球赛事"
-        rank_label = "实力档" if is_league else "FIFA排名"
-        if is_league:
-            knockout_section = (
-                "8. 【联赛】本场是俱乐部联赛，只预测90分钟常规时间，不考虑加时和点球；"
-                "不要套用世界杯淘汰赛的保守小球/拖平逻辑。\n"
-            )
-        else:
-            knockout_section = (
-                "8. 【淘汰赛特殊考量】如果本场为淘汰赛（1/8、1/4、半决赛、决赛、季军赛）：\n"
-                "   a) 预测比分仅指常规时间90分钟\n"
-                "   b) 常规时间打平将进入加时赛，球队战术可能更保守\n"
-                "   c) 弱队倾向防守反击；强队则需在90分钟内解决战斗\n"
-                "   d) 淘汰赛常规时间平局率约30-40%，显著高于小组赛的22-28%\n"
-                "   e) 亚盘让球方若让球偏浅（如强队仅-0.5），需警惕常规时间打平风险\n"
-                "   f) 大小球盘口若偏低（≤2.25），优先考虑1:0/0:0/1:1类小比分\n"
-            )
+        role = "五大联赛"
+        rank_label = "实力档"
+        knockout_section = (
+            "8. 【联赛】本场是俱乐部联赛，只预测90分钟常规时间，不考虑加时和点球；"
+            "不要套用世界杯淘汰赛的保守小球/拖平逻辑。\n"
+        )
 
         return f"""你是专业{role}足球预测分析师。请综合以下多维数据，结合博彩市场信号与规则模型提示，进行科学严谨的比赛预测，并给出相对合理的常规时间比分。
 

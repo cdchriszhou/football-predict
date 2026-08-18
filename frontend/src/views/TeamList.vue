@@ -89,7 +89,7 @@ const compStore = useCompetitionStore()
 
 const showGroups = computed(() => compStore.features?.groups !== false)
 const listSubtitle = computed(() => {
-  if (compStore.current?.short_name && !compStore.isWorldCup) {
+  if (compStore.current?.short_name) {
     return t('team.listSubtitleLeague', { league: compStore.current.short_name })
   }
   return t('team.listSubtitle')
@@ -97,7 +97,7 @@ const listSubtitle = computed(() => {
 const groups = ['A','B','C','D','E','F','G','H','I','J','K','L']
 
 function rankLabel(rank) {
-  return compStore.isWorldCup ? `FIFA #${rank}` : t('team.leagueRank', { n: rank })
+  return t('team.leagueRank', { n: rank })
 }
 
 function goTeamDetail(id) {

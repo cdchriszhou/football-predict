@@ -21,7 +21,6 @@ from .poisson_scorer import PoissonModelScorer
 from .market_crs_scorer import MarketCRSScorer
 from .context_scorer import ContextAdjustmentScorer
 from .resilience_scorer import ResilienceAdjustmentScorer
-from .knockout_scorer import KnockoutMarketScorer
 from .aggregator import ScoreAggregator
 from .validator import ScoreValidator
 from .upset_picker import UpsetPicker
@@ -40,7 +39,6 @@ class ScorePredictionPipeline:
         self.market_scorer = MarketCRSScorer(cfg.get("market_crs"))
         self.context_scorer = ContextAdjustmentScorer(cfg.get("context"))
         self.resilience_scorer = ResilienceAdjustmentScorer(cfg.get("resilience"))
-        self.knockout_scorer = KnockoutMarketScorer(cfg.get("knockout"))
         self.aggregator = ScoreAggregator(cfg.get("weights"))
         self.validator = ScoreValidator()
         self.upset_picker = UpsetPicker()
@@ -131,7 +129,6 @@ class ScorePredictionPipeline:
             self.market_scorer.score(inp),
             self.context_scorer.score(inp),
             self.resilience_scorer.score(inp),
-            self.knockout_scorer.score(inp),
         ]
 
         # When CRS+handicap strongly disagree with WDL, trust market more

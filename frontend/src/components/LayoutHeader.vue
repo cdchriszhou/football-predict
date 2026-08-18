@@ -9,7 +9,11 @@
         class="hamburger-btn"
         @click="$emit('toggleSidebar')"
       />
-      <WorldCupLogo :size="32" />
+      <svg class="app-logo" width="32" height="32" viewBox="0 0 32 32" aria-hidden="true">
+        <circle cx="16" cy="16" r="14.5" fill="#1a237e" stroke="#D4AF37" stroke-width="1.5"/>
+        <circle cx="16" cy="16" r="9" fill="none" stroke="#fff" stroke-width="1.4"/>
+        <path d="M16 7v18M7 16h18M10.2 10.2c3.8 1.6 7.8 1.6 11.6 0M10.2 21.8c3.8-1.6 7.8-1.6 11.6 0" fill="none" stroke="#fff" stroke-width="1.2"/>
+      </svg>
       <h1 class="header-title">{{ headerTitle }}</h1>
       <div class="timezones" v-if="!isMobile">
         <span class="tz-item"><span class="tz-flag">🇨🇳</span><span class="tz-label">{{ t('competition.timeBeijing') }}</span>{{ beijingTime }}</span>
@@ -108,7 +112,6 @@ import { ElMessage } from 'element-plus'
 import { useAuthStore } from '@/stores/auth'
 import { useCompetitionStore } from '@/stores/competition'
 import { changePassword } from '@/api/auth'
-import WorldCupLogo from '@/components/WorldCupLogo.vue'
 import LanguageSwitcher from '@/components/LanguageSwitcher.vue'
 import {
   BEIJING_TZ, formatClock, resolveCompetitionTimezone, TIMEZONE_FLAGS, resolveActiveCompetition,
@@ -301,6 +304,10 @@ onUnmounted(() => {
   justify-content: space-between;
   align-items: center;
   width: 100%;
+}
+.app-logo {
+  flex-shrink: 0;
+  display: block;
 }
 .header-left {
   display: flex;

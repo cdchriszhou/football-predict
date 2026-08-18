@@ -964,11 +964,9 @@ def _build_single_pick(
     db_match: Optional[Match],
     analysis: dict,
 ) -> Optional[dict]:
-    from data.worldcup_venues import canonical_team_order
-
     st_home, st_away = st_match["home_team"], st_match["away_team"]
     if db_match:
-        home, away = canonical_team_order(db_match.team_a, db_match.team_b)
+        home, away = db_match.team_a, db_match.team_b
         odds_team_a, odds_team_b = db_match.team_a, db_match.team_b
     else:
         home, away = st_home, st_away
@@ -1333,9 +1331,8 @@ async def _build_singles_from_st_matches(
             continue
         pred = preds.get(dm.id) if dm else None
 
-        from data.worldcup_venues import canonical_team_order
         if dm:
-            home, away = canonical_team_order(dm.team_a, dm.team_b)
+            home, away = dm.team_a, dm.team_b
             odds_a, odds_b = dm.team_a, dm.team_b
         else:
             home, away = st["home_team"], st["away_team"]

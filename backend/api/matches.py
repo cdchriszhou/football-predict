@@ -11,7 +11,6 @@ from api.deps import require_competition_entitlement
 from data.competitions import get_competition
 from data.competition_status import _parse_iso
 from data.match_status import (
-    confirmed_scores_from_history,
     include_in_today_dashboard,
     match_has_recorded_score,
     season_label_for,
@@ -85,53 +84,26 @@ def match_to_dict(m: Match, *, knockout_by_no: dict | None = None) -> dict:
     status = resolve_public_match_status(m)
     ra, rb = m.result_a, m.result_b
     pa, pb = getattr(m, "penalty_a", None), getattr(m, "penalty_b", None)
-    if not match_has_recorded_score(m):
-        hist = confirmed_scores_from_history(m)
-        if hist:
-            ra, rb = hist["result_a"], hist["result_b"]
-            pa, pb = hist.get("penalty_a"), hist.get("penalty_b")
-            if status != MATCH_LIVE:
-                status = MATCH_FINISHED
-    # Expose recorded scores for live and finished; hide only when not yet stored.
-    if ra is None or rb is None:
-        ra, rb = None, None
-        pa, pb = None, None
-
-    from data.match_status import history_match_overlay
-    meta = history_match_overlay(m)
-    if meta.get("penalty_a") is not None and meta.get("penalty_b") is not None:
-        pa, pb = meta["penalty_a"], meta["penalty_b"]
-    extra_time = bool(meta.get("extra_time"))
-    regulation_a = meta.get("regulation_a")
-    regulation_b = meta.get("regulation_b")
-
-    team_a, team_b = m.team_a, m.team_b
-    if knockout_by_no is not None and m.competition_slug == "worldcup-2026":
-        from data.knockout_advance import display_teams_for_match
-        team_a, team_b = display_teams_for_match(m, knockout_by_no)
 
     return {
         "id": m.id, "competition_slug": m.competition_slug,
         "stage": m.stage, "group_name": m.group_name,
-        "team_a": team_a, "team_b": team_b,
+        "team_a": m.team_a, "team_b": m.team_b,
         "match_time": format_beijing_iso(m.match_time),
         "location": m.location, "stadium": m.stadium,
         "result_a": ra, "result_b": rb,
         "penalty_a": pa,
         "penalty_b": pb,
-        "extra_time": extra_time,
-        "regulation_a": regulation_a,
-        "regulation_b": regulation_b,
+        "extra_time": False,
+        "regulation_a": None,
+        "regulation_b": None,
         "status": status,
         "season": m.season, "matchday": m.matchday,
     }
 
 
 async def _knockout_by_no(db: AsyncSession, comp_slug: str) -> dict | None:
-    if comp_slug != "worldcup-2026":
-        return None
-    from data.knockout_advance import load_knockout_slot_index_cached
-    return await load_knockout_slot_index_cached(db, comp_slug)
+    return None
 
 
 @router.get("/list")
@@ -189,45 +161,8 @@ async def get_knockout_bracket(
     db: AsyncSession = Depends(get_db),
     current_user: str = Depends(get_current_user),
 ):
-    """All knockout stages in one response for the bracket view."""
-    comp_slug = resolve_competition(competition)
-    await _ensure_results_synced(db, comp_slug)
-    if comp_slug == "worldcup-2026":
-        from data.knockout_advance import (
-            ensure_knockout_fixtures,
-            advance_knockout_teams,
-            invalidate_knockout_slot_index_cache,
-        )
-
-        created = await ensure_knockout_fixtures(db, comp_slug)
-        try:
-            from service.write_guard import is_heavy_job_running
-            if created or not is_heavy_job_running():
-                await advance_knockout_teams(db, comp_slug, flush=False)
-        except Exception:
-            pass
-        invalidate_knockout_slot_index_cache(comp_slug)
-
-    ko_index = await _knockout_by_no(db, comp_slug)
-    stages = ["1/16决赛", "1/8决赛", "1/4决赛", "半决赛", "季军赛", "决赛"]
-    payload: dict[str, list] = {}
-    for stage in stages:
-        rows = list((await db.execute(
-            select(Match).where(
-                Match.competition_slug == comp_slug,
-                Match.stage == stage,
-            ).order_by(Match.match_time.asc())
-        )).scalars().all())
-        payload[stage] = [match_to_dict(m, knockout_by_no=ko_index) for m in rows]
-
-    slots: dict[str, dict] = {}
-    if ko_index:
-        for match_no, row in ko_index.items():
-            if row is None:
-                continue
-            slots[str(match_no)] = match_to_dict(row, knockout_by_no=ko_index)
-    payload["slots"] = slots
-    return success(payload)
+    """Knockout bracket retired with World Cup; keep empty payload for old clients."""
+    return success({"slots": {}})
 
 
 @router.get("/dates")
@@ -285,19 +220,7 @@ async def get_match_stages(
 
 
 async def _ensure_knockout_display_ready(db: AsyncSession, comp_slug: str) -> None:
-    """Advance feeder placeholders so dashboard/recent APIs show real team names."""
-    if comp_slug != "worldcup-2026":
-        return
-    try:
-        from data.knockout_advance import advance_knockout_teams, invalidate_knockout_slot_index_cache
-        from service.write_guard import is_heavy_job_running
-
-        if not is_heavy_job_running():
-            updated = await advance_knockout_teams(db, comp_slug, flush=True)
-            if updated:
-                invalidate_knockout_slot_index_cache(comp_slug)
-    except Exception:
-        pass
+    return
 
 
 @router.get("/recent-results")
@@ -374,8 +297,8 @@ async def get_today_matches(
     source = kickoff_today
     # Rest day: 今日赛果 shows the latest finished matchday within a short lookback.
     comp = get_competition(comp_slug)
-    is_football = comp_slug == "worldcup-2026" or (comp or {}).get("type") == "club"
-    lookback_days = 4 if comp_slug == "worldcup-2026" else 5
+    is_football = (comp or {}).get("type") == "club"
+    lookback_days = 5
     if is_football and not kickoff_today:
         lookback_start = today_start - timedelta(days=lookback_days)
         recent_rows = list((await db.execute(

@@ -7,8 +7,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from db import get_db
 from db.sqlite_write import IS_SQLITE, commit_session, write_lock
 from db.models import CrawlerLog, InviteCode, User
-from crawler import run_all_crawlers, run_schedule_crawler, run_team_crawler, run_all_odds_crawlers
-from crawler.league_crawler import run_league_crawler
+from crawler import run_all_crawlers, run_all_odds_crawlers
+from crawler.league_crawler import run_league_crawler, run_all_league_crawlers
 from service.prediction_service import PredictionService, team_to_dict, prepare_fused_odds
 from service.calibration_service import CalibratedRuleEngine, run_backtest, calibrate, load_calibrated_params
 from service.runtime_config import get_runtime_config, save_runtime_config
@@ -99,8 +99,7 @@ async def trigger_crawler(db: AsyncSession = Depends(get_db), current_user: str 
 @router.post("/crawler/run/{crawler_type}")
 async def trigger_crawler_type(crawler_type: str, db: AsyncSession = Depends(get_db), current_user: str = Depends(get_current_admin_user)):
     crawlers = {
-        "schedule": run_schedule_crawler,
-        "team": run_team_crawler,
+        "leagues": run_all_league_crawlers,
         "odds": run_all_odds_crawlers
     }
     if crawler_type not in crawlers:
@@ -283,11 +282,12 @@ async def test_api_connection(config: ConfigTestRequest = None, current_user: st
 
 @router.post("/config/test-odds")
 async def test_odds_api_connection(current_user: str = Depends(get_current_admin_user)):
-    """Test The Odds API connectivity and World Cup odds availability."""
+    """Test The Odds API connectivity against Premier League odds."""
     import os
     import time
 
-    from crawler.the_odds_api_client import fetch_world_cup_odds, find_odds_api_match
+    from crawler.the_odds_api_client import fetch_sport_odds, find_odds_api_match
+    from data.competitions import DEFAULT_COMPETITION, get_competition
     from db import async_session
     from db.models import Match
     from sqlalchemy import select
@@ -300,14 +300,16 @@ async def test_odds_api_connection(current_user: str = Depends(get_current_admin
             "data": {"ok": False, "model": "The Odds API"},
         }
 
+    comp = get_competition(DEFAULT_COMPETITION) or {}
+    sport_key = comp.get("odds_api_sport_key") or "soccer_epl"
     start = time.monotonic()
-    pool = await fetch_world_cup_odds()
+    pool = await fetch_sport_odds(sport_key, "Premier League")
     elapsed = round(time.monotonic() - start, 2)
 
     if not pool:
         return {
             "code": 502,
-            "message": "API 已连接但未返回世界杯赛事盘口（可能尚未开盘或 Key 额度不足）",
+            "message": "API 已连接但未返回英超盘口（可能尚未开盘或 Key 额度不足）",
             "data": {
                 "ok": False,
                 "model": "The Odds API",

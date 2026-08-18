@@ -9,9 +9,9 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       manifest: {
-        name: '2026 世界杯预测',
-        short_name: '世界杯预测',
-        description: '2026美加墨世界杯 AI智能预测系统',
+        name: '足智预测',
+        short_name: '足智预测',
+        description: '五大联赛与数字彩 AI 预测',
         theme_color: '#1a237e',
         background_color: '#f5f5f7',
         display: 'standalone',
@@ -21,13 +21,13 @@ export default defineConfig({
         lang: 'zh-CN',
         icons: [
           {
-            src: '/worldcup2026-logo.svg',
+            src: '/app-logo.svg',
             sizes: 'any',
             type: 'image/svg+xml',
             purpose: 'any',
           },
           {
-            src: '/worldcup2026-logo.svg',
+            src: '/app-logo.svg',
             sizes: 'any',
             type: 'image/svg+xml',
             purpose: 'maskable',

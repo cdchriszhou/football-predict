@@ -13,8 +13,6 @@ from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
 
-from data.worldcup_history import HISTORICAL_MATCHES, match_to_team_dict
-from data.worldcup_group_standings import load_standings_from_history
 from utils.score_prediction import normalize_score_prediction
 from service.odds_fusion import fuse_multi_market_odds, fused_odds_to_dict, score_distribution_from_odds
 from service.match_context import build_group_context, analyze_match_context, apply_context_to_rates
@@ -451,7 +449,19 @@ def _predicted_score_lines(pred: dict) -> list[str]:
 
 
 def run_backtest(params: dict = None, matches: list = None) -> dict:
-    """Run backtest on historical matches and return metrics."""
+    """Return stored metrics. World Cup historical replay has been removed."""
+    params = params or load_calibrated_params()
+    stored = params.get("backtest") or {}
+    return {
+        "total_matches": stored.get("total_matches", 0),
+        "result_accuracy": stored.get("result_accuracy", 0),
+        "score_pick_accuracy": stored.get("score_pick_accuracy", 0),
+        "score_top3_accuracy": stored.get("score_top3_accuracy", 0),
+        "brier_score": stored.get("brier_score", 0),
+        "upset_detection_rate": stored.get("upset_detection_rate", 0),
+        "collusion_detection_rate": stored.get("collusion_detection_rate", 0),
+        "details": stored.get("details") or [],
+    }
     engine = CalibratedRuleEngine(params)
     data = matches or HISTORICAL_MATCHES
 
@@ -530,7 +540,10 @@ def _score_params(params: dict) -> float:
 
 
 def calibrate(iterations: int = 80) -> dict:
-    """Grid-search calibration over key parameters."""
+    """World Cup historical calibration retired; keep current params."""
+    params = load_calibrated_params()
+    save_calibrated_params(params)
+    return params
     best_params = deepcopy(DEFAULT_PARAMS)
     best_score = _score_params(best_params)
 

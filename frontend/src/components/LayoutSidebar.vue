@@ -32,14 +32,6 @@
           <el-icon><Flag /></el-icon>
           <span>{{ t('nav.teams') }}</span>
         </el-menu-item>
-        <el-menu-item v-if="features.bracket" :index="`${basePath}/bracket`">
-          <el-icon><Share /></el-icon>
-          <span>{{ t('nav.bracket') }}</span>
-        </el-menu-item>
-        <el-menu-item v-if="features.tournament" :index="`${basePath}/tournament`">
-          <el-icon><Medal /></el-icon>
-          <span>{{ t('nav.tournament') }}</span>
-        </el-menu-item>
         <el-menu-item :index="`${basePath}/predictions`">
           <el-icon><TrendCharts /></el-icon>
           <span>{{ t('nav.predictions') }}</span>
@@ -65,7 +57,7 @@
 import { computed, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { Close, DataAnalysis, Medal, ShoppingCart, Switch } from '@element-plus/icons-vue'
+import { Close, DataAnalysis, ShoppingCart, Switch } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
 import { useCompetitionStore } from '@/stores/competition'
 
@@ -96,8 +88,6 @@ const activeMenu = computed(() => {
   if (path.startsWith(`${basePath.value}/backtest`)) return `${basePath.value}/backtest`
   if (path.startsWith(`${basePath.value}/matches`)) return `${basePath.value}/matches`
   if (path.startsWith(`${basePath.value}/teams`)) return `${basePath.value}/teams`
-  if (path.startsWith(`${basePath.value}/bracket`)) return `${basePath.value}/bracket`
-  if (path.startsWith(`${basePath.value}/tournament`)) return `${basePath.value}/tournament`
   if (path.startsWith(`${basePath.value}/predictions`)) return `${basePath.value}/predictions`
   if (path.startsWith(`${basePath.value}/sporttery-plan`)) return `${basePath.value}/sporttery-plan`
   if (path === basePath.value || path === `${basePath.value}/`) return basePath.value

@@ -20,7 +20,7 @@ from .sporttery_client import (
     sporttery_row_has_sale_data,
     to_db_odds,
 )
-from .the_odds_api_client import fetch_world_cup_odds, find_odds_api_match
+from .the_odds_api_client import find_odds_api_match
 from data.competitions import COMPETITIONS, get_competition, league_hints_for
 from utils.logger import logger
 
@@ -134,11 +134,9 @@ async def run_odds_crawler(
 
             if sporttery_pool is None:
                 sporttery_pool = await fetch_sporttery_on_sale()
-            hints = league_hints_for(competition_slug) or ("世界", "世界杯", "World Cup", "FIFA")
+            hints = league_hints_for(competition_slug)
             comp = get_competition(competition_slug)
-            if competition_slug == "worldcup-2026":
-                odds_api_pool = await fetch_world_cup_odds()
-            elif comp and comp.get("odds_api_sport_key"):
+            if comp and comp.get("odds_api_sport_key"):
                 from .the_odds_api_client import fetch_sport_odds
                 odds_api_pool = await fetch_sport_odds(
                     comp["odds_api_sport_key"], comp["short_name"]

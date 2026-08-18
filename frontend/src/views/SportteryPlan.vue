@@ -123,9 +123,6 @@ const pageTitle = computed(() => {
 })
 
 const pageSubtitle = computed(() => {
-  if (compStore.isWorldCup && competitionName.value) {
-    return t('sportteryPlan.subtitleWithCompetition', { name: competitionName.value })
-  }
   const league = compStore.current?.short_name || competitionName.value
   if (league) return t('sportteryPlan.subtitleLeague', { league })
   return t('sportteryPlan.subtitle')
@@ -174,9 +171,6 @@ const emptyHint = computed(() => {
   }
   if (reason === 'today_no_on_sale' || reason === 'no_on_sale') {
     return t('sportteryPlan.emptyHintToday')
-  }
-  if (compStore.isWorldCup && competitionName.value) {
-    return t('sportteryPlan.emptyHintWithCompetition', { name: competitionName.value })
   }
   const league = compStore.current?.short_name || competitionName.value
   if (league) return t('sportteryPlan.emptyHintLeague', { league })

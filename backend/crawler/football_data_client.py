@@ -261,3 +261,31 @@ def player_age_from_dob(dob: str | None) -> int | None:
         return today.year - born.year - ((today.month, today.day) < (born.month, born.day))
     except ValueError:
         return None
+
+
+def normalize_ext_id(ext_id) -> int | None:
+    if ext_id is None:
+        return None
+    try:
+        return int(ext_id)
+    except (TypeError, ValueError):
+        return None
+
+
+def perspective_scores(row: dict, team_a_is_home: bool) -> tuple[int | None, int | None, int | None, int | None]:
+    """Map football-data home/away scores onto DB team_a / team_b."""
+    ra, rb = row.get("result_a"), row.get("result_b")
+    pa, pb = row.get("penalty_a"), row.get("penalty_b")
+    if ra is None or rb is None:
+        reg = (None, None)
+    elif team_a_is_home:
+        reg = (int(ra), int(rb))
+    else:
+        reg = (int(rb), int(ra))
+    if pa is None or pb is None:
+        pen = (None, None)
+    elif team_a_is_home:
+        pen = (int(pa), int(pb))
+    else:
+        pen = (int(pb), int(pa))
+    return reg[0], reg[1], pen[0], pen[1]

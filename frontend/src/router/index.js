@@ -39,18 +39,6 @@ const competitionRoutes = [
     meta: { titleKey: 'route.teamDetail', footballOnly: true }
   },
   {
-    path: 'bracket',
-    name: 'Bracket',
-    component: () => import('../views/Bracket.vue'),
-    meta: { titleKey: 'route.bracket', feature: 'bracket' }
-  },
-  {
-    path: 'tournament',
-    name: 'TournamentPredict',
-    component: () => import('../views/TournamentPredict.vue'),
-    meta: { titleKey: 'route.tournament', feature: 'tournament' }
-  },
-  {
     path: 'predictions',
     name: 'Predictions',
     component: () => import('../views/PredictionHistory.vue'),
