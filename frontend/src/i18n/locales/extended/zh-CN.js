@@ -113,7 +113,7 @@ export default {
     tacticStyle: '战术风格',
     tactic: '战术',
     marketValue: '身价',
-    fifaRank: 'FIFA排名',
+    fifaRank: '联赛排名',
     roster: '球员名单',
     colNumber: '号码',
     colName: '姓名',

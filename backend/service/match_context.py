@@ -93,7 +93,8 @@ def build_group_context(
     else:
         home_side = ""
     is_group_opener = stage == "小组赛" and matchday == 1 and bool(home_side)
-    is_league = _is_league_matchday(stage)
+    # Club fixtures pass home_side_override even when stage is blank / "联赛".
+    is_league = _is_league_matchday(stage) or home_side_override in ("a", "b")
     home_win_boost = 0.0
     home_xg_boost = 0.0
     if home_side:
@@ -134,6 +135,7 @@ def build_group_context(
         "rank_a": ra,
         "rank_b": rb,
         "rank_gap": league_rank_gap(ra, rb),
+        "is_league": is_league,
     }
     if is_league and standings:
         _apply_league_table_motivation(ctx, team_a, team_b, standings)
@@ -166,8 +168,10 @@ def _apply_league_table_motivation(
     size = int(standings.get("_size") or 0) or 20
     ctx["table_size"] = size
 
-    ra = table_rank(sa.get("rank")) or 99
-    rb = table_rank(sb.get("rank")) or 99
+    ra = table_rank(sa.get("rank"))
+    rb = table_rank(sb.get("rank"))
+    if ra is None or rb is None:
+        return
     pa = int(sa.get("points") or 0)
     pb = int(sb.get("points") or 0)
     played = min(int(sa.get("played") or 0), int(sb.get("played") or 0))

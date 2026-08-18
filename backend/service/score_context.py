@@ -276,17 +276,25 @@ def detect_resilience_signals(
     minnow_side = "a" if is_minnow_rank(rank_a) else ("b" if is_minnow_rank(rank_b) else "")
     minnow_st = sa if minnow_side == "a" else sb if minnow_side == "b" else {}
 
+    from service.match_context import _is_league_matchday
+    is_league = bool(ctx.get("is_league")) or _is_league_matchday(ctx.get("stage"))
+    # League: one game is not form. World Cup group MD2 still uses a single sample.
+    form_min = 6 if is_league else 1
+    opp_played = int(opp.get("played") or 0)
+    fav_played = int(fav.get("played") or 0)
+    minnow_played = int(minnow_st.get("played") or 0)
+
     return {
         "fav_a": fav_a,
         "rank_gap": league_rank_gap(rank_a, rank_b),
         "matchday": int(ctx.get("matchday") or 0),
-        "opponent_clean_sheet": bool(opp.get("played")) and opp.get("goals_against", 1) == 0,
+        "opponent_clean_sheet": opp_played >= form_min and opp.get("goals_against", 1) == 0,
         "favorite_scoring_drought": (
-            bool(fav.get("played"))
-            and fav.get("goals_for", 0) / max(1, fav["played"]) <= 1.0
+            fav_played >= form_min
+            and fav.get("goals_for", 0) / max(1, fav_played) <= 1.0
         ),
         "opponent_defensive": any(x in tactic for x in ("铁桶", "防守", "防反", "硬朗")),
-        "leaky_minnow": bool(minnow_st.get("played")) and minnow_st.get("goals_against", 0) >= 2,
+        "leaky_minnow": minnow_played >= form_min and minnow_st.get("goals_against", 0) >= 2,
         "low_total": market.get("low_total", False),
         "drawish": market.get("drawish", False),
         "group_low_scoring": float(ctx.get("group_avg_gf") or 1.35) <= 0.85,

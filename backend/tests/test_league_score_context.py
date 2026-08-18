@@ -162,3 +162,50 @@ def test_missing_rank_does_not_invent_fifa_gap():
         ctx,
     )
     assert analysis.upset_risk == 0
+
+
+def test_missing_table_rank_does_not_fake_relegation():
+    standings = {
+        "巴萨": {"team": "巴萨", "rank": 1, "points": 70, "played": 32},
+        "未知": {"team": "未知", "rank": 50, "points": 20, "played": 32},
+        "_size": 20,
+    }
+    ctx = build_group_context(
+        "第33轮", "", 33, "巴萨", "未知", 1, 50,
+        standings=standings, home_side_override="a",
+    )
+    assert ctx["must_win_b"] is False
+    assert ctx["both_must_win"] is False
+
+
+def test_club_blank_stage_still_uses_league_home_boost():
+    ctx = build_group_context(
+        "", "", 10, "巴萨", "皇马", 1, 2, home_side_override="a",
+    )
+    assert ctx["home_side"] == "a"
+    assert ctx["home_win_boost"] == 5.0
+
+
+def test_league_early_clean_sheet_is_not_resilience():
+    from service.score_context import detect_resilience_signals
+    ctx = {
+        "stage": "第2轮",
+        "matchday": 2,
+        "standing_a": {"played": 1, "goals_for": 2, "goals_against": 0},
+        "standing_b": {"played": 1, "goals_for": 0, "goals_against": 0},
+    }
+    sig = detect_resilience_signals(ctx, None, 1, 18)
+    assert sig["opponent_clean_sheet"] is False
+    assert sig["favorite_scoring_drought"] is False
+
+
+def test_league_sustained_clean_sheet_is_resilience():
+    from service.score_context import detect_resilience_signals
+    ctx = {
+        "stage": "第10轮",
+        "matchday": 10,
+        "standing_a": {"played": 9, "goals_for": 18, "goals_against": 8},
+        "standing_b": {"played": 9, "goals_for": 6, "goals_against": 0},
+    }
+    sig = detect_resilience_signals(ctx, None, 1, 18)
+    assert sig["opponent_clean_sheet"] is True

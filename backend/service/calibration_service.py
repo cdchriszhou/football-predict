@@ -107,7 +107,7 @@ class CalibratedRuleEngine(RuleEngine):
         self.LOW_DRAW_ODDS = p.get("low_draw_odds", 3.4)
         self._market_blend = p.get("market_blend", 0.28)
         self._score_odds_blend = p.get("score_odds_blend", 0.32)
-        self._draw_base = p.get("draw_base", 26.0)
+        self._draw_base = p.get("draw_base", 25.0)
         self.DRAW_BASE = self._draw_base  # wire to parent RuleEngine
         self._upset_weight = p.get("upset_weight", 1.0)
         self._collusion_weight = p.get("collusion_weight", 1.0)

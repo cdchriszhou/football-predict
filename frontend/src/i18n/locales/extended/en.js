@@ -114,7 +114,7 @@ export default {
     tacticStyle: 'Tactical style',
     tactic: 'Tactics',
     marketValue: 'Market value',
-    fifaRank: 'FIFA ranking',
+    fifaRank: 'League table',
     roster: 'Squad',
     colNumber: 'No.',
     colName: 'Name',
