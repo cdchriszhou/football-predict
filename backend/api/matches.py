@@ -38,6 +38,17 @@ async def _ensure_results_synced(db: AsyncSession, comp_slug: str) -> None:
     """Best-effort score sync; never block the response on maintenance work."""
     try:
         await sync_match_results_for_read(db, comp_slug)
+        # Old-season rows can hide a missing 2026/27 schedule — kick off bootstrap.
+        from crawler.club_data_sync import (
+            current_season_match_count,
+            schedule_current_season_bootstrap,
+        )
+        from data.competitions import get_competition
+        comp = get_competition(comp_slug)
+        if comp and comp.get("type") == "club":
+            _season, n = await current_season_match_count(db, comp_slug)
+            if n == 0:
+                schedule_current_season_bootstrap(comp_slug)
     except SQLAlchemyError:
         await db.rollback()
     except Exception:

@@ -6,9 +6,11 @@ Falls back to existing seed + The Odds API when API key is missing.
 """
 from __future__ import annotations
 
+import asyncio
+import time
 from datetime import datetime
 
-from sqlalchemy import select, delete
+from sqlalchemy import select, delete, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from data.club_crests import crest_url_for
@@ -27,6 +29,10 @@ from crawler.football_data_client import (
     _api_key,
 )
 from utils.logger import logger
+
+_BOOTSTRAP_INTERVAL_SEC = 1800  # avoid hammering FD when season is still empty
+_last_bootstrap_at: dict[str, float] = {}
+_bootstrap_running: dict[str, bool] = {}
 
 
 def _season_label(year: int) -> str:
@@ -47,7 +53,30 @@ def _ability_from_rank(rank: int, total: int) -> dict:
     }
 
 
-async def sync_league_from_football_data(db: AsyncSession, slug: str) -> dict:
+async def current_season_match_count(db: AsyncSession, slug: str) -> tuple[str | None, int]:
+    """Return (season_label, match_count) for the competition's configured season."""
+    comp = get_competition(slug)
+    if not comp or comp.get("type") != "club":
+        return None, 0
+    year = comp.get("season_year")
+    if year is None:
+        return None, 0
+    season = _season_label(int(year))
+    n = (await db.execute(
+        select(func.count(Match.id)).where(
+            Match.competition_slug == slug,
+            Match.season == season,
+        )
+    )).scalar() or 0
+    return season, int(n)
+
+
+async def sync_league_from_football_data(
+    db: AsyncSession,
+    slug: str,
+    *,
+    include_squads: bool = True,
+) -> dict:
     comp = get_competition(slug)
     if not comp or comp.get("type") != "club":
         return {"status": "skipped", "reason": "not_club"}
@@ -65,7 +94,7 @@ async def sync_league_from_football_data(db: AsyncSession, slug: str) -> dict:
     standings = await fetch_standings(fd_code, season_year)
 
     if not matches_raw and not standings:
-        return {"status": "empty", "reason": "football_data_empty"}
+        return {"status": "empty", "reason": "football_data_empty", "season": season_str}
 
     teams_synced = await _sync_standings(db, slug, season_str, standings)
     if standings:
@@ -74,7 +103,9 @@ async def sync_league_from_football_data(db: AsyncSession, slug: str) -> dict:
     from db.sqlite_write import flush_session
     await flush_session(db)
 
-    squads = await _sync_squads(db, slug, max_teams=None)
+    squads = {"teams": 0, "players": 0}
+    if include_squads:
+        squads = await _sync_squads(db, slug, max_teams=None)
     removed = await cleanup_orphan_seed_matches(db, slug)
 
     from data.league_standings import ensure_league_standings_stats
@@ -90,6 +121,84 @@ async def sync_league_from_football_data(db: AsyncSession, slug: str) -> dict:
         "squads": squads,
         "removed_orphans": removed,
     }
+
+
+async def ensure_current_season_fixtures(
+    db: AsyncSession,
+    slug: str,
+    *,
+    force: bool = False,
+    include_squads: bool = False,
+) -> dict:
+    """If configured season has no fixtures yet, pull them from football-data.org.
+
+    Needed after season_year rollover: old-season rows keep total match count > 0,
+    so startup used to skip the initial crawl and the API season filter returned empty.
+    """
+    season, count = await current_season_match_count(db, slug)
+    if not season:
+        return {"status": "skipped", "reason": "not_club"}
+    if count > 0:
+        return {"status": "ok", "season": season, "matches": count}
+
+    now = time.monotonic()
+    last = _last_bootstrap_at.get(slug, 0.0)
+    if not force and (now - last) < _BOOTSTRAP_INTERVAL_SEC:
+        return {
+            "status": "throttled",
+            "season": season,
+            "matches": 0,
+            "retry_in_sec": int(_BOOTSTRAP_INTERVAL_SEC - (now - last)),
+        }
+
+    if not _api_key():
+        return {
+            "status": "skipped",
+            "reason": "no_football_data_api_key",
+            "season": season,
+            "matches": 0,
+        }
+
+    _last_bootstrap_at[slug] = now
+    logger.warning(
+        "Current season %s has 0 fixtures for %s — bootstrapping from football-data.org",
+        season, slug,
+    )
+    result = await sync_league_from_football_data(
+        db, slug, include_squads=include_squads,
+    )
+    _, after = await current_season_match_count(db, slug)
+    return {**result, "season": season, "matches": after}
+
+
+def schedule_current_season_bootstrap(slug: str) -> None:
+    """Fire-and-forget bootstrap when a page read finds an empty current season."""
+    if _bootstrap_running.get(slug) or not _api_key():
+        return
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        return
+
+    async def _run() -> None:
+        from db import async_session
+        from db.sqlite_write import commit_session, write_lock
+
+        _bootstrap_running[slug] = True
+        try:
+            async with write_lock:
+                async with async_session() as db:
+                    result = await ensure_current_season_fixtures(
+                        db, slug, include_squads=False,
+                    )
+                    await commit_session(db)
+                    logger.info("Season bootstrap [%s]: %s", slug, result)
+        except Exception as exc:
+            logger.warning("Season bootstrap failed [%s]: %s", slug, exc)
+        finally:
+            _bootstrap_running[slug] = False
+
+    loop.create_task(_run())
 
 
 async def _sync_standings(

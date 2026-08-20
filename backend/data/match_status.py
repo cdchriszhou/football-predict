@@ -698,6 +698,17 @@ async def maintain_competition_matches(db: AsyncSession, slug: str) -> dict:
     live_scores = await sync_live_scores(db, slug, network=True)
     repaired_ids: list[int] = []
     fixtures_repaired = 0
+    season_bootstrap = {}
+    try:
+        from crawler.club_data_sync import ensure_current_season_fixtures
+        season_bootstrap = await ensure_current_season_fixtures(
+            db, slug, include_squads=False,
+        )
+        if season_bootstrap.get("matches"):
+            fixtures_repaired = int(season_bootstrap.get("matches") or 0)
+    except Exception as exc:
+        logger.warning("Current-season bootstrap skipped [%s]: %s", slug, exc)
+        season_bootstrap = {"status": "error", "error": str(exc)}
     if fixtures_repaired:
         confirmed += await apply_confirmed_results(db, slug)
     odds_backfill = await backfill_historical_odds(db, slug)
@@ -737,6 +748,7 @@ async def maintain_competition_matches(db: AsyncSession, slug: str) -> dict:
         "confirmed_results_applied": confirmed,
         "live_scores_synced": live_scores,
         "fixtures_repaired": fixtures_repaired,
+        "season_bootstrap": season_bootstrap,
         "predictions_repredicted": repredicted,
         "historical_odds_backfilled": odds_backfill,
         "predictions_refreshed": predictions_refreshed,

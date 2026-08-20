@@ -56,9 +56,25 @@ async def _background_startup():
     try:
         from sqlalchemy import func, select
         from db.models import Match
+        from crawler.club_data_sync import (
+            current_season_match_count,
+            ensure_current_season_fixtures,
+        )
+        from crawler.league_crawler import run_league_crawler
+
+        # Prefer per-league current-season bootstrap. Old-season rows alone must
+        # not skip pulling 2026/27 fixtures (season filter would look empty).
+        need_crawl: list[str] = []
         async with async_session() as session:
-            n = (await session.execute(select(func.count(Match.id)))).scalar() or 0
-        if n == 0:
+            total = (await session.execute(select(func.count(Match.id)))).scalar() or 0
+            for slug, comp in COMPETITIONS.items():
+                if comp.get("type") != "club":
+                    continue
+                _season, n = await current_season_match_count(session, slug)
+                if n == 0:
+                    need_crawl.append(slug)
+
+        if total == 0:
             logger.warning("Database has no matches — running initial league crawl")
             async with write_lock:
                 async with async_session() as session:
@@ -66,6 +82,25 @@ async def _background_startup():
                     result = await run_all_league_crawlers(session)
                     await commit_session(session)
                     logger.info(f"Initial league crawl: {result}")
+        elif need_crawl:
+            logger.warning(
+                "Current season fixtures missing for %s — bootstrapping",
+                ", ".join(need_crawl),
+            )
+            for slug in need_crawl:
+                try:
+                    async with write_lock:
+                        async with async_session() as session:
+                            # Full league crawler: football-data + odds fallback.
+                            boot = await ensure_current_season_fixtures(
+                                session, slug, force=True, include_squads=False,
+                            )
+                            if boot.get("status") != "success" or not boot.get("matches"):
+                                boot = await run_league_crawler(session, slug)
+                            await commit_session(session)
+                            logger.info("Season bootstrap [%s]: %s", slug, boot)
+                except Exception as e:
+                    logger.warning("Season bootstrap failed [%s]: %s", slug, e)
     except Exception as e:
         logger.warning(f"Initial schedule crawl skipped: {e}")
 
