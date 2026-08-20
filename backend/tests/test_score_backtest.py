@@ -135,7 +135,8 @@ def test_league_notes_do_not_mention_knockout_seed():
     assert _is_worldcup_competition("worldcup-2026") is False
     notes = _notes_for("la-liga")
     assert notes == LEAGUE_NOTES
-    assert any("不混入世界杯" in n for n in notes)
+    assert any("当前赛季" in n for n in notes)
+    assert not any("世界杯" in n for n in notes)
 
 
 def test_league_backtest_does_not_seed_worldcup_matches():

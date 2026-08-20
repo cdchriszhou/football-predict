@@ -30,13 +30,13 @@ LEAGUE_NOTES = [
     "首推：CRS 锚定管线输出的第一推荐比分。",
     "三选：首推、次推与冷门选项中任一命中即计为命中（含胜/平/负其它桶）。",
     "所有推荐比分均为常规时间（90分钟）赛果，与体彩 CRS 结算一致。",
-    "仅回测当前联赛已完赛场次，不混入世界杯或其他赛事。",
+    "仅回测当前赛季已完赛场次，不混入上赛季或其他赛事。",
     "优先使用数据库中的赛前 CRS 与已发布预测；无 CRS 时用泊松合成赔率回测。",
     "胜平负概率优先取自数据库预测记录，并与欧赔隐含概率做纠偏。",
 ]
 
 DAILY_REPORT_CACHE_TTL = 300
-DAILY_REPORT_CACHE_PREFIX = "score_backtest_daily:v8:"
+DAILY_REPORT_CACHE_PREFIX = "score_backtest_daily:v9:"
 
 
 LEAGUE_HOME_XG = 1.45
@@ -320,12 +320,22 @@ async def _collect_evaluated_rows(
     competition_slug: str = "premier-league",
 ) -> tuple[list[dict], int, dict[str, int]]:
     """Evaluate finished matches with CRS odds; returns (rows, skipped, skip_reasons)."""
+    from data.competitions import get_competition
+    from data.match_status import season_label_for
+
+    filters = [
+        Match.competition_slug == competition_slug,
+        Match.result_a.isnot(None),
+        Match.result_b.isnot(None),
+    ]
+    comp = get_competition(competition_slug)
+    if comp and comp.get("type") == "club":
+        season = season_label_for(comp)
+        if season:
+            filters.append(Match.season == season)
+
     rows = (await db.execute(
-        select(Match).where(
-            Match.competition_slug == competition_slug,
-            Match.result_a.isnot(None),
-            Match.result_b.isnot(None),
-        ).order_by(Match.match_time.asc(), Match.id.asc())
+        select(Match).where(*filters).order_by(Match.match_time.asc(), Match.id.asc())
     )).scalars().all()
 
     evaluated: list[dict] = []
