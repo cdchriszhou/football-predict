@@ -675,6 +675,12 @@ class PredictionService:
             standings=await club_standings_for(db, match),
             home_side_override=_club_home_override(match.competition_slug),
         )
+        group_context["has_book_odds"] = bool(odds_dict.get("has_real_market"))
+        if not group_context["has_book_odds"]:
+            alerts = list((odds_dict.get("market_signals") or {}).get("alerts") or [])
+            if "无真实外围盘口数据" not in alerts:
+                alerts.append("无真实外围盘口数据")
+            odds_dict["market_signals"] = {**(odds_dict.get("market_signals") or {}), "alerts": alerts}
 
         pre_result = self.rule_engine.evaluate(
             team_a_dict, team_b_dict, odds=None, group_context=group_context
@@ -742,6 +748,10 @@ class PredictionService:
         # 5. Fuse results with market-implied probability blending
         context_alerts = context_analysis.alerts
         conf_penalty = context_analysis.confidence_penalty
+        if not group_context.get("has_book_odds"):
+            conf_penalty = min(0.45, float(conf_penalty or 0) + 0.18)
+            if "无真实外围盘口数据" not in context_alerts:
+                context_alerts = list(context_alerts) + ["无真实外围盘口数据，比分置信已下调"]
         if llm_results:
             fused = _fuse_predictions(
                 llm_results, rule_result, odds_dict,
@@ -781,47 +791,25 @@ class PredictionService:
                     skip_wdl_resilience=True,
                 )
             else:
-                from service.score_pick import prepare_pipeline_crs_and_hints
-
-                synth_crs, score_hints, synth_upset = prepare_pipeline_crs_and_hints(
-                    None,
-                    expected_a=rule_result.expected_a,
-                    expected_b=rule_result.expected_b,
+                scores, upset, _, pick_warnings = run_full_score_pipeline(
+                    {},
                     win_rate=rule_result.win_rate,
                     draw_rate=rule_result.draw_rate,
                     lose_rate=rule_result.lose_rate,
+                    expected_a=rule_result.expected_a,
+                    expected_b=rule_result.expected_b,
                     model_scores=rule_result.best_scores,
                     stage=match.stage,
+                    handicap=score_ctx.get("handicap"),
                     rank_a=(team_a_dict or {}).get("rank"),
                     rank_b=(team_b_dict or {}).get("rank"),
-                    sp_win=(market_odds or {}).get("win_win"),
-                    sp_draw=(market_odds or {}).get("draw"),
-                    sp_lose=(market_odds or {}).get("win_lose"),
+                    group_context=group_context,
+                    odds_dict=score_ctx,
+                    rule_result=rule_result,
+                    team_a=team_a_dict,
+                    team_b=team_b_dict,
+                    skip_wdl_resilience=True,
                 )
-                if synth_crs:
-                    scores, upset, _, pick_warnings = run_full_score_pipeline(
-                        synth_crs,
-                        win_rate=rule_result.win_rate,
-                        draw_rate=rule_result.draw_rate,
-                        lose_rate=rule_result.lose_rate,
-                        expected_a=rule_result.expected_a,
-                        expected_b=rule_result.expected_b,
-                        model_scores=score_hints or rule_result.best_scores,
-                        stage=match.stage,
-                        handicap=score_ctx.get("handicap"),
-                        rank_a=(team_a_dict or {}).get("rank"),
-                        rank_b=(team_b_dict or {}).get("rank"),
-                        group_context=group_context,
-                        odds_dict=score_ctx,
-                        rule_result=rule_result,
-                        team_a=team_a_dict,
-                        team_b=team_b_dict,
-                        skip_wdl_resilience=True,
-                    )
-                else:
-                    scores = score_hints or (rule_result.best_scores or ["?"])[:2]
-                    upset = synth_upset
-                    pick_warnings = []
                 if not upset:
                     upset = rule_result.upset_score if rule_result.upset_score != "?" else None
             rule_norm = normalize_score_prediction(scores, upset)

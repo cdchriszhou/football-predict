@@ -107,6 +107,8 @@ def build_group_context(
         "rank_b": rb,
         "rank_gap": league_rank_gap(ra, rb),
         "is_league": is_league,
+        # MD1–6: table ranks are noisy; prefer ability + markets over live table.
+        "early_season": bool(is_league and matchday > 0 and matchday < 7),
     }
     if is_league and standings:
         _apply_league_table_motivation(ctx, team_a, team_b, standings)

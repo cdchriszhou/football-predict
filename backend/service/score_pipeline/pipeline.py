@@ -131,29 +131,42 @@ class ScorePredictionPipeline:
             self.resilience_scorer.score(inp),
         ]
 
-        # When CRS+handicap strongly disagree with WDL, trust market more
-        if crs_orientation_bonus:
-            from .aggregator import ScoreAggregator
+        # Synthetic CRS is Poisson-derived — zero market weight to avoid double-counting.
+        # Also dampen blowout promotion when early-season / no book markets.
+        synthetic_crs = bool(ctx.get("synthetic_crs"))
+        early_season = bool(ctx.get("early_season"))
+        has_book = bool(ctx.get("has_book_odds"))
+        conservative = synthetic_crs or (ctx.get("is_league") and (early_season or not has_book))
+
+        from .aggregator import ScoreAggregator
+        if crs_orientation_bonus and not synthetic_crs:
             orient_weights = dict(self.aggregator.weights)
             orient_weights["poisson"] *= 0.5
             orient_weights["market_crs"] *= 1.8
             orient_aggregator = ScoreAggregator(orient_weights)
             aggregated = orient_aggregator.aggregate(scorer_results)
+        elif synthetic_crs:
+            synth_weights = dict(self.aggregator.weights)
+            synth_weights["market_crs"] = 0.0
+            synth_weights["poisson"] = float(synth_weights.get("poisson", 0.5)) + 0.25
+            synth_aggregator = ScoreAggregator(synth_weights)
+            aggregated = synth_aggregator.aggregate(scorer_results)
         else:
             aggregated = self.aggregator.aggregate(scorer_results)
         best = self.aggregator.top_scores(aggregated, n=2)
 
         # ── Post-processing ──
-        # Ensure rout representation for deep favourites
         from service.score_pick import ensure_rout_score_in_likely_pair
         from service.league_rank import rank_gap as league_rank_gap
         gap = league_rank_gap(rank_a, rank_b)
-        best = ensure_rout_score_in_likely_pair(
-            best, crs,
-            sp_win=sp_win, sp_lose=sp_lose,
-            win_rate=adjusted_wr, lose_rate=adjusted_lr,
-            rank_gap=gap,
-        )
+        # Skip forced rout injection when CRS is synthetic / early-season blind mode.
+        if not conservative:
+            best = ensure_rout_score_in_likely_pair(
+                best, crs,
+                sp_win=sp_win, sp_lose=sp_lose,
+                win_rate=adjusted_wr, lose_rate=adjusted_lr,
+                rank_gap=gap,
+            )
 
         # WDL alignment: ensure primary score matches dominant direction
         from service.score_pick import align_score_picks_to_wdl

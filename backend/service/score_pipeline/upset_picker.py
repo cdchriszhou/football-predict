@@ -67,7 +67,8 @@ class UpsetPicker:
         )
 
         if domain_upset and domain_upset not in ("胜其它", "平其它", "负其它", "?"):
-            return domain_upset
+            if domain_upset not in top_scores:
+                return domain_upset
 
         # 2. Fallback: use aggregator ranking for uncovered direction
         covered_outcomes = {self._score_outcome(s) for s in top_scores if s and s != "?"}
@@ -81,4 +82,12 @@ class UpsetPicker:
                 if odd <= 25.0:
                     return ascore.score
 
-        return domain_upset if domain_upset and domain_upset != "?" else None
+        # Last resort: any plausible score not already in the likely pair
+        for ascore in aggregated:
+            if ascore.score in top_scores:
+                continue
+            odd = crs.get(ascore.score, 99)
+            if odd <= 22.0:
+                return ascore.score
+
+        return None

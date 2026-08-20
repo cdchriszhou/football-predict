@@ -1934,7 +1934,7 @@ def run_full_score_pipeline(
     double-counting resilience signals on win/draw/lose rates.
     """
     hints = [s for s in (model_scores or []) if s and s != "?"]
-    pre_upset: str | None = None
+    book_crs = bool(crs)
     crs, hints, pre_upset = prepare_pipeline_crs_and_hints(
         crs or None,
         expected_a=expected_a,
@@ -1953,6 +1953,16 @@ def run_full_score_pipeline(
     if not crs:
         fallback = hints[:2] if hints else ["?"]
         return fallback, pre_upset, fallback + ([pre_upset] if pre_upset else []), []
+
+    # Tag synthetic CRS so ensemble does not double-count Poisson as "market".
+    ctx = dict(group_context or {})
+    synthetic_crs = (not book_crs) and bool(crs)
+    ctx["synthetic_crs"] = synthetic_crs
+    if odds_dict is not None:
+        ctx["has_book_odds"] = bool(odds_dict.get("has_real_market"))
+    elif "has_book_odds" not in ctx:
+        ctx["has_book_odds"] = False
+    group_context = ctx
 
     win_rate, draw_rate, lose_rate = cap_knockout_wdl_to_market(
         win_rate, draw_rate, lose_rate, stage,

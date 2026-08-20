@@ -29,7 +29,9 @@ def test_league_round_is_not_worldcup_knockout_in_rule_engine():
     engine = RuleEngine()
     barca = _club("巴萨", 1)
     malaga = _club("马拉加", 20, "防守反击")
-    league = engine.evaluate(barca, malaga, group_context=_league_ctx("第1轮", 1))
+    league_ctx = _league_ctx("第1轮", 1)
+    league_ctx["has_book_odds"] = True
+    league = engine.evaluate(barca, malaga, group_context=league_ctx)
     knockout = engine.evaluate(
         barca, malaga,
         group_context={"stage": "1/8决赛", "rank_gap": 19},
@@ -38,7 +40,9 @@ def test_league_round_is_not_worldcup_knockout_in_rule_engine():
 
     mid_a = _club("维拉", 8)
     mid_b = _club("布赖顿", 10)
-    league_draw = engine.evaluate(mid_a, mid_b, group_context=_league_ctx("第12轮", 12))
+    league_draw_ctx = _league_ctx("第12轮", 12)
+    league_draw_ctx["has_book_odds"] = True
+    league_draw = engine.evaluate(mid_a, mid_b, group_context=league_draw_ctx)
     knockout_draw = engine.evaluate(
         mid_a, mid_b,
         group_context={"stage": "1/8决赛", "rank_gap": 2},

@@ -105,13 +105,22 @@ class RuleEngine:
         from service.league_rank import table_rank
         rank_a = table_rank(team_a.get("rank"))
         rank_b = table_rank(team_b.get("rank"))
-        if rank_a is not None and rank_b is not None:
+        # Early-season / missing book markets: table ranks are noisy — dampen.
+        early_season = bool(group_context and group_context.get("early_season"))
+        has_book = bool(group_context and group_context.get("has_book_odds"))
+        rank_weight = self.WEIGHTS["rank"]
+        if group_context and group_context.get("is_league"):
+            if early_season:
+                rank_weight *= 0.35
+            elif not has_book:
+                rank_weight *= 0.55
+        if rank_a is not None and rank_b is not None and rank_weight > 0:
             rank_diff = (rank_b - rank_a) * 8
             expected_a = 1.0 / (1.0 + math.pow(10, -rank_diff / 400))
             rank_score = expected_a * 100
-            scores["a"] += self.WEIGHTS["rank"] * rank_score
-            scores["b"] += self.WEIGHTS["rank"] * (100 - rank_score)
-            active_weight += self.WEIGHTS["rank"]
+            scores["a"] += rank_weight * rank_score
+            scores["b"] += rank_weight * (100 - rank_score)
+            active_weight += rank_weight
 
         # ── 2. Team ability composite (all 6 dimensions) ──
         att_a, def_a, mid_a = _num(team_a, "attack"), _num(team_a, "defend"), _num(team_a, "midfield")
@@ -273,8 +282,15 @@ class RuleEngine:
             draw_boost = (self.LOW_DRAW_ODDS - float(draw_o)) * 3.0
             target_draw = min(38.0, target_draw + draw_boost)
 
+        # League early-season / no book: keep a healthier draw prior (MD1 draws are common).
+        is_league = bool(group_context and group_context.get("is_league"))
+        draw_floor = 10.0
+        if is_league and (early_season or not has_book):
+            draw_floor = 18.0
+            target_draw = max(target_draw, 18.0)
+
         scores["draw"] = scores["draw"] * 0.40 + target_draw * 0.60
-        scores["draw"] = max(10.0, min(38.0, scores["draw"]))
+        scores["draw"] = max(draw_floor, min(38.0, scores["draw"]))
 
         # Draw nudge: in close matches, draw should be competitive with win/loss.
         # The Poisson model structurally under-predicts draws because xG separation
@@ -311,6 +327,9 @@ class RuleEngine:
 
         if group_context:
             home_xg = float(group_context.get("home_xg_boost") or 0)
+            # Without markets / early season, keep home tilt milder so away xG stays realistic.
+            if is_league and (early_season or not has_book):
+                home_xg *= 0.55
             home_side = group_context.get("home_side")
             if home_xg and home_side == "a":
                 expected_a += home_xg
@@ -330,6 +349,16 @@ class RuleEngine:
                 expected_a = min(3.5, expected_a + 0.12)
             if group_context.get("need_goals_b"):
                 expected_b = min(3.5, expected_b + 0.12)
+
+        # League without book CRS / early season: compress xG gap + raise underdog floor.
+        # Avoids blind 3:0/4:0 stacks when Poisson is the only signal.
+        if is_league and (early_season or not has_book):
+            avg = (expected_a + expected_b) / 2.0
+            expected_a = avg + (expected_a - avg) * 0.62
+            expected_b = avg + (expected_b - avg) * 0.62
+            min_xg = 0.65
+            expected_a = max(min_xg, min(self.MAX_XG_PER_TEAM, expected_a))
+            expected_b = max(min_xg, min(self.MAX_XG_PER_TEAM, expected_b))
 
         handicap = 0.0
         if odds:
