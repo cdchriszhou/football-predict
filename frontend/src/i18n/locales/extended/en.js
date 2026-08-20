@@ -84,7 +84,7 @@ export default {
     updateDoneSimple: 'Data update complete',
     updateFailed: 'Update failed',
     loadFailed: 'Failed to load dashboard data. Please try again later.',
-    scoreLoadPartial: 'Today/recent results timed out. Please refresh and try again.',
+    scoreLoadPartial: 'This week\'s results timed out. Please refresh and try again.',
     refreshProgress: 'Updating: {phase}',
     refreshTimeout: 'Data refresh timed out; check admin panel for progress',
     refreshAlreadyRunning: 'A data refresh is already running',

@@ -162,6 +162,8 @@ export default {
     manualUpdate: '手动更新数据',
     todayMatches: '今日赛果',
     noTodayMatches: '今日无比赛',
+    weekResults: '本周赛果',
+    noWeekResults: '本周暂无赛果',
     recentResults: '最近赛果',
     noRecentResults: '暂无最近完场比赛',
     noUpcomingMatches: '暂无即将开始的比赛',

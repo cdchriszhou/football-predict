@@ -83,7 +83,7 @@ export default {
     updateDoneSimple: '数据更新完成',
     updateFailed: '更新失败',
     loadFailed: '仪表盘数据加载失败，请稍后重试',
-    scoreLoadPartial: '今日/最近赛果加载超时，请刷新页面重试',
+    scoreLoadPartial: '本周赛果加载超时，请刷新页面重试',
     refreshProgress: '正在更新：{phase}',
     refreshTimeout: '数据更新超时，请稍后在管理后台查看进度',
     refreshAlreadyRunning: '数据更新已在进行中',

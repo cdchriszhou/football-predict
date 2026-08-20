@@ -162,6 +162,8 @@ export default {
     manualUpdate: 'Refresh Data',
     todayMatches: "Today's Results",
     noTodayMatches: 'No matches today',
+    weekResults: "This Week's Results",
+    noWeekResults: 'No results this week',
     recentResults: 'Recent Results',
     noRecentResults: 'No recent finished matches',
     noUpcomingMatches: 'No upcoming matches',

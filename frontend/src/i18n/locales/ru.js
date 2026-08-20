@@ -155,6 +155,8 @@ export default {
     manualUpdate: 'Обновить данные',
     todayMatches: 'Матчи сегодня',
     noTodayMatches: 'Сегодня матчей нет',
+    weekResults: 'Результаты недели',
+    noWeekResults: 'На этой неделе результатов нет',
     noUpcomingMatches: 'Нет предстоящих матчей',
     seasonEnded: 'Сезон завершён — новых матчей нет',
     upcoming: 'Скоро',

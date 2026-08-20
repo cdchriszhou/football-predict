@@ -155,6 +155,8 @@ export default {
     manualUpdate: 'データ更新',
     todayMatches: '今日の結果',
     noTodayMatches: '本日の試合はありません',
+    weekResults: '今週の結果',
+    noWeekResults: '今週の結果はありません',
     noUpcomingMatches: '近日開催の試合はありません',
     seasonEnded: 'シーズン終了 — 新しい試合はありません',
     upcoming: '近日開催',

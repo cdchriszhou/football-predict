@@ -155,6 +155,8 @@ export default {
     manualUpdate: '手動更新數據',
     todayMatches: '今日賽果',
     noTodayMatches: '今日無比賽',
+    weekResults: '本週賽果',
+    noWeekResults: '本週暫無賽果',
     noUpcomingMatches: '暫無即將開始的比賽',
     seasonEnded: '本賽季已結束，暫無新賽程',
     upcoming: '即將開始',

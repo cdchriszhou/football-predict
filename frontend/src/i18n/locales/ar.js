@@ -155,6 +155,8 @@ export default {
     manualUpdate: 'تحديث البيانات',
     todayMatches: 'مباريات اليوم',
     noTodayMatches: 'لا مباريات اليوم',
+    weekResults: 'نتائج هذا الأسبوع',
+    noWeekResults: 'لا نتائج هذا الأسبوع',
     noUpcomingMatches: 'لا مباريات قادمة',
     seasonEnded: 'انتهى الموسم — لا مباريات جديدة',
     upcoming: 'قريباً',

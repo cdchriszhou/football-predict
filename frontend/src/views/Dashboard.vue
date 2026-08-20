@@ -36,25 +36,29 @@
       </el-col>
     </el-row>
 
-    <el-row :gutter="20" style="margin-top: 20px">
-      <!-- Today's matches -->
-      <el-col :xs="24" :sm="14">
-        <el-card class="section-card">
-          <template #header>
-            <div class="flex-between">
-              <span class="card-title">{{ t('dashboard.todayMatches') }}</span>
-              <el-button text type="primary" @click="goMatches">{{ t('dashboard.viewFullSchedule') }}</el-button>
-            </div>
-          </template>
-          <el-empty v-if="initialLoading" :description="t('common.loading')" />
-          <el-empty v-else-if="loadError && displayTodayMatches.length === 0" :description="loadError" />
-          <el-empty v-else-if="displayTodayMatches.length === 0" :description="t('dashboard.noTodayMatches')" />
-          <div v-else class="today-matches">
-            <MatchCard v-for="m in displayTodayMatches" :key="m.id" :match="m" />
-          </div>
-        </el-card>
-      </el-col>
+    <!-- This week's finished / live results -->
+    <el-card class="section-card" style="margin-top: 20px">
+      <template #header>
+        <div class="flex-between">
+          <span class="card-title">{{ t('dashboard.weekResults') }}</span>
+          <el-button text type="primary" @click="goMatches">{{ t('dashboard.viewFullSchedule') }}</el-button>
+        </div>
+      </template>
+      <el-empty v-if="initialLoading" :description="t('common.loading')" />
+      <el-empty v-else-if="loadError && displayWeekResults.length === 0" :description="loadError" />
+      <el-empty v-else-if="displayWeekResults.length === 0" :description="t('dashboard.noWeekResults')" />
+      <el-row v-else :gutter="16">
+        <el-col
+          :xs="24" :sm="12" :lg="8"
+          v-for="m in displayWeekResults"
+          :key="'week-' + m.id"
+        >
+          <MatchCard :match="m" />
+        </el-col>
+      </el-row>
+    </el-card>
 
+    <el-row :gutter="20" style="margin-top: 20px">
       <!-- Prediction accuracy + Algorithm -->
       <el-col :xs="24" :sm="10">
         <el-card class="section-card">
@@ -84,8 +88,9 @@
           </div>
           <el-empty v-else :description="t('dashboard.noPredictionData')" :image-size="80" />
         </el-card>
-
-        <el-card class="section-card algo-card" style="margin-top: 20px">
+      </el-col>
+      <el-col :xs="24" :sm="14">
+        <el-card class="section-card algo-card">
           <template #header>
             <span class="card-title">{{ t('dashboard.algoTitle') }}</span>
           </template>
@@ -114,29 +119,6 @@
         />
       </el-col>
     </el-row>
-
-    <!-- Recent finished results — skip when all already shown in 今日赛果 -->
-    <el-card
-      v-if="showRecentResults && displayedRecentResults.length"
-      class="section-card"
-      style="margin-top: 20px"
-    >
-      <template #header>
-        <div class="flex-between">
-          <span class="card-title">{{ t('dashboard.recentResults') }}</span>
-          <el-button text type="primary" @click="goMatches">{{ t('dashboard.viewFullSchedule') }}</el-button>
-        </div>
-      </template>
-      <el-row :gutter="16">
-        <el-col
-          :xs="24" :sm="12" :lg="8"
-          v-for="m in displayedRecentResults"
-          :key="'recent-' + m.id"
-        >
-          <MatchCard :match="m" />
-        </el-col>
-      </el-row>
-    </el-card>
 
     <!-- Upcoming matches -->
     <el-card class="section-card" style="margin-top: 20px">
@@ -225,7 +207,6 @@ const dashboardSubtitle = computed(() => {
 const seasonEnded = computed(() => compStore.current?.season_status === 'ended')
 const isClubLeague = computed(() => compStore.current?.type === 'club')
 const isFootball = computed(() => isClubLeague.value)
-const showRecentResults = computed(() => isFootball.value)
 
 const scheduleTotal = computed(() => Number(statValues.value.total) || 0)
 
@@ -236,36 +217,37 @@ function beijingDateKey(iso) {
   return d.toLocaleDateString('sv-SE', { timeZone: 'Asia/Shanghai' })
 }
 
-const beijingTodayKey = computed(() =>
-  new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Shanghai' }),
-)
+/** Beijing calendar week Mon–Sun as YYYY-MM-DD keys. */
+function beijingWeekBounds(now = new Date()) {
+  const todayKey = now.toLocaleDateString('sv-SE', { timeZone: 'Asia/Shanghai' })
+  const [y, m, d] = todayKey.split('-').map(Number)
+  const localNoon = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Shanghai' }))
+  const sun0 = localNoon.getDay() // 0=Sun … 6=Sat
+  const monOffset = sun0 === 0 ? 6 : sun0 - 1
+  const monday = new Date(Date.UTC(y, m - 1, d - monOffset))
+  const sunday = new Date(Date.UTC(y, m - 1, d - monOffset + 6))
+  return {
+    startKey: monday.toISOString().slice(0, 10),
+    endKey: sunday.toISOString().slice(0, 10),
+  }
+}
 
-/** Today's results: prefer scored/live today; otherwise the latest finished round. */
-const displayTodayMatches = computed(() => {
-  const todayKey = beijingTodayKey.value
+/** This week's finished/live results (Beijing Mon–Sun). */
+const displayWeekResults = computed(() => {
+  const { startKey, endKey } = beijingWeekBounds()
   const isScoredOrLive = (m) => (
     isEffectiveMatchStatus(m, 'finished') || isEffectiveMatchStatus(m, 'live')
   )
   const byId = new Map()
-  const todays = store.todayMatches.filter((m) => beijingDateKey(m.match_time) === todayKey)
-  const todaysScored = todays.filter(isScoredOrLive)
-  if (todaysScored.length) {
-    for (const m of todays) byId.set(m.id, m)
-  } else {
-    // Rest day / only upcoming today: API already returns the latest finished matchday.
-    for (const m of store.todayMatches) {
-      if (isScoredOrLive(m)) byId.set(m.id, m)
-    }
-  }
-  if (!byId.size && isFootball.value) {
-    for (const m of store.recentResults) {
-      byId.set(m.id, m)
-    }
+  for (const m of [...store.todayMatches, ...store.recentResults]) {
+    const day = beijingDateKey(m.match_time)
+    if (!day || day < startKey || day > endKey) continue
+    if (!isScoredOrLive(m)) continue
+    byId.set(m.id, m)
   }
   const rows = [...byId.values()].sort(
     (a, b) => new Date(a.match_time || 0) - new Date(b.match_time || 0),
   )
-  // Dedupe by stage + team pair in case API returns placeholder + advanced rows.
   const seenPairs = new Set()
   const deduped = []
   for (const m of rows) {
@@ -278,25 +260,7 @@ const displayTodayMatches = computed(() => {
     seenPairs.add(pairKey)
     deduped.push(m)
   }
-  const withScore = deduped.filter(
-    (m) => isEffectiveMatchStatus(m, 'finished') || isEffectiveMatchStatus(m, 'live'),
-  )
-  return withScore.length ? withScore : deduped
-})
-
-/** Recent results excluding matches already shown under 「今日赛果」. */
-const displayedRecentResults = computed(() => {
-  const todayIds = new Set(displayTodayMatches.value.map((m) => m.id))
-  const seenPairs = new Set(
-    displayTodayMatches.value.map((m) =>
-      [m.stage || '', [m.team_a || '', m.team_b || ''].map(String).sort().join('|')].join('::'),
-    ),
-  )
-  return store.recentResults.filter((m) => {
-    if (todayIds.has(m.id)) return false
-    const pairKey = [m.stage || '', [m.team_a || '', m.team_b || ''].map(String).sort().join('|')].join('::')
-    return !seenPairs.has(pairKey)
-  })
+  return deduped
 })
 
 const upcomingPreviewLimit = computed(() => 6)
@@ -374,7 +338,7 @@ async function loadDashboard() {
   ]
   if (isFootball.value) {
     dataCalls.push(
-      { key: 'recentResults', p: store.fetchRecentResults(168, 16) },
+      { key: 'recentResults', p: store.fetchRecentResults(168, 50) },
     )
   }
   const settled = await Promise.allSettled([
@@ -415,7 +379,7 @@ async function loadDashboard() {
     statValues.value.total = compStore.current.stats.matches || 0
     statValues.value.teams = compStore.current.stats.teams || 0
   }
-  const ids = [...store.todayMatches, ...store.upcomingMatches].map(m => m.id)
+  const ids = [...displayWeekResults.value, ...store.upcomingMatches].map(m => m.id)
   if (ids.length) await predStore.fetchBatch(ids)
   statValues.value.predicted = Object.keys(predStore.cache).length || '—'
   statValues.value.updateTime = new Date().toLocaleString(locale.value)
@@ -523,7 +487,7 @@ async function refreshMatchScores() {
     await Promise.all([
       store.fetchToday(),
       store.fetchUpcoming(12),
-      isFootball.value ? store.fetchRecentResults(168, 16) : Promise.resolve(),
+      isFootball.value ? store.fetchRecentResults(168, 50) : Promise.resolve(),
     ])
   } catch {
     /* ignore transient poll errors */
@@ -578,7 +542,7 @@ onUnmounted(() => {
 .card-title { font-size: 16px; font-weight: 700; }
 .flex-between { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .schedule-hint { margin: 0 0 12px; font-size: 13px; color: #909399; line-height: 1.5; }
-.today-matches { display: flex; flex-direction: column; gap: 12px; }
+.section-card :deep(.el-col) { margin-bottom: 16px; }
 .accuracy-display { text-align: center; padding: 10px 0; }
 .accuracy-num { font-size: 28px; font-weight: 800; }
 .accuracy-desc { font-size: 13px; color: #666; margin-top: 8px; }
