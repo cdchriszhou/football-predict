@@ -1,4 +1,4 @@
-"""数字彩主推号持久化：按「基于期号」存下期预测，开奖后可对照命中。"""
+"""数字彩推荐号持久化：按「基于期号」存下期最多 5 注，开奖后可对照命中。"""
 
 from __future__ import annotations
 
@@ -25,7 +25,6 @@ def _load() -> dict[str, Any]:
 
 def _save(data: dict[str, Any]) -> None:
     _STORE_PATH.parent.mkdir(parents=True, exist_ok=True)
-    # 按更新时间裁剪，避免无限膨胀
     if len(data) > _MAX_ENTRIES:
         ranked = sorted(
             data.items(),
@@ -43,6 +42,26 @@ def _key(game_id: str, based_on_issue: str) -> str:
     return f"{game_id}:{based_on_issue}"
 
 
+def _normalize_picks(recommendations: list[dict]) -> list[dict[str, Any]]:
+    picks: list[dict[str, Any]] = []
+    for rec in recommendations[:5]:
+        if not isinstance(rec, dict):
+            continue
+        digits = rec.get("digits")
+        if not isinstance(digits, list) or not digits:
+            continue
+        try:
+            digits_i = [int(x) for x in digits]
+        except (TypeError, ValueError):
+            continue
+        picks.append({
+            "digits": digits_i,
+            "display": str(rec.get("display") or " ".join(str(x) for x in digits_i)),
+            "source": rec.get("source") or "frequency",
+        })
+    return picks
+
+
 def save_primary_prediction(
     game_id: str,
     based_on_issue: str | None,
@@ -50,26 +69,20 @@ def save_primary_prediction(
     *,
     rotate: int = 0,
 ) -> None:
-    """保存当期主推（推荐 1）。仅 rotate=0，避免「换一批」覆盖主记录。"""
+    """保存当期全部推荐（最多 5 注）。仅 rotate=0，避免「换一批」覆盖主记录。"""
     if rotate or not game_id or not based_on_issue or not recommendations:
         return
-    primary = recommendations[0] if recommendations else None
-    if not isinstance(primary, dict):
+    picks = _normalize_picks(recommendations)
+    if not picks:
         return
-    digits = primary.get("digits")
-    if not isinstance(digits, list) or not digits:
-        return
-    try:
-        digits_i = [int(x) for x in digits]
-    except (TypeError, ValueError):
-        return
-    display = primary.get("display") or " ".join(str(x) for x in digits_i)
     entry = {
         "game": game_id,
         "based_on_issue": str(based_on_issue),
-        "digits": digits_i,
-        "display": str(display),
-        "source": primary.get("source") or "frequency",
+        "picks": picks,
+        # 兼容旧字段：主推 = 第一注
+        "digits": picks[0]["digits"],
+        "display": picks[0]["display"],
+        "source": picks[0].get("source") or "frequency",
         "updated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
     }
     with _LOCK:
@@ -78,10 +91,52 @@ def save_primary_prediction(
         _save(data)
 
 
-def get_stored_primary(game_id: str, based_on_issue: str | None) -> dict[str, Any] | None:
+def get_stored_picks(game_id: str, based_on_issue: str | None) -> list[dict[str, Any]]:
+    """返回已存预测列表；兼容旧版仅存主推 digits 的记录。"""
     if not game_id or not based_on_issue:
-        return None
+        return []
     with _LOCK:
         data = _load()
         hit = data.get(_key(game_id, str(based_on_issue)))
-        return dict(hit) if isinstance(hit, dict) else None
+    if not isinstance(hit, dict):
+        return []
+    picks = hit.get("picks")
+    if isinstance(picks, list) and picks:
+        out: list[dict[str, Any]] = []
+        for p in picks[:5]:
+            if not isinstance(p, dict):
+                continue
+            digits = p.get("digits")
+            if not isinstance(digits, list):
+                continue
+            try:
+                digits_i = [int(x) for x in digits]
+            except (TypeError, ValueError):
+                continue
+            if not digits_i:
+                continue
+            out.append({
+                "digits": digits_i,
+                "display": str(p.get("display") or " ".join(str(x) for x in digits_i)),
+                "source": p.get("source") or hit.get("source") or "frequency",
+            })
+        if out:
+            return out
+    digits = hit.get("digits")
+    if isinstance(digits, list) and digits:
+        try:
+            digits_i = [int(x) for x in digits]
+        except (TypeError, ValueError):
+            return []
+        if digits_i:
+            return [{
+                "digits": digits_i,
+                "display": str(hit.get("display") or " ".join(str(x) for x in digits_i)),
+                "source": hit.get("source") or "frequency",
+            }]
+    return []
+
+
+def get_stored_primary(game_id: str, based_on_issue: str | None) -> dict[str, Any] | None:
+    picks = get_stored_picks(game_id, based_on_issue)
+    return picks[0] if picks else None

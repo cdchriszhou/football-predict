@@ -459,12 +459,12 @@ def _prediction_hits(game_id: str, pred: list[int], actual: list[int]) -> list[b
     ]
 
 
-def _retro_primary_pick(game_id: str, prior_draws: list[dict]) -> tuple[list[int] | None, str | None]:
-    """用开奖前历史回放频率主推（与默认 rotate=0 推荐一致）。"""
+def _retro_picks(game_id: str, prior_draws: list[dict]) -> list[dict[str, Any]]:
+    """用开奖前历史回放频率推荐（与默认 rotate=0 的最多 5 注一致）。"""
     from service.digital_pick import period_seed
 
     if len(prior_draws) < 5:
-        return None, None
+        return []
     window = min(100, len(prior_draws))
     draws = prior_draws[:window]
     latest_issue = str(draws[0].get("issue") or "")
@@ -489,51 +489,63 @@ def _retro_primary_pick(game_id: str, prior_draws: list[dict]) -> tuple[list[int
         analysis = _analyze_draws(draws, alphabets)
         recs = _build_recommendations(game_id, draws, analysis, seed=seed)
 
-    if not recs:
-        return None, None
-    digits = recs[0].get("digits") or []
-    try:
-        digits_i = [int(x) for x in digits]
-    except (TypeError, ValueError):
-        return None, None
-    if not digits_i:
-        return None, None
-    display = recs[0].get("display") or " ".join(str(x) for x in digits_i)
-    return digits_i, str(display)
+    out: list[dict[str, Any]] = []
+    for rec in (recs or [])[:5]:
+        digits = rec.get("digits") or []
+        try:
+            digits_i = [int(x) for x in digits]
+        except (TypeError, ValueError):
+            continue
+        if not digits_i:
+            continue
+        out.append({
+            "digits": digits_i,
+            "display": str(rec.get("display") or " ".join(str(x) for x in digits_i)),
+            "source": rec.get("source") or "frequency",
+        })
+    return out
 
 
 def enrich_draws_with_predictions(game_id: str, rows: list[dict]) -> list[dict]:
-    """为历史开奖行附加主推号码与各位命中标记。"""
-    from service.digital_rec_store import get_stored_primary
+    """为历史开奖行附加最多 5 注预测号码与各位命中标记。"""
+    from service.digital_rec_store import get_stored_picks
 
     out: list[dict] = []
     for i, row in enumerate(rows):
         item = dict(row)
         prior = rows[i + 1 :]
         based_on = str(prior[0]["issue"]) if prior else None
-        pred_digits: list[int] | None = None
-        pred_display: str | None = None
+        picks: list[dict[str, Any]] = []
         if based_on:
-            stored = get_stored_primary(game_id, based_on)
-            if stored and isinstance(stored.get("digits"), list):
-                try:
-                    pred_digits = [int(x) for x in stored["digits"]]
-                    pred_display = str(stored.get("display") or "")
-                except (TypeError, ValueError):
-                    pred_digits = None
-        if pred_digits is None and prior:
-            pred_digits, pred_display = _retro_primary_pick(game_id, prior)
+            picks = get_stored_picks(game_id, based_on)
+        if not picks and prior:
+            picks = _retro_picks(game_id, prior)
 
         actual = row.get("digits") or []
-        if pred_digits and isinstance(actual, list) and actual:
-            try:
-                actual_i = [int(x) for x in actual]
-            except (TypeError, ValueError):
-                actual_i = []
-            if actual_i:
-                item["prediction_digits"] = pred_digits
-                item["prediction_display"] = pred_display or " ".join(str(x) for x in pred_digits)
-                item["prediction_hits"] = _prediction_hits(game_id, pred_digits, actual_i)
+        try:
+            actual_i = [int(x) for x in actual] if isinstance(actual, list) else []
+        except (TypeError, ValueError):
+            actual_i = []
+
+        predictions: list[dict[str, Any]] = []
+        if picks and actual_i:
+            for p in picks:
+                digits = p.get("digits") or []
+                if not digits:
+                    continue
+                predictions.append({
+                    "digits": digits,
+                    "display": p.get("display") or " ".join(str(x) for x in digits),
+                    "hits": _prediction_hits(game_id, digits, actual_i),
+                    "source": p.get("source") or "frequency",
+                })
+
+        if predictions:
+            item["predictions"] = predictions
+            # 兼容旧前端字段：第一注
+            item["prediction_digits"] = predictions[0]["digits"]
+            item["prediction_display"] = predictions[0]["display"]
+            item["prediction_hits"] = predictions[0]["hits"]
         out.append(item)
     return out
 
@@ -549,6 +561,7 @@ def _history_pool_row(r: dict) -> dict[str, Any]:
         "sale_amount": r.get("sale_amount"),
         "sale_amount_text": r.get("sale_amount_text"),
         "prize_levels": r.get("prize_levels") or [],
+        "predictions": r.get("predictions"),
         "prediction_digits": r.get("prediction_digits"),
         "prediction_display": r.get("prediction_display"),
         "prediction_hits": r.get("prediction_hits"),

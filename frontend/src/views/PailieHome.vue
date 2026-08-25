@@ -388,58 +388,65 @@
         <el-table :data="historyTableRows" stripe size="small" empty-text="—">
           <el-table-column prop="issue" :label="t('pailie.colIssue')" min-width="90" />
           <el-table-column prop="result" :label="t('pailie.colResult')" min-width="180" />
-          <el-table-column :label="t('pailie.colPredict')" min-width="200">
+          <el-table-column :label="t('pailie.colPredict')" min-width="220">
             <template #default="{ row }">
-              <div v-if="row.prediction_digits?.length" class="hist-pred">
-                <template v-if="activeGame === 'ssq'">
-                  <span
-                    v-for="(d, di) in row.prediction_digits.slice(0, 6)"
-                    :key="'pr' + di"
-                    class="hist-pred-ball hist-pred-ball--red"
-                    :class="{ 'hist-pred-ball--hit': row.prediction_hits?.[di] }"
-                  >{{ formatBall(d) }}</span>
-                  <span class="hist-pred-plus">+</span>
-                  <span
-                    class="hist-pred-ball hist-pred-ball--blue"
-                    :class="{ 'hist-pred-ball--hit': row.prediction_hits?.[6] }"
-                  >{{ formatBall(row.prediction_digits[6]) }}</span>
-                </template>
-                <template v-else-if="activeGame === 'dlt'">
-                  <span
-                    v-for="(d, di) in row.prediction_digits.slice(0, 5)"
-                    :key="'pf' + di"
-                    class="hist-pred-ball hist-pred-ball--red"
-                    :class="{ 'hist-pred-ball--hit': row.prediction_hits?.[di] }"
-                  >{{ formatBall(d) }}</span>
-                  <span class="hist-pred-plus">+</span>
-                  <span
-                    v-for="(d, di) in row.prediction_digits.slice(5, 7)"
-                    :key="'pb' + di"
-                    class="hist-pred-ball hist-pred-ball--blue"
-                    :class="{ 'hist-pred-ball--hit': row.prediction_hits?.[di + 5] }"
-                  >{{ formatBall(d) }}</span>
-                </template>
-                <template v-else-if="activeGame === 'qxc'">
-                  <span
-                    v-for="(d, di) in row.prediction_digits.slice(0, 6)"
-                    :key="'pq' + di"
-                    class="hist-pred-ball"
-                    :class="{ 'hist-pred-ball--hit': row.prediction_hits?.[di] }"
-                  >{{ formatBall(d) }}</span>
-                  <span class="hist-pred-plus">+</span>
-                  <span
-                    class="hist-pred-ball hist-pred-ball--special"
-                    :class="{ 'hist-pred-ball--hit': row.prediction_hits?.[6] }"
-                  >{{ formatBall(row.prediction_digits[6]) }}</span>
-                </template>
-                <template v-else>
-                  <span
-                    v-for="(d, di) in row.prediction_digits"
-                    :key="'p' + di"
-                    class="hist-pred-ball"
-                    :class="{ 'hist-pred-ball--hit': row.prediction_hits?.[di] }"
-                  >{{ formatBall(d) }}</span>
-                </template>
+              <div v-if="historyPredictions(row).length" class="hist-pred-list">
+                <div
+                  v-for="(pred, pi) in historyPredictions(row)"
+                  :key="'pred-' + pi"
+                  class="hist-pred"
+                >
+                  <span class="hist-pred-idx">{{ pi + 1 }}</span>
+                  <template v-if="activeGame === 'ssq'">
+                    <span
+                      v-for="(d, di) in pred.digits.slice(0, 6)"
+                      :key="'pr' + pi + '-' + di"
+                      class="hist-pred-ball hist-pred-ball--red"
+                      :class="{ 'hist-pred-ball--hit': pred.hits?.[di] }"
+                    >{{ formatBall(d) }}</span>
+                    <span class="hist-pred-plus">+</span>
+                    <span
+                      class="hist-pred-ball hist-pred-ball--blue"
+                      :class="{ 'hist-pred-ball--hit': pred.hits?.[6] }"
+                    >{{ formatBall(pred.digits[6]) }}</span>
+                  </template>
+                  <template v-else-if="activeGame === 'dlt'">
+                    <span
+                      v-for="(d, di) in pred.digits.slice(0, 5)"
+                      :key="'pf' + pi + '-' + di"
+                      class="hist-pred-ball hist-pred-ball--red"
+                      :class="{ 'hist-pred-ball--hit': pred.hits?.[di] }"
+                    >{{ formatBall(d) }}</span>
+                    <span class="hist-pred-plus">+</span>
+                    <span
+                      v-for="(d, di) in pred.digits.slice(5, 7)"
+                      :key="'pb' + pi + '-' + di"
+                      class="hist-pred-ball hist-pred-ball--blue"
+                      :class="{ 'hist-pred-ball--hit': pred.hits?.[di + 5] }"
+                    >{{ formatBall(d) }}</span>
+                  </template>
+                  <template v-else-if="activeGame === 'qxc'">
+                    <span
+                      v-for="(d, di) in pred.digits.slice(0, 6)"
+                      :key="'pq' + pi + '-' + di"
+                      class="hist-pred-ball"
+                      :class="{ 'hist-pred-ball--hit': pred.hits?.[di] }"
+                    >{{ formatBall(d) }}</span>
+                    <span class="hist-pred-plus">+</span>
+                    <span
+                      class="hist-pred-ball hist-pred-ball--special"
+                      :class="{ 'hist-pred-ball--hit': pred.hits?.[6] }"
+                    >{{ formatBall(pred.digits[6]) }}</span>
+                  </template>
+                  <template v-else>
+                    <span
+                      v-for="(d, di) in pred.digits"
+                      :key="'p' + pi + '-' + di"
+                      class="hist-pred-ball"
+                      :class="{ 'hist-pred-ball--hit': pred.hits?.[di] }"
+                    >{{ formatBall(d) }}</span>
+                  </template>
+                </div>
               </div>
               <span v-else class="hist-pred-empty">—</span>
             </template>
@@ -566,6 +573,16 @@ function formatBall(n) {
 function formatPool(text) {
   if (text === 0 || text === '0') return '0'
   return text || '—'
+}
+
+function historyPredictions(row) {
+  if (Array.isArray(row?.predictions) && row.predictions.length) {
+    return row.predictions.filter((p) => Array.isArray(p?.digits) && p.digits.length)
+  }
+  if (Array.isArray(row?.prediction_digits) && row.prediction_digits.length) {
+    return [{ digits: row.prediction_digits, hits: row.prediction_hits || [] }]
+  }
+  return []
 }
 
 function poolAmountDisplay(gameId) {
@@ -1547,11 +1564,24 @@ onUnmounted(() => {
 .history-alert {
   margin-bottom: 12px;
 }
+.hist-pred-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 2px 0;
+}
 .hist-pred {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 4px;
+}
+.hist-pred-idx {
+  width: 14px;
+  font-size: 11px;
+  color: #909399;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
 }
 .hist-pred-plus {
   font-size: 12px;
