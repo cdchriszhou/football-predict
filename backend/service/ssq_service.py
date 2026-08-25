@@ -530,6 +530,13 @@ async def get_ssq_recommendations(
         cached = rec_cache_get(cache_key)
         if cached:
             cached["cached"] = True
+            from service.digital_rec_store import save_primary_prediction
+            save_primary_prediction(
+                "ssq",
+                cached.get("based_on_issue"),
+                cached.get("recommendations") or [],
+                rotate=rotate,
+            )
             return cached
 
     if not draws:
@@ -629,5 +636,7 @@ async def get_ssq_recommendations(
         "ai_models": model_names,
         "cached": False,
     }
+    from service.digital_rec_store import save_primary_prediction
+    save_primary_prediction("ssq", latest_issue or None, merged, rotate=rotate)
     rec_cache_set(cache_key, payload)
     return payload

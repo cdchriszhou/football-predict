@@ -298,6 +298,7 @@ export default {
     historyTitle: '近期開獎與獎池',
     colIssue: '期號',
     colResult: '開獎號碼',
+    colPredict: '預測號碼',
     colTime: '開獎日期',
     colPool: '獎池(元)',
     colSale: '銷售額(元)',

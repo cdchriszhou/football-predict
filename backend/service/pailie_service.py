@@ -421,6 +421,140 @@ async def _fetch_history(game_id: str, limit: int = 100, *, force_refresh: bool 
     return collected
 
 
+def _prediction_hits(game_id: str, pred: list[int], actual: list[int]) -> list[bool]:
+    """按玩法规则标记预测各位/各球是否命中。"""
+    if not pred:
+        return []
+    if game_id == "ssq":
+        if len(actual) < 7:
+            return [False] * len(pred)
+        reds = set(int(x) for x in actual[:6])
+        blue = int(actual[6])
+        hits = []
+        for i, p in enumerate(pred):
+            if i < 6:
+                hits.append(int(p) in reds)
+            elif i == 6:
+                hits.append(int(p) == blue)
+            else:
+                hits.append(False)
+        return hits
+    if game_id == "dlt":
+        if len(actual) < 7:
+            return [False] * len(pred)
+        front = set(int(x) for x in actual[:5])
+        back = set(int(x) for x in actual[5:7])
+        hits = []
+        for i, p in enumerate(pred):
+            if i < 5:
+                hits.append(int(p) in front)
+            elif i < 7:
+                hits.append(int(p) in back)
+            else:
+                hits.append(False)
+        return hits
+    return [
+        i < len(actual) and int(pred[i]) == int(actual[i])
+        for i in range(len(pred))
+    ]
+
+
+def _retro_primary_pick(game_id: str, prior_draws: list[dict]) -> tuple[list[int] | None, str | None]:
+    """用开奖前历史回放频率主推（与默认 rotate=0 推荐一致）。"""
+    from service.digital_pick import period_seed
+
+    if len(prior_draws) < 5:
+        return None, None
+    window = min(100, len(prior_draws))
+    draws = prior_draws[:window]
+    latest_issue = str(draws[0].get("issue") or "")
+    seed = period_seed(latest_issue, 0)
+
+    if game_id == "ssq":
+        from service.ssq_service import analyze_ssq, build_ssq_recommendations
+
+        exclude: set[tuple[int, ...]] = set()
+        if isinstance(draws[0].get("digits"), list) and len(draws[0]["digits"]) >= 7:
+            exclude.add(tuple(int(x) for x in draws[0]["digits"][:7]))
+        recs = build_ssq_recommendations(analyze_ssq(draws), seed=seed, exclude=exclude)
+    elif game_id == "dlt":
+        from service.dlt_service import analyze_dlt, build_dlt_recommendations
+
+        exclude = set()
+        if isinstance(draws[0].get("digits"), list) and len(draws[0]["digits"]) >= 7:
+            exclude.add(tuple(int(x) for x in draws[0]["digits"][:7]))
+        recs = build_dlt_recommendations(analyze_dlt(draws), seed=seed, exclude=exclude)
+    else:
+        alphabets = GAME_SPECS[game_id]["alphabets"]
+        analysis = _analyze_draws(draws, alphabets)
+        recs = _build_recommendations(game_id, draws, analysis, seed=seed)
+
+    if not recs:
+        return None, None
+    digits = recs[0].get("digits") or []
+    try:
+        digits_i = [int(x) for x in digits]
+    except (TypeError, ValueError):
+        return None, None
+    if not digits_i:
+        return None, None
+    display = recs[0].get("display") or " ".join(str(x) for x in digits_i)
+    return digits_i, str(display)
+
+
+def enrich_draws_with_predictions(game_id: str, rows: list[dict]) -> list[dict]:
+    """为历史开奖行附加主推号码与各位命中标记。"""
+    from service.digital_rec_store import get_stored_primary
+
+    out: list[dict] = []
+    for i, row in enumerate(rows):
+        item = dict(row)
+        prior = rows[i + 1 :]
+        based_on = str(prior[0]["issue"]) if prior else None
+        pred_digits: list[int] | None = None
+        pred_display: str | None = None
+        if based_on:
+            stored = get_stored_primary(game_id, based_on)
+            if stored and isinstance(stored.get("digits"), list):
+                try:
+                    pred_digits = [int(x) for x in stored["digits"]]
+                    pred_display = str(stored.get("display") or "")
+                except (TypeError, ValueError):
+                    pred_digits = None
+        if pred_digits is None and prior:
+            pred_digits, pred_display = _retro_primary_pick(game_id, prior)
+
+        actual = row.get("digits") or []
+        if pred_digits and isinstance(actual, list) and actual:
+            try:
+                actual_i = [int(x) for x in actual]
+            except (TypeError, ValueError):
+                actual_i = []
+            if actual_i:
+                item["prediction_digits"] = pred_digits
+                item["prediction_display"] = pred_display or " ".join(str(x) for x in pred_digits)
+                item["prediction_hits"] = _prediction_hits(game_id, pred_digits, actual_i)
+        out.append(item)
+    return out
+
+
+def _history_pool_row(r: dict) -> dict[str, Any]:
+    return {
+        "issue": r["issue"],
+        "draw_time": r.get("draw_time"),
+        "result": r.get("result"),
+        "digits": r.get("digits"),
+        "pool_balance": r.get("pool_balance"),
+        "pool_balance_text": r.get("pool_balance_text"),
+        "sale_amount": r.get("sale_amount"),
+        "sale_amount_text": r.get("sale_amount_text"),
+        "prize_levels": r.get("prize_levels") or [],
+        "prediction_digits": r.get("prediction_digits"),
+        "prediction_display": r.get("prediction_display"),
+        "prediction_hits": r.get("prediction_hits"),
+    }
+
+
 async def get_draw_history(
     game_id: str | None = None,
     limit: int = 10,
@@ -435,7 +569,10 @@ async def get_draw_history(
             from service.digital_ai import rec_cache_invalidate
             rec_cache_invalidate(g)
     results = await asyncio.gather(*[_fetch_history(g, limit, force_refresh=force_refresh) for g in games])
-    history = {g: rows for g, rows in zip(games, results)}
+    history = {
+        g: enrich_draws_with_predictions(g, rows)
+        for g, rows in zip(games, results)
+    }
     reachable = any(bool(v) for v in history.values())
     return {
         "reachable": reachable,
@@ -464,19 +601,8 @@ async def get_prize_pools(history_limit: int = 30, *, force_refresh: bool = Fals
             refreshed_games.append(game_id)
         spec = GAME_SPECS[game_id]
         latest = rows[0] if rows else None
-        history = [
-            {
-                "issue": r["issue"],
-                "draw_time": r.get("draw_time"),
-                "result": r.get("result"),
-                "pool_balance": r.get("pool_balance"),
-                "pool_balance_text": r.get("pool_balance_text"),
-                "sale_amount": r.get("sale_amount"),
-                "sale_amount_text": r.get("sale_amount_text"),
-                "prize_levels": r.get("prize_levels") or [],
-            }
-            for r in rows
-        ]
+        enriched = enrich_draws_with_predictions(game_id, rows)
+        history = [_history_pool_row(r) for r in enriched]
         if game_id in ("pl3", "fc3d"):
             pool_note = "固定奖玩法，官方奖池字段通常为 0 或空，以下为接口同步值。"
         elif game_id == "ssq":
@@ -919,6 +1045,13 @@ async def get_recommendations(
         cached = rec_cache_get(cache_key)
         if cached:
             cached["cached"] = True
+            from service.digital_rec_store import save_primary_prediction
+            save_primary_prediction(
+                game_id,
+                cached.get("based_on_issue"),
+                cached.get("recommendations") or [],
+                rotate=rotate,
+            )
             return cached
 
     if not draws:
@@ -998,5 +1131,7 @@ async def get_recommendations(
         "ai_models": model_names,
         "cached": False,
     }
+    from service.digital_rec_store import save_primary_prediction
+    save_primary_prediction(game_id, latest_issue or None, recs, rotate=rotate)
     rec_cache_set(cache_key, payload)
     return payload

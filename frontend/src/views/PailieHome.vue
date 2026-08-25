@@ -388,6 +388,62 @@
         <el-table :data="historyTableRows" stripe size="small" empty-text="—">
           <el-table-column prop="issue" :label="t('pailie.colIssue')" min-width="90" />
           <el-table-column prop="result" :label="t('pailie.colResult')" min-width="180" />
+          <el-table-column :label="t('pailie.colPredict')" min-width="200">
+            <template #default="{ row }">
+              <div v-if="row.prediction_digits?.length" class="hist-pred">
+                <template v-if="activeGame === 'ssq'">
+                  <span
+                    v-for="(d, di) in row.prediction_digits.slice(0, 6)"
+                    :key="'pr' + di"
+                    class="hist-pred-ball hist-pred-ball--red"
+                    :class="{ 'hist-pred-ball--hit': row.prediction_hits?.[di] }"
+                  >{{ formatBall(d) }}</span>
+                  <span class="hist-pred-plus">+</span>
+                  <span
+                    class="hist-pred-ball hist-pred-ball--blue"
+                    :class="{ 'hist-pred-ball--hit': row.prediction_hits?.[6] }"
+                  >{{ formatBall(row.prediction_digits[6]) }}</span>
+                </template>
+                <template v-else-if="activeGame === 'dlt'">
+                  <span
+                    v-for="(d, di) in row.prediction_digits.slice(0, 5)"
+                    :key="'pf' + di"
+                    class="hist-pred-ball hist-pred-ball--red"
+                    :class="{ 'hist-pred-ball--hit': row.prediction_hits?.[di] }"
+                  >{{ formatBall(d) }}</span>
+                  <span class="hist-pred-plus">+</span>
+                  <span
+                    v-for="(d, di) in row.prediction_digits.slice(5, 7)"
+                    :key="'pb' + di"
+                    class="hist-pred-ball hist-pred-ball--blue"
+                    :class="{ 'hist-pred-ball--hit': row.prediction_hits?.[di + 5] }"
+                  >{{ formatBall(d) }}</span>
+                </template>
+                <template v-else-if="activeGame === 'qxc'">
+                  <span
+                    v-for="(d, di) in row.prediction_digits.slice(0, 6)"
+                    :key="'pq' + di"
+                    class="hist-pred-ball"
+                    :class="{ 'hist-pred-ball--hit': row.prediction_hits?.[di] }"
+                  >{{ formatBall(d) }}</span>
+                  <span class="hist-pred-plus">+</span>
+                  <span
+                    class="hist-pred-ball hist-pred-ball--special"
+                    :class="{ 'hist-pred-ball--hit': row.prediction_hits?.[6] }"
+                  >{{ formatBall(row.prediction_digits[6]) }}</span>
+                </template>
+                <template v-else>
+                  <span
+                    v-for="(d, di) in row.prediction_digits"
+                    :key="'p' + di"
+                    class="hist-pred-ball"
+                    :class="{ 'hist-pred-ball--hit': row.prediction_hits?.[di] }"
+                  >{{ formatBall(d) }}</span>
+                </template>
+              </div>
+              <span v-else class="hist-pred-empty">—</span>
+            </template>
+          </el-table-column>
           <el-table-column prop="draw_time" :label="t('pailie.colTime')" min-width="110" />
           <el-table-column :label="t('pailie.colPool')" min-width="140">
             <template #default="{ row }">
@@ -1490,6 +1546,52 @@ onUnmounted(() => {
 }
 .history-alert {
   margin-bottom: 12px;
+}
+.hist-pred {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+.hist-pred-plus {
+  font-size: 12px;
+  font-weight: 700;
+  color: #909399;
+  margin: 0 1px;
+}
+.hist-pred-empty {
+  color: #c0c4cc;
+}
+.hist-pred-ball {
+  min-width: 22px;
+  height: 22px;
+  padding: 0 4px;
+  border-radius: 11px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: #606266;
+  background: #f0f2f5;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+.hist-pred-ball--red {
+  color: #c62828;
+  background: #fdecea;
+}
+.hist-pred-ball--blue {
+  color: #1565c0;
+  background: #e3f2fd;
+}
+.hist-pred-ball--special {
+  color: #c62828;
+  background: #fdecea;
+}
+.hist-pred-ball--hit {
+  color: #fff !important;
+  background: #2e7d32 !important;
 }
 @media (max-width: 640px) {
   .page-header {

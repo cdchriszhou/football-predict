@@ -359,6 +359,7 @@ export default {
     historyTitle: 'Recent draws & pools',
     colIssue: 'Issue',
     colResult: 'Result',
+    colPredict: 'Prediction',
     colTime: 'Draw date',
     colPool: 'Prize pool',
     colSale: 'Sales',

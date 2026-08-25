@@ -364,6 +364,7 @@ export default {
     historyTitle: '近期开奖与奖池',
     colIssue: '期号',
     colResult: '开奖号码',
+    colPredict: '预测号码',
     colTime: '开奖日期',
     colPool: '奖池(元)',
     colSale: '销售额(元)',
