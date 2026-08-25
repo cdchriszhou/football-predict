@@ -121,6 +121,17 @@ def _expected_goals(team_a: str, team_b: str, competition_slug: str = "") -> tup
 def _correct_draw(wr: float, dr: float, lr: float, sp: dict | None) -> tuple[float, float, float]:
     if not sp or not sp.get("draw"):
         return wr, dr, lr
+    inferred = _wdl_from_european(sp)
+    if inferred:
+        mw, md, ml = inferred
+        # Direction clash (model home-fav vs market away-fav, or reverse): trust market.
+        if (ml >= mw + 8 and wr >= lr + 5) or (mw >= ml + 8 and lr >= wr + 5):
+            a = 0.72
+            wr = (1 - a) * wr + a * mw
+            dr = (1 - a) * dr + a * md
+            lr = (1 - a) * lr + a * ml
+            total = max(wr + dr + lr, 1.0)
+            return wr / total * 100, dr / total * 100, lr / total * 100
     w, d, l = sp.get("win_win"), sp.get("draw"), sp.get("win_lose")
     if not (w and d and l):
         return wr, dr, lr
@@ -174,14 +185,51 @@ def run_score_prediction(
     stage: str | None = None,
     model_scores: list[str] | None = None,
     competition_slug: str = "",
+    matchday: int | None = None,
 ) -> tuple[str, str, str | None, list[str]]:
     """Run full CRS score pick pipeline (same as production)."""
-    wr, dr, lr = wdl if wdl else (50.0, 25.0, 25.0)
     sp = odds_meta or {}
+    inferred = _wdl_from_european(sp)
+    if wdl:
+        wr, dr, lr = wdl
+        # Flat placeholder WDL + decisive market → trust the book.
+        if inferred and max(wdl) < 40.0 and max(inferred) >= 45.0:
+            wr, dr, lr = inferred
+    elif inferred:
+        wr, dr, lr = inferred
+    else:
+        wr, dr, lr = 50.0, 25.0, 25.0
     wr, dr, lr = _correct_draw(wr, dr, lr, sp)
     exp_a, exp_b = _expected_goals(team_a, team_b, competition_slug)
     ra, rb = _pipeline_ranks(team_a, team_b, competition_slug)
     hints = model_scores or _poisson_model_hints(exp_a, exp_b, dr)
+
+    has_book = bool(sp.get("win_win") and sp.get("draw") and sp.get("win_lose"))
+    from service.match_context import build_group_context
+    from data.competitions import get_competition
+
+    md = int(matchday or 0)
+    comp = get_competition(competition_slug) if competition_slug else None
+    is_club = bool(comp and comp.get("type") == "club")
+    ctx = build_group_context(
+        stage or "",
+        "",
+        md,
+        team_a,
+        team_b,
+        ra,
+        rb,
+        home_side_override="a" if is_club else None,
+    )
+    ctx["has_book_odds"] = has_book
+    # Keep handicap on the dedicated pipeline arg only — duplicating it inside
+    # odds_dict can over-trigger CRS/handicap orientation away from draw primaries.
+    odds_dict = {
+        "win_win": sp.get("win_win"),
+        "draw": sp.get("draw"),
+        "win_lose": sp.get("win_lose"),
+        "has_real_market": has_book,
+    }
 
     best, upset, picks, _ = run_full_score_pipeline(
         crs,
@@ -198,6 +246,8 @@ def run_score_prediction(
         handicap=sp.get("handicap"),
         rank_a=ra,
         rank_b=rb,
+        group_context=ctx,
+        odds_dict=odds_dict,
     )
     wr, dr, lr = refine_wdl_after_score_pick(best, wr, dr, lr)
     from service.score_pick import reconcile_wdl_with_score_picks
@@ -274,9 +324,14 @@ def _evaluate_match(
         p1, p2, upset, all_picks = published_picks
         pick_source = "published"
     else:
+        # Fill WDL from European odds when prediction row is missing.
+        eff_wdl = wdl
+        if not eff_wdl and odds_meta:
+            eff_wdl = _wdl_from_european(odds_meta)
         p1, p2, upset, all_picks = run_score_prediction(
-            team_a, team_b, crs, wdl, odds_meta, stage=stage or None,
+            team_a, team_b, crs, eff_wdl, odds_meta, stage=stage or None,
             competition_slug=competition_slug,
+            matchday=matchday,
         )
         pick_source = "replay"
     if crs_source != "book":

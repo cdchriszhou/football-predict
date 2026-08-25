@@ -95,3 +95,72 @@ def test_upset_picker_never_duplicates_likely_pair():
     )
     upset = picker.pick(aggregated, ["3:0", "3:1"], crs, inp)
     assert upset not in {"3:0", "3:1"}
+
+
+def test_best_draw_prefers_low_scoring_draws():
+    from service.score_pick import _best_draw, _rank_crs
+
+    crs = {"2:2": 7.0, "1:1": 8.5, "0:0": 9.0, "2:1": 6.0}
+    ranked = _rank_crs(crs, set())
+    assert _best_draw(ranked, set()) == "0:0"
+    assert _best_draw(ranked, {"0:0"}) == "1:1"
+
+
+def test_away_favourite_trio_includes_away_score():
+    from service.score_pick import ensure_market_direction_in_trio
+
+    crs = {
+        "2:1": 8.0, "1:0": 9.0, "2:0": 10.0,
+        "0:1": 5.5, "0:2": 7.0, "1:2": 6.5,
+        "1:1": 7.5, "0:0": 11.0, "2:2": 14.0,
+    }
+    best, upset = ensure_market_direction_in_trio(
+        ["2:1", "1:0"], "2:2", crs,
+        win_rate=22.0, draw_rate=24.0, lose_rate=54.0,
+        sp_win=4.05, sp_draw=3.75, sp_lose=1.63,
+    )
+    trio = set(best) | ({upset} if upset else set())
+    assert any(
+        ":" in s and int(s.split(":")[1]) > int(s.split(":")[0])
+        for s in trio
+    ), trio
+    if upset and ":" in upset and upset.split(":")[0] == upset.split(":")[1]:
+        assert upset in ("0:0", "1:1"), upset
+
+
+def test_strong_home_fav_upset_prefers_low_draw():
+    from service.score_pick import ensure_market_direction_in_trio
+
+    crs = {
+        "2:1": 5.0, "2:0": 6.0, "1:0": 7.0,
+        "1:1": 8.0, "0:0": 9.5, "2:2": 12.0,
+    }
+    best, upset = ensure_market_direction_in_trio(
+        ["2:1", "2:0"], "2:2", crs,
+        win_rate=58.0, draw_rate=24.0, lose_rate=18.0,
+        sp_win=1.62, sp_draw=3.36, sp_lose=4.66,
+    )
+    assert best[1] == "1:0"
+    assert upset in ("0:0", "1:1")
+
+
+def test_run_score_prediction_uses_european_wdl_when_missing():
+    from service.score_backtest import run_score_prediction
+
+    crs = {
+        "2:1": 9.0, "1:0": 10.0, "2:0": 11.0,
+        "0:1": 5.0, "1:2": 6.0, "0:2": 7.5,
+        "1:1": 8.0, "0:0": 12.0, "2:2": 15.0,
+    }
+    p1, p2, upset, all_picks = run_score_prediction(
+        "富勒姆", "切尔西", crs, None,
+        {"win_win": 4.05, "draw": 3.75, "win_lose": 1.63},
+        stage="第1轮",
+        competition_slug="premier-league",
+        matchday=1,
+    )
+    trio = [p for p in [p1, p2, upset] if p and p != "-"]
+    assert any(
+        ":" in s and int(s.split(":")[1]) > int(s.split(":")[0])
+        for s in trio
+    ), (p1, p2, upset, all_picks)

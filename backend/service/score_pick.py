@@ -616,6 +616,11 @@ def _crs_map(ranked: list[tuple[str, float]]) -> dict[str, float]:
 
 
 def _best_draw(ranked: list[tuple[str, float]], skip: set[str]) -> str | None:
+    """Prefer common low-scoring draws (0:0/1:1) over 2:2+."""
+    cmap = _crs_map(ranked)
+    for score in ("0:0", "1:1", "2:2", "3:3"):
+        if score not in skip and score in cmap:
+            return score
     for score, _ in ranked:
         if score in skip:
             continue
@@ -670,6 +675,36 @@ def _best_home_win(
             best = (odd, score)
     if two_nil and one_nil and expected_a >= 1.0 and (two_nil[0] - one_nil[0]) <= 1.5:
         return two_nil[1]
+    return best[1] if best else None
+
+
+def _best_away_win(
+    ranked: list[tuple[str, float]],
+    skip: set[str],
+    *,
+    expected_b: float = 1.0,
+) -> str | None:
+    """Pick best away-win CRS line; prefer 0:2 when close to 0:1 and xG supports it."""
+    nil_one: tuple[float, str] | None = None
+    nil_two: tuple[float, str] | None = None
+    best: tuple[float, str] | None = None
+    for score, odd in ranked:
+        if score in skip:
+            continue
+        try:
+            ga, gb = map(int, score.split(":"))
+        except ValueError:
+            continue
+        if gb <= ga:
+            continue
+        if ga == 0 and gb == 1:
+            nil_one = (odd, score)
+        elif ga == 0 and gb == 2:
+            nil_two = (odd, score)
+        if best is None or odd < best[0]:
+            best = (odd, score)
+    if nil_two and nil_one and expected_b >= 1.0 and (nil_two[0] - nil_one[0]) <= 1.5:
+        return nil_two[1]
     return best[1] if best else None
 
 
@@ -3097,6 +3132,110 @@ def ensure_extreme_mismatch_triple_coverage(
                     else:
                         upset_val = score
                     break
+
+    return picks[:2], upset_val
+
+
+def ensure_market_direction_in_trio(
+    best_scores: list[str],
+    upset: str | None,
+    crs: dict[str, float],
+    *,
+    win_rate: float,
+    draw_rate: float,
+    lose_rate: float,
+    sp_win: float | None = None,
+    sp_draw: float | None = None,
+    sp_lose: float | None = None,
+) -> tuple[list[str], str | None]:
+    """
+    Safety net after ensemble pick:
+    - Away market favourites must appear in the triple (not all home wins).
+    - Prefer 0:0/1:1 cold draws over 2:2 when a draw slot is used.
+    - Competitive / strong-fav games without a draw slot get a low draw upset.
+    """
+    picks = [s for s in (best_scores or []) if s and s != "?"][:2]
+    upset_val = upset if upset and upset != "?" else None
+    if not crs or not picks:
+        return picks, upset_val
+
+    ranked = _rank_crs(crs, set())
+    skip = set(picks) | ({upset_val} if upset_val else set())
+
+    def _outs(ps: list[str], u: str | None) -> set[str]:
+        return {_score_outcome(s) for s in ps + ([u] if u else []) if s}
+
+    market_away = (
+        _market_fav_a(sp_win, sp_lose) is False
+        or (sp_lose is not None and sp_lose <= 1.90 and lose_rate >= win_rate)
+        or lose_rate >= 45.0
+    )
+    market_home = (
+        _market_fav_a(sp_win, sp_lose) is True
+        or (sp_win is not None and sp_win <= 1.70)
+        or win_rate >= 55.0
+    )
+    competitive = _is_competitive(win_rate, lose_rate, draw_rate)
+
+    # 1) Away favourite but triple has no away score → inject.
+    if market_away and "lose" not in _outs(picks, upset_val):
+        away_pick = _best_away_win(ranked, skip, expected_b=1.2)
+        if away_pick:
+            if all(_score_outcome(p) == "win" for p in picks):
+                if len(picks) >= 2:
+                    picks[1] = away_pick
+                else:
+                    picks.append(away_pick)
+            else:
+                upset_val = away_pick
+            skip = set(picks) | ({upset_val} if upset_val else set())
+
+    # 2) Normalize high-scoring draw upsets to 0:0/1:1.
+    if upset_val and _score_outcome(upset_val) == "draw" and upset_val not in ("0:0", "1:1"):
+        for pref in ("1:1", "0:0"):
+            if pref in crs and pref not in picks:
+                upset_val = pref
+                break
+        skip = set(picks) | ({upset_val} if upset_val else set())
+
+    # 3) Missing draw coverage on competitive / heavy-fav games.
+    if "draw" not in _outs(picks, upset_val) and (competitive or market_home or market_away):
+        draw_pick = _best_draw(ranked, skip)
+        if draw_pick:
+            # Prefer replacing same-direction secondary before overwriting a useful upset.
+            if (
+                len(picks) >= 2
+                and _score_outcome(picks[0]) == _score_outcome(picks[1])
+                and _score_outcome(picks[0]) in ("win", "lose")
+                and not market_away
+            ):
+                # Keep both fav scores when away fav already handled; else keep secondary as draw
+                # only when both are fav wins and market is home — actually put draw on upset.
+                upset_val = draw_pick
+            else:
+                upset_val = draw_pick
+
+    # 4) Both likely home wins under strong home fav: avoid 2:1+2:0 with 2:2 cold —
+    # ensure upset is low draw (already handled by 2/3) and secondary prefers 1:0 if present.
+    if (
+        market_home
+        and len(picks) >= 2
+        and _score_outcome(picks[0]) == "win"
+        and _score_outcome(picks[1]) == "win"
+        and {picks[0], picks[1]} == {"2:1", "2:0"}
+        and "1:0" in crs
+    ):
+        picks[1] = "1:0"
+
+    # 5) Pad missing secondary for home/away favourites so UI/triple always has two likelies.
+    if len(picks) == 1:
+        skip = set(picks) | ({upset_val} if upset_val else set())
+        if market_away:
+            alt = _best_away_win(ranked, skip, expected_b=1.2)
+        else:
+            alt = _best_home_win(ranked, skip, expected_a=1.2)
+        if alt:
+            picks.append(alt)
 
     return picks[:2], upset_val
 

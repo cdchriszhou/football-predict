@@ -72,6 +72,17 @@ class UpsetPicker:
 
         # 2. Fallback: use aggregator ranking for uncovered direction
         covered_outcomes = {self._score_outcome(s) for s in top_scores if s and s != "?"}
+        draw_prefs = ("0:0", "1:1", "2:2")
+        if "draw" not in covered_outcomes:
+            by_score = {a.score: a for a in aggregated}
+            for pref in draw_prefs:
+                ascore = by_score.get(pref)
+                if not ascore or pref in top_scores:
+                    continue
+                odd = crs.get(pref, 99)
+                if odd <= 25.0:
+                    return pref
+
         for ascore in aggregated:
             if ascore.score in top_scores:
                 continue

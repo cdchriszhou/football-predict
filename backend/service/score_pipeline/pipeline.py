@@ -244,6 +244,17 @@ class ScorePredictionPipeline:
             expected_a=expected_a, expected_b=expected_b,
         )
 
+        from service.score_pick import ensure_market_direction_in_trio
+        best, upset = ensure_market_direction_in_trio(
+            best, upset, crs,
+            win_rate=adjusted_wr,
+            draw_rate=adjusted_dr,
+            lose_rate=adjusted_lr,
+            sp_win=sp_win,
+            sp_draw=sp_draw,
+            sp_lose=sp_lose,
+        )
+
         # ── Validate ──
         best, upset, warnings = self.validator.validate(
             best, upset, crs,
