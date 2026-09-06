@@ -22,7 +22,7 @@ SSQ_GAME = {
     "blue_max": 16,
     "price_per_bet": 2,
     "draw_cycle": "tue_thu_sun",
-    "note": "红球从 01–33 中选 6 个（不重复），蓝球从 01–16 中选 1 个；每周二、四、日开奖。",
+    "note": "红球从 01–33 中选 6 个（不重复），蓝球从 01–16 中选 1 个；每周二、四、日开奖。推荐参考历史红球和值与蓝球 01–10 集中区间，并提供胆拖参考。",
     "play_types": [
         {
             "id": "single",
@@ -31,6 +31,13 @@ SSQ_GAME = {
             "prize_label": "一等奖浮动（最高1000万）",
             "desc": "6 个红球 + 1 个蓝球全部命中为一等奖；另有二至六等奖。",
         },
+        {
+            "id": "dantuo",
+            "name": "胆拖投注",
+            "prize": None,
+            "prize_label": "按单式拆注计奖",
+            "desc": "红球设胆码（必出）与拖码（选满 6 个），蓝球可选 1 个或多个；注数=C(拖码数, 6−胆码数)×蓝球数。",
+        },
     ],
 }
 
@@ -38,6 +45,14 @@ _SSQ_URLS = (
     "https://www.cwl.gov.cn/cwl_admin/front/cwlkj/search/kjxx/findDrawNotice",
     "https://www.cwl.gov.cn/cwl_admin/kjxx/findDrawNotice",
 )
+
+# 蓝球历史高度集中在 01–10；评分与选号时加权
+_BLUE_LOW_MAX = 10
+_BLUE_ZONE_BOOST = 0.28
+# 红球和值：落在历史分位区间内更常见
+_SUM_LO_PCT = 0.15
+_SUM_HI_PCT = 0.85
+
 _SSQ_HEADERS = {
     "User-Agent": (
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
@@ -279,9 +294,16 @@ def analyze_ssq(draws: list[dict]) -> dict[str, Any]:
     blue_gaps = [blue_last[i] if blue_last[i] is not None else sample for i in range(17)]
     red_scores = _score_pool(red_count[1:], red_gaps[1:], red_recent[1:], sample, recent_n)
     blue_scores = _score_pool(blue_count[1:], blue_gaps[1:], blue_recent[1:], sample, recent_n)
-    # pad index 0 unused for convenience aligning with ball numbers via +1
     red_score_map = {i + 1: red_scores[i] for i in range(33)}
     blue_score_map = {i + 1: blue_scores[i] for i in range(16)}
+
+    # 蓝球 01–10 历史占比显著更高：在归一化分上加权，仍保留 11–16 的冷号可能
+    for n in range(1, 17):
+        if n <= _BLUE_LOW_MAX:
+            blue_score_map[n] = min(1.0, float(blue_score_map[n]) + _BLUE_ZONE_BOOST)
+
+    red_sums = [sum(row.get("red") or []) for row in draws if len(row.get("red") or []) == 6]
+    sum_stats = _compute_sum_stats(red_sums)
 
     red_stats = []
     for n in range(1, 34):
@@ -307,12 +329,14 @@ def analyze_ssq(draws: list[dict]) -> dict[str, Any]:
             "rate": round(rate, 4),
             "miss": blue_gaps[n],
             "score": round(blue_score_map[n], 4),
+            "zone": "low" if n <= _BLUE_LOW_MAX else "high",
             "tag": "hot" if rate >= sorted([blue_count[i] / sample for i in range(1, 17)], reverse=True)[2] else (
                 "cold" if blue_gaps[n] >= sorted(blue_gaps[1:], reverse=True)[2] else "normal"
             ),
         })
     blue_stats.sort(key=lambda x: (-x["score"], -x["count"], x["digit"]))
 
+    low_blue_hits = sum(blue_count[n] for n in range(1, _BLUE_LOW_MAX + 1))
     return {
         "sample_size": sample,
         "kind": "ssq",
@@ -324,11 +348,139 @@ def analyze_ssq(draws: list[dict]) -> dict[str, Any]:
         "cold_digits": sorted(range(1, 34), key=lambda d: (-red_gaps[d], d))[:6],
         "hot_blue": [r["digit"] for r in blue_stats[:3]],
         "cold_blue": sorted(range(1, 17), key=lambda d: (-blue_gaps[d], d))[:3],
-        # UI 兼容：把红球统计映射到 position_stats[0]，蓝球到 position_stats[1]
+        "sum_stats": sum_stats,
+        "blue_zone": {
+            "low_max": _BLUE_LOW_MAX,
+            "low_rate": round(low_blue_hits / sample, 4) if sample else 0.0,
+            "boost": _BLUE_ZONE_BOOST,
+        },
         "position_stats": [red_stats, blue_stats],
         "alphabets": [33, 16],
         "overall": red_stats[:10],
     }
+
+
+def _compute_sum_stats(sums: list[int]) -> dict[str, Any]:
+    if not sums:
+        # 理论均值约 102（6 个均匀 1–33）
+        return {
+            "mean": 102.0,
+            "min": 21,
+            "max": 168,
+            "p15": 80,
+            "p50": 102,
+            "p85": 124,
+            "target_lo": 80,
+            "target_hi": 124,
+            "sample": 0,
+        }
+    ordered = sorted(sums)
+    n = len(ordered)
+
+    def pct(p: float) -> int:
+        idx = min(n - 1, max(0, int(round((n - 1) * p))))
+        return int(ordered[idx])
+
+    p15 = pct(_SUM_LO_PCT)
+    p85 = pct(_SUM_HI_PCT)
+    mean = sum(sums) / n
+    return {
+        "mean": round(mean, 1),
+        "min": int(ordered[0]),
+        "max": int(ordered[-1]),
+        "p15": p15,
+        "p50": pct(0.5),
+        "p85": p85,
+        "target_lo": p15,
+        "target_hi": p85,
+        "sample": n,
+    }
+
+
+def _fit_reds_to_sum(
+    reds: list[int],
+    pool: list[int],
+    *,
+    lo: int,
+    hi: int,
+    target: float,
+) -> list[int]:
+    """微调红球组合，使和值落入历史常见区间。"""
+    cur = sorted(set(int(x) for x in reds if 1 <= int(x) <= 33))
+    if len(cur) != 6:
+        return cur
+    pool_ext = [n for n in pool if 1 <= n <= 33]
+    for n in range(1, 34):
+        if n not in pool_ext:
+            pool_ext.append(n)
+
+    def total(xs: list[int]) -> int:
+        return sum(xs)
+
+    for _ in range(36):
+        s = total(cur)
+        if lo <= s <= hi:
+            break
+        if s < lo:
+            small = min(cur)
+            # 直接换入池中最大可用号，尽快抬升和值
+            cand = next((n for n in sorted(pool_ext, reverse=True) if n not in cur), None)
+            if cand is None or cand <= small:
+                break
+            cur = sorted(set(cur) - {small} | {cand})
+        else:
+            big = max(cur)
+            cand = next((n for n in sorted(pool_ext) if n not in cur), None)
+            if cand is None or cand >= big:
+                break
+            cur = sorted(set(cur) - {big} | {cand})
+
+    # 已在区间内时，轻微向均值靠拢，且不得越界
+    for _ in range(8):
+        s = total(cur)
+        if abs(s - target) <= 8:
+            break
+        if s < target:
+            small = min(cur)
+            cand = next(
+                (n for n in sorted(pool_ext, reverse=True)
+                 if n not in cur and n > small and s - small + n <= hi),
+                None,
+            )
+            if cand is None:
+                break
+            cur = sorted(set(cur) - {small} | {cand})
+        else:
+            big = max(cur)
+            cand = next(
+                (n for n in sorted(pool_ext)
+                 if n not in cur and n < big and s - big + n >= lo),
+                None,
+            )
+            if cand is None:
+                break
+            cur = sorted(set(cur) - {big} | {cand})
+    return cur[:6]
+
+
+def _pick_blue_prefer_low(
+    blue_ranked: list[int],
+    *,
+    seed: int,
+    salt: int,
+    allow_high: bool = False,
+) -> int:
+    """默认从 01–10 选蓝球；allow_high 时才考虑 11–16。"""
+    from service.digital_pick import pick_from_pool
+
+    low = [b for b in blue_ranked if 1 <= b <= _BLUE_LOW_MAX]
+    high = [b for b in blue_ranked if b > _BLUE_LOW_MAX]
+    if allow_high and high and (seed + salt) % 5 == 0:
+        picked = pick_from_pool(high, seed, salt=salt)
+        return int(picked) if picked is not None else (high[0] if high else 1)
+    pool = low or blue_ranked or list(range(1, _BLUE_LOW_MAX + 1))
+    picked = pick_from_pool(pool, seed, salt=salt)
+    return int(picked) if picked is not None else 1
 
 
 def _pick_ssq_sets(
@@ -341,19 +493,26 @@ def _pick_ssq_sets(
     from service.digital_pick import rotate_ranked
 
     exclude = exclude or set()
+    sum_stats = analysis.get("sum_stats") or _compute_sum_stats([])
+    lo = int(sum_stats.get("target_lo") or 80)
+    hi = int(sum_stats.get("target_hi") or 124)
+    target = float(sum_stats.get("mean") or 102)
+
     red_ranked = rotate_ranked(
-        [r["digit"] for r in analysis["red_stats"]], seed, top_k=8, salt=3,
+        [r["digit"] for r in analysis["red_stats"]], seed, top_k=10, salt=3,
     )
     blue_ranked = rotate_ranked(
-        [b["digit"] for b in analysis["blue_stats"]], seed, top_k=4, salt=11,
+        [b["digit"] for b in analysis["blue_stats"]], seed, top_k=6, salt=11,
     )
     cold_red = rotate_ranked(list(analysis["cold_digits"]), seed, top_k=6, salt=19)
-    cold_blue = rotate_ranked(list(analysis["cold_blue"]), seed, top_k=3, salt=23)
 
     picks: list[tuple[list[int], int]] = []
     used: set[tuple[int, ...]] = set()
 
-    def add(reds: list[int], blue: int) -> None:
+    def add(reds: list[int], blue: int, *, fit_sum: bool = True) -> None:
+        reds = sorted(set(int(x) for x in reds))
+        if fit_sum:
+            reds = _fit_reds_to_sum(reds, red_ranked + cold_red, lo=lo, hi=hi, target=target)
         reds = sorted(set(reds))
         if len(reds) != 6 or not (1 <= blue <= 16):
             return
@@ -363,11 +522,11 @@ def _pick_ssq_sets(
         used.add(key)
         picks.append((reds, blue))
 
-    # 1 主推：热红 + 热蓝
-    add(red_ranked[:6], blue_ranked[0])
-    # 2 次热红 + 次热蓝
-    add(red_ranked[1:7], blue_ranked[min(1, len(blue_ranked) - 1)])
-    # 3 热红混一点冷红
+    # 1 主推：热红 + 低区热蓝，和值拟合
+    add(red_ranked[:6], _pick_blue_prefer_low(blue_ranked, seed=seed, salt=1))
+    # 2 次热红 + 另一低区蓝
+    add(red_ranked[1:7], _pick_blue_prefer_low(blue_ranked, seed=seed, salt=2))
+    # 3 热红混冷红
     mix = sorted(set(red_ranked[:4] + cold_red[:2]))[:6]
     if len(mix) < 6:
         for n in red_ranked:
@@ -375,22 +534,137 @@ def _pick_ssq_sets(
                 mix.append(n)
             if len(mix) >= 6:
                 break
-    add(sorted(mix[:6]), blue_ranked[0])
-    # 4 冷号回补
-    add(sorted(cold_red[:6]), cold_blue[0] if cold_blue else blue_ranked[-1])
-    # 5 交错：奇偶均衡倾向
+    add(sorted(mix[:6]), _pick_blue_prefer_low(blue_ranked, seed=seed, salt=3))
+    # 4 冷号回补（蓝球仍优先 01–10）
+    add(
+        sorted(cold_red[:6]),
+        _pick_blue_prefer_low(blue_ranked, seed=seed, salt=4),
+        fit_sum=True,
+    )
+    # 5 奇偶均衡；偶发允许高区蓝球作多样性
     odd = [n for n in red_ranked if n % 2 == 1]
     even = [n for n in red_ranked if n % 2 == 0]
     bal = sorted((odd[:3] + even[:3])[:6])
-    add(bal, blue_ranked[min(2, len(blue_ranked) - 1)])
+    add(bal, _pick_blue_prefer_low(blue_ranked, seed=seed, salt=5, allow_high=True))
 
-    # 补足
     offset = 2
-    while len(picks) < count and offset < 20:
-        add(red_ranked[offset:offset + 6], blue_ranked[offset % len(blue_ranked)])
+    while len(picks) < count and offset < 24:
+        chunk = red_ranked[offset:offset + 6]
+        if len(chunk) < 6:
+            chunk = (red_ranked + cold_red + list(range(1, 34)))[:6]
+        add(
+            chunk,
+            _pick_blue_prefer_low(blue_ranked, seed=seed, salt=10 + offset, allow_high=(offset % 4 == 0)),
+        )
         offset += 1
 
     return picks[:count]
+
+
+def build_ssq_dantuo(
+    analysis: dict[str, Any],
+    *,
+    seed: int = 0,
+) -> dict[str, Any]:
+    """生成胆拖参考：3 胆 + 6 拖 + 蓝球（蓝优先 01–10）。注数 C(6,3)=20。"""
+    from math import comb
+    from service.digital_pick import rotate_ranked
+
+    sum_stats = analysis.get("sum_stats") or _compute_sum_stats([])
+    red_ranked = rotate_ranked(
+        [r["digit"] for r in analysis["red_stats"]], seed, top_k=12, salt=41,
+    )
+    blue_ranked = rotate_ranked(
+        [b["digit"] for b in analysis["blue_stats"]], seed, top_k=6, salt=43,
+    )
+    cold = rotate_ranked(list(analysis["cold_digits"]), seed, top_k=6, salt=47)
+
+    dan = sorted(red_ranked[:3])
+    tuo_pool = [n for n in red_ranked[3:] + cold if n not in dan]
+    tuo: list[int] = []
+    for n in tuo_pool:
+        if n not in tuo:
+            tuo.append(n)
+        if len(tuo) >= 6:
+            break
+    while len(tuo) < 6:
+        for n in range(1, 34):
+            if n not in dan and n not in tuo:
+                tuo.append(n)
+            if len(tuo) >= 6:
+                break
+
+    # 胆+拖整体和值倾向：用胆+拖中位数附近的 6 码做校验提示
+    sample6 = _fit_reds_to_sum(
+        dan + tuo[:3],
+        dan + tuo,
+        lo=int(sum_stats.get("target_lo") or 80),
+        hi=int(sum_stats.get("target_hi") or 124),
+        target=float(sum_stats.get("mean") or 102),
+    )
+    # 若拟合动了胆码外的号，同步回拖码（胆码锁定）
+    tuo = sorted((set(sample6) | set(tuo)) - set(dan))
+    while len(tuo) < 6:
+        for n in red_ranked + list(range(1, 34)):
+            if n not in dan and n not in tuo:
+                tuo.append(n)
+            if len(tuo) >= 6:
+                break
+    tuo = sorted(tuo)[:6]
+
+    blue = _pick_blue_prefer_low(blue_ranked, seed=seed, salt=49)
+    # 蓝拖：再给一个低区备选，方便复式
+    blue_alt = _pick_blue_prefer_low(
+        [b for b in blue_ranked if b != blue] or blue_ranked,
+        seed=seed,
+        salt=51,
+    )
+    blue_pool = sorted({blue, blue_alt})
+    need = 6 - len(dan)
+    bets = comb(len(tuo), need) * len(blue_pool) if 0 < need <= len(tuo) else 0
+
+    conf = (
+        sum(analysis["red_score_map"].get(n, 0.5) for n in dan) / max(1, len(dan))
+        + sum(analysis["red_score_map"].get(n, 0.5) for n in tuo) / max(1, len(tuo))
+        + analysis["blue_score_map"].get(blue, 0.5)
+    ) / 3
+
+    display = (
+        "胆 " + " ".join(_fmt_ball(x) for x in dan)
+        + " | 拖 " + " ".join(_fmt_ball(x) for x in tuo)
+        + " | 蓝 " + " ".join(_fmt_ball(x) for x in blue_pool)
+    )
+    # digits：用胆 + 拖前 need 个 + 主蓝，便于落库/历史对照
+    sample_reds = sorted(dan + tuo[:need])
+    return {
+        "id": "pick-dantuo",
+        "mode": "dantuo",
+        "source": "frequency",
+        "label": "胆拖参考",
+        "dan": dan,
+        "tuo": tuo,
+        "blue": blue,
+        "blue_pool": blue_pool,
+        "red": sample_reds,
+        "digits": sample_reds + [blue],
+        "display": display,
+        "confidence": round(conf, 4),
+        "bets": bets,
+        "reason": (
+            f"3 胆 + 6 拖参考胆拖玩法；红球组合和值倾向 "
+            f"{sum_stats.get('target_lo')}–{sum_stats.get('target_hi')} "
+            f"（历史均值约 {sum_stats.get('mean')}）；"
+            f"蓝球优先 01–{_BLUE_LOW_MAX:02d}（近窗约 "
+            f"{(analysis.get('blue_zone') or {}).get('low_rate', 0):.0%} 落在此区间）。"
+            f"注数约 {bets}（C({len(tuo)},{need})×{len(blue_pool)}）。"
+        ),
+        "sum_hint": {
+            "target_lo": sum_stats.get("target_lo"),
+            "target_hi": sum_stats.get("target_hi"),
+            "mean": sum_stats.get("mean"),
+            "sample_sum": sum(sample_reds),
+        },
+    }
 
 
 def build_ssq_recommendations(
@@ -398,16 +672,26 @@ def build_ssq_recommendations(
     *,
     seed: int = 0,
     exclude: set[tuple[int, ...]] | None = None,
+    include_dantuo: bool = True,
 ) -> list[dict]:
     red_map = analysis["red_score_map"]
     blue_map = analysis["blue_score_map"]
-    picks = _pick_ssq_sets(analysis, count=5, seed=seed, exclude=exclude)
+    sum_stats = analysis.get("sum_stats") or {}
+    blue_zone = analysis.get("blue_zone") or {}
+    singles = _pick_ssq_sets(analysis, count=4 if include_dantuo else 5, seed=seed, exclude=exclude)
     recs = []
-    for i, (reds, blue) in enumerate(picks):
+    for i, (reds, blue) in enumerate(singles):
         conf = (sum(red_map[n] for n in reds) / 6 + blue_map[blue]) / 2
-        reason = "红球/蓝球历史频率 + 遗漏 + 近窗趋势；按最新期号在热号池内轮换"
+        red_sum = sum(reds)
+        reason = (
+            f"红球频率/遗漏/趋势 + 和值约束（本注 {red_sum}，"
+            f"目标 {sum_stats.get('target_lo')}–{sum_stats.get('target_hi')}，"
+            f"均值约 {sum_stats.get('mean')}）；"
+            f"蓝球倾向 01–{_BLUE_LOW_MAX:02d}"
+            f"（历史约 {float(blue_zone.get('low_rate') or 0):.0%}）"
+        )
         if i == 3:
-            reason = "冷号回补：遗漏偏大的红蓝球作均衡参考"
+            reason = "冷号回补 + 和值拟合；蓝球仍优先低区 " + reason
         recs.append({
             "id": f"pick-{i + 1}",
             "mode": "ssq",
@@ -416,11 +700,14 @@ def build_ssq_recommendations(
             "digits": reds + [blue],
             "red": reds,
             "blue": blue,
+            "red_sum": red_sum,
             "display": " ".join(_fmt_ball(x) for x in reds) + " + " + _fmt_ball(blue),
             "confidence": round(conf, 4),
             "reason": reason,
             "bets": 1,
         })
+    if include_dantuo:
+        recs.append(build_ssq_dantuo(analysis, seed=seed))
     return recs
 
 
@@ -458,17 +745,21 @@ async def ai_refine_ssq(analysis: dict[str, Any], draws: list[dict], base_recs: 
         return []
 
     recent = [{"issue": d["issue"], "result": d["result"]} for d in draws[:12]]
-    seed = [{"display": r["display"], "confidence": r["confidence"]} for r in base_recs[:5]]
+    seed = [{"display": r["display"], "confidence": r["confidence"]} for r in base_recs[:5] if r.get("mode") != "dantuo"]
+    sum_stats = analysis.get("sum_stats") or {}
+    blue_zone = analysis.get("blue_zone") or {}
     prompt = (
-        "你是福利彩票双色球选号分析助手。根据历史频率与遗漏给出购彩参考号，不要声称必中。严格输出 JSON。\n"
-        "规则: 红球 6 个不重复整数 1-33，蓝球 1 个整数 1-16。\n"
+        "你是福利彩票双色球选号分析助手。根据历史频率、红球和值分布与蓝球区间给出购彩参考号，不要声称必中。严格输出 JSON。\n"
+        "规则: 红球 6 个不重复整数 1-33，蓝球 1 个整数 1-16；"
+        f"红球和值尽量落在 {sum_stats.get('target_lo')}–{sum_stats.get('target_hi')}（历史均值约 {sum_stats.get('mean')}）；"
+        f"蓝球优先 01–{_BLUE_LOW_MAX:02d}（近窗约 {float(blue_zone.get('low_rate') or 0):.0%} 落在此区间）。\n"
         f"样本期数: {analysis['sample_size']}\n"
         f"热红: {analysis['hot_digits']}, 冷红: {analysis['cold_digits']}\n"
         f"热蓝: {analysis['hot_blue']}, 冷蓝: {analysis['cold_blue']}\n"
         f"频率候选: {json.dumps(seed, ensure_ascii=False)}\n"
         f"近12期: {json.dumps(recent, ensure_ascii=False)}\n"
         '返回: {"picks":[{"red":[1,2,3,4,5,6],"blue":8,"reason":"一句话","confidence":0.7}],"summary":"..."}\n'
-        "要求: picks 恰好 2 注；尽量与候选不完全重复。"
+        "要求: picks 恰好 2 注；尽量与候选不完全重复；蓝球尽量选 1–10。"
     )
 
     model_results = await gather_digital_llm_json(prompt)
@@ -562,24 +853,33 @@ async def get_ssq_recommendations(
         exclude.add(tuple(int(x) for x in draws[0]["digits"][:7]))
 
     analysis = analyze_ssq(draws)
-    freq_recs = build_ssq_recommendations(analysis, seed=seed, exclude=exclude)
+    freq_recs = build_ssq_recommendations(analysis, seed=seed, exclude=exclude, include_dantuo=True)
     ai_picks: list[dict] = []
     configured = configured_digital_models()
     if use_ai and configured:
         ai_picks = await ai_refine_ssq(analysis, draws, freq_recs)
 
-    # merge to 5
+    dantuo_rec = next((r for r in freq_recs if r.get("mode") == "dantuo"), None)
+    singles = [r for r in freq_recs if r.get("mode") != "dantuo"]
+
+    # AI 精选只并入单式，最后固定附带胆拖参考
     merged: list[dict] = []
     seen: set[tuple] = set()
-    for rec in list(ai_picks) + list(freq_recs):
+    for rec in list(ai_picks) + singles:
         key = tuple(rec.get("digits") or [])
         if not key or key in seen:
             continue
         seen.add(key)
         merged.append(rec)
-        if len(merged) >= 5:
+        if len(merged) >= 4:
             break
+    if dantuo_rec:
+        merged.append(dantuo_rec)
     for i, rec in enumerate(merged):
+        if rec.get("mode") == "dantuo":
+            rec["id"] = "pick-dantuo"
+            rec["label"] = "胆拖参考"
+            continue
         rec["id"] = f"pick-{i + 1}"
         if rec.get("source") == "ai":
             model_label = rec.get("model_label") or "AI"
@@ -593,6 +893,8 @@ async def get_ssq_recommendations(
         for m in (r.get("models") or [])
     })
 
+    sum_stats = analysis.get("sum_stats") or {}
+    blue_zone = analysis.get("blue_zone") or {}
     payload = {
         "reachable": True,
         "message": None,
@@ -611,19 +913,29 @@ async def get_ssq_recommendations(
             "ai_models": model_names,
             "pick_limit": 5,
             "period_seed": True,
+            "sum_constraint": True,
+            "blue_zone_prefer": f"01-{_BLUE_LOW_MAX:02d}",
+            "dantuo": True,
             "desc": (
-                f"基于第 {latest_issue} 期后统计；红/蓝字母表全量评分（含未出现冷号），"
-                "按期号在热号池内轮换生成 5 注"
-                + (f"（换号批次 {rotate}）" if rotate else "")
+                f"基于第 {latest_issue} 期后统计；红球参考历史和值"
+                f"（约 {sum_stats.get('target_lo')}–{sum_stats.get('target_hi')}，"
+                f"均值 {sum_stats.get('mean')}）；"
+                f"蓝球倾向 01–{_BLUE_LOW_MAX:02d}"
+                f"（近窗约 {float(blue_zone.get('low_rate') or 0):.0%}）；"
+                "并给出胆拖参考"
+                + (f"；换号批次 {rotate}" if rotate else "")
                 + (
-                    f"，并由 {'+'.join(model_names)} 多模型精选前几注。"
+                    f"；并由 {'+'.join(model_names)} 精选部分单式。"
                     if ai_picks and model_names
-                    else ("，并由 AI 精选前几注。" if ai_picks else "。可点「换一批」换号。")
+                    else ("；并由 AI 精选部分单式。" if ai_picks else "。可点「换一批」换号。")
                 )
             ),
         },
-        "disclaimer": "历史频率与 AI 建议均不代表下期必然开出，请勿作为必中依据。双色球为福利彩票玩法。",
+        "disclaimer": "历史频率、和值区间与 AI 建议均不代表下期必然开出，请勿作为必中依据。双色球为福利彩票玩法。",
         "recommendations": merged,
+        "dantuo": dantuo_rec,
+        "sum_stats": sum_stats,
+        "blue_zone": blue_zone,
         "position_stats": analysis["position_stats"],
         "overall": analysis["overall"],
         "hot_digits": analysis["hot_digits"],
@@ -637,6 +949,11 @@ async def get_ssq_recommendations(
         "cached": False,
     }
     from service.digital_rec_store import save_primary_prediction
-    save_primary_prediction("ssq", latest_issue or None, merged, rotate=rotate)
+    save_primary_prediction(
+        "ssq",
+        latest_issue or None,
+        [r for r in merged if r.get("mode") != "dantuo"] or merged,
+        rotate=rotate,
+    )
     rec_cache_set(cache_key, payload)
     return payload

@@ -153,7 +153,37 @@
               <span class="rec-conf">{{ Math.round((rec.confidence || 0) * 100) }}%</span>
             </div>
             <div
-              v-if="activeGame === 'ssq'"
+              v-if="activeGame === 'ssq' && rec.mode === 'dantuo'"
+              class="rec-nums rec-nums--dantuo"
+            >
+              <div class="dantuo-row">
+                <span class="dantuo-label">{{ t('pailie.danCode') }}</span>
+                <span
+                  v-for="(d, di) in (rec.dan || [])"
+                  :key="'dan' + di"
+                  class="rec-ball rec-ball--red"
+                >{{ formatBall(d) }}</span>
+              </div>
+              <div class="dantuo-row">
+                <span class="dantuo-label">{{ t('pailie.tuoCode') }}</span>
+                <span
+                  v-for="(d, di) in (rec.tuo || [])"
+                  :key="'tuo' + di"
+                  class="rec-ball rec-ball--red rec-ball--tuo"
+                >{{ formatBall(d) }}</span>
+              </div>
+              <div class="dantuo-row">
+                <span class="dantuo-label">{{ t('pailie.ssqBlue') }}</span>
+                <span
+                  v-for="(d, di) in (rec.blue_pool || [rec.blue])"
+                  :key="'bb' + di"
+                  class="rec-ball rec-ball--blue"
+                >{{ formatBall(d) }}</span>
+                <span v-if="rec.bets" class="dantuo-bets">{{ t('pailie.betCount', { n: rec.bets }) }}</span>
+              </div>
+            </div>
+            <div
+              v-else-if="activeGame === 'ssq'"
               class="rec-nums rec-nums--ssq"
             >
               <div class="rec-nums-row">
@@ -167,6 +197,7 @@
                 <span class="rec-ball rec-ball--red">{{ formatBall(recDigits(rec)[5]) }}</span>
                 <span class="rec-plus">+</span>
                 <span class="rec-ball rec-ball--blue">{{ formatBall(recDigits(rec)[6]) }}</span>
+                <span v-if="rec.red_sum" class="rec-sum">{{ t('pailie.redSum', { n: rec.red_sum }) }}</span>
               </div>
             </div>
             <div
@@ -778,6 +809,17 @@ function displayFromSelection() {
 }
 
 function applyRecommend(rec) {
+  if (!rec) return
+  if (rec.mode === 'dantuo' || (activeGame.value === 'ssq' && rec.dan?.length)) {
+    const dan = (rec.dan || []).map(Number)
+    const tuo = (rec.tuo || []).map(Number)
+    const need = Math.max(0, 6 - dan.length)
+    const reds = [...dan, ...tuo.slice(0, need)].slice(0, 6).sort((a, b) => a - b)
+    ssqRed.value = reds
+    ssqBlue.value = Number(rec.blue ?? rec.blue_pool?.[0])
+    ElMessage.success(t('pailie.appliedDantuo'))
+    return
+  }
   if (!rec?.digits?.length) return
   if (activeGame.value === 'ssq' || rec.mode === 'ssq') {
     const digits = rec.digits
@@ -893,6 +935,7 @@ function removeTicket(idx) {
 
 function ticketModeLabel(tk) {
   if (tk.mode === 'ssq' || tk.game === 'ssq') return t('pailie.modeSsq')
+  if (tk.mode === 'dantuo') return t('pailie.modeDantuo')
   if (tk.mode === 'dlt' || tk.game === 'dlt') return t('pailie.modeDlt')
   if (tk.mode === 'group3') return t('pailie.modeGroup3')
   if (tk.mode === 'group6') return t('pailie.modeGroup6')
@@ -1326,6 +1369,34 @@ onUnmounted(() => {
 .rec-ball--blue {
   background: linear-gradient(145deg, #42a5f5, #1565c0);
 }
+.rec-ball--tuo {
+  opacity: 0.85;
+  outline: 1px dashed rgba(255, 255, 255, 0.35);
+}
+.rec-sum,
+.dantuo-bets {
+  margin-left: 6px;
+  font-size: 12px;
+  color: #909399;
+  font-weight: 600;
+}
+.rec-nums--dantuo {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.dantuo-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+}
+.dantuo-label {
+  min-width: 28px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #606266;
+}
 .rec-reason {
   margin: 0;
   font-size: 12px;
@@ -1334,6 +1405,14 @@ onUnmounted(() => {
   height: 2.9em;
   overflow: hidden;
   display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+.rec-card:has(.rec-nums--dantuo) .rec-reason {
+  height: auto;
+  max-height: 5.8em;
+  -webkit-line-clamp: 4;
+}
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
 }
