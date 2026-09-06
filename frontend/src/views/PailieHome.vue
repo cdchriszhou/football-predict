@@ -1413,9 +1413,6 @@ onUnmounted(() => {
   max-height: 5.8em;
   -webkit-line-clamp: 4;
 }
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-}
 .rec-actions {
   display: grid;
   grid-template-columns: 1fr 1fr;
