@@ -7,6 +7,7 @@ from service.ssq_service import (
     _validate_ssq_ai,
     analyze_ssq,
     build_ssq_dantuo,
+    build_ssq_fushi,
     build_ssq_recommendations,
 )
 
@@ -75,8 +76,10 @@ def test_analyze_and_build_ssq_recs():
     recs = build_ssq_recommendations(analysis)
     assert len(recs) == 5
     singles = [r for r in recs if r["mode"] == "ssq"]
+    fushi = [r for r in recs if r["mode"] == "fushi"]
     dantuo = [r for r in recs if r["mode"] == "dantuo"]
-    assert len(singles) == 4
+    assert len(singles) == 3
+    assert len(fushi) == 1
     assert len(dantuo) == 1
     for r in singles:
         assert len(r["digits"]) == 7
@@ -88,19 +91,33 @@ def test_analyze_and_build_ssq_recs():
         hi = analysis["sum_stats"]["target_hi"]
         assert lo - 12 <= r["red_sum"] <= hi + 12
     # Most singles should prefer blue 01-10
-    assert sum(1 for r in singles if r["blue"] <= _BLUE_LOW_MAX) >= 3
+    assert sum(1 for r in singles if r["blue"] <= _BLUE_LOW_MAX) >= 2
 
 
 def test_build_ssq_dantuo():
     analysis = analyze_ssq(_make_draws())
     dt = build_ssq_dantuo(analysis, seed=1)
     assert dt["mode"] == "dantuo"
-    assert len(dt["dan"]) == 3
-    assert len(dt["tuo"]) == 6
+    assert len(dt["dan"]) == 2
+    assert len(dt["tuo"]) == 5
     assert not set(dt["dan"]) & set(dt["tuo"])
     assert dt["blue"] <= _BLUE_LOW_MAX
-    assert all(1 <= b <= _BLUE_LOW_MAX for b in dt["blue_pool"])
-    assert dt["bets"] == 20 * len(dt["blue_pool"])
+    assert dt["blue_pool"] == [dt["blue"]]
+    assert dt["bets"] == 5  # C(5,4)
+    assert dt["amount"] == 10
+
+
+def test_build_ssq_fushi():
+    analysis = analyze_ssq(_make_draws())
+    fs = build_ssq_fushi(analysis, seed=2)
+    assert fs["mode"] == "fushi"
+    assert len(fs["red"]) == 7
+    assert len(set(fs["red"])) == 7
+    assert all(1 <= n <= 33 for n in fs["red"])
+    assert 1 <= fs["blue"] <= 16
+    assert fs["bets"] == 7
+    assert fs["amount"] == 14
+    assert fs["blue"] <= _BLUE_LOW_MAX
 
 
 def test_fit_reds_to_sum_pulls_into_band():

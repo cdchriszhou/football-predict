@@ -22,7 +22,7 @@ SSQ_GAME = {
     "blue_max": 16,
     "price_per_bet": 2,
     "draw_cycle": "tue_thu_sun",
-    "note": "红球从 01–33 中选 6 个（不重复），蓝球从 01–16 中选 1 个；每周二、四、日开奖。推荐参考历史红球和值与蓝球 01–10 集中区间，并提供胆拖参考。",
+    "note": "红球从 01–33 中选 6 个（不重复），蓝球从 01–16 中选 1 个；每周二、四、日开奖。推荐参考历史红球和值与蓝球 01–10，并提供最低金额复式（7红+1蓝）与 2 胆胆拖参考。",
     "play_types": [
         {
             "id": "single",
@@ -36,7 +36,14 @@ SSQ_GAME = {
             "name": "胆拖投注",
             "prize": None,
             "prize_label": "按单式拆注计奖",
-            "desc": "红球设胆码（必出）与拖码（选满 6 个），蓝球可选 1 个或多个；注数=C(拖码数, 6−胆码数)×蓝球数。",
+            "desc": "红球固定 2 个胆码（必出）+ 拖码选满 6 个；注数=C(拖码数, 4)×蓝球数。",
+        },
+        {
+            "id": "fushi",
+            "name": "复式投注",
+            "prize": None,
+            "prize_label": "按单式拆注计奖",
+            "desc": "红球选 7 个、蓝球 1 个为最低红球复式：C(7,6)×1=7 注，金额 14 元。",
         },
     ],
 }
@@ -566,7 +573,7 @@ def build_ssq_dantuo(
     *,
     seed: int = 0,
 ) -> dict[str, Any]:
-    """生成胆拖参考：3 胆 + 6 拖 + 蓝球（蓝优先 01–10）。注数 C(6,3)=20。"""
+    """生成胆拖参考：固定 2 胆 + 5 拖 + 1 蓝（蓝优先 01–10）。注数 C(5,4)=5，金额 10 元。"""
     from math import comb
     from service.digital_pick import rotate_ranked
 
@@ -579,49 +586,43 @@ def build_ssq_dantuo(
     )
     cold = rotate_ranked(list(analysis["cold_digits"]), seed, top_k=6, salt=47)
 
-    dan = sorted(red_ranked[:3])
-    tuo_pool = [n for n in red_ranked[3:] + cold if n not in dan]
+    dan = sorted(red_ranked[:2])
+    tuo_pool = [n for n in red_ranked[2:] + cold if n not in dan]
     tuo: list[int] = []
     for n in tuo_pool:
         if n not in tuo:
             tuo.append(n)
-        if len(tuo) >= 6:
+        if len(tuo) >= 5:
             break
-    while len(tuo) < 6:
+    while len(tuo) < 5:
         for n in range(1, 34):
             if n not in dan and n not in tuo:
                 tuo.append(n)
-            if len(tuo) >= 6:
+            if len(tuo) >= 5:
                 break
 
-    # 胆+拖整体和值倾向：用胆+拖中位数附近的 6 码做校验提示
+    # 用「胆 + 拖中 4 个」做和值拟合，再回写拖码（胆码锁定）
+    need = 6 - len(dan)  # 4
     sample6 = _fit_reds_to_sum(
-        dan + tuo[:3],
+        dan + tuo[:need],
         dan + tuo,
         lo=int(sum_stats.get("target_lo") or 80),
         hi=int(sum_stats.get("target_hi") or 124),
         target=float(sum_stats.get("mean") or 102),
     )
-    # 若拟合动了胆码外的号，同步回拖码（胆码锁定）
     tuo = sorted((set(sample6) | set(tuo)) - set(dan))
-    while len(tuo) < 6:
+    while len(tuo) < 5:
         for n in red_ranked + list(range(1, 34)):
             if n not in dan and n not in tuo:
                 tuo.append(n)
-            if len(tuo) >= 6:
+            if len(tuo) >= 5:
                 break
-    tuo = sorted(tuo)[:6]
+    tuo = sorted(tuo)[:5]
 
     blue = _pick_blue_prefer_low(blue_ranked, seed=seed, salt=49)
-    # 蓝拖：再给一个低区备选，方便复式
-    blue_alt = _pick_blue_prefer_low(
-        [b for b in blue_ranked if b != blue] or blue_ranked,
-        seed=seed,
-        salt=51,
-    )
-    blue_pool = sorted({blue, blue_alt})
-    need = 6 - len(dan)
+    blue_pool = [blue]
     bets = comb(len(tuo), need) * len(blue_pool) if 0 < need <= len(tuo) else 0
+    amount = bets * int(SSQ_GAME.get("price_per_bet") or 2)
 
     conf = (
         sum(analysis["red_score_map"].get(n, 0.5) for n in dan) / max(1, len(dan))
@@ -632,9 +633,8 @@ def build_ssq_dantuo(
     display = (
         "胆 " + " ".join(_fmt_ball(x) for x in dan)
         + " | 拖 " + " ".join(_fmt_ball(x) for x in tuo)
-        + " | 蓝 " + " ".join(_fmt_ball(x) for x in blue_pool)
+        + " | 蓝 " + _fmt_ball(blue)
     )
-    # digits：用胆 + 拖前 need 个 + 主蓝，便于落库/历史对照
     sample_reds = sorted(dan + tuo[:need])
     return {
         "id": "pick-dantuo",
@@ -650,13 +650,13 @@ def build_ssq_dantuo(
         "display": display,
         "confidence": round(conf, 4),
         "bets": bets,
+        "amount": amount,
         "reason": (
-            f"3 胆 + 6 拖参考胆拖玩法；红球组合和值倾向 "
-            f"{sum_stats.get('target_lo')}–{sum_stats.get('target_hi')} "
-            f"（历史均值约 {sum_stats.get('mean')}）；"
-            f"蓝球优先 01–{_BLUE_LOW_MAX:02d}（近窗约 "
-            f"{(analysis.get('blue_zone') or {}).get('low_rate', 0):.0%} 落在此区间）。"
-            f"注数约 {bets}（C({len(tuo)},{need})×{len(blue_pool)}）。"
+            f"固定 2 胆 + 5 拖；从拖码选 {need} 个凑满 6 红，"
+            f"注数 {bets}（C({len(tuo)},{need})），金额 {amount} 元；"
+            f"和值倾向 {sum_stats.get('target_lo')}–{sum_stats.get('target_hi')} "
+            f"（均值约 {sum_stats.get('mean')}）；"
+            f"蓝球优先 01–{_BLUE_LOW_MAX:02d}。"
         ),
         "sum_hint": {
             "target_lo": sum_stats.get("target_lo"),
@@ -667,18 +667,117 @@ def build_ssq_dantuo(
     }
 
 
+def build_ssq_fushi(
+    analysis: dict[str, Any],
+    *,
+    seed: int = 0,
+    exclude: set[tuple[int, ...]] | None = None,
+) -> dict[str, Any]:
+    """最低红球复式：7 红 + 1 蓝 = C(7,6)×1 = 7 注 = 14 元。"""
+    from math import comb
+    from service.digital_pick import rotate_ranked
+
+    exclude = exclude or set()
+    sum_stats = analysis.get("sum_stats") or _compute_sum_stats([])
+    blue_zone = analysis.get("blue_zone") or {}
+    red_ranked = rotate_ranked(
+        [r["digit"] for r in analysis["red_stats"]], seed, top_k=12, salt=61,
+    )
+    blue_ranked = rotate_ranked(
+        [b["digit"] for b in analysis["blue_stats"]], seed, top_k=6, salt=67,
+    )
+    cold = rotate_ranked(list(analysis["cold_digits"]), seed, top_k=4, salt=71)
+
+    # 先取 6 码做和值拟合，再补第 7 红
+    base6 = _fit_reds_to_sum(
+        red_ranked[:6],
+        red_ranked + cold,
+        lo=int(sum_stats.get("target_lo") or 80),
+        hi=int(sum_stats.get("target_hi") or 124),
+        target=float(sum_stats.get("mean") or 102),
+    )
+    seventh = next(
+        (n for n in red_ranked + cold + list(range(1, 34)) if n not in base6),
+        None,
+    )
+    reds7 = sorted(set(base6) | ({seventh} if seventh else set()))
+    while len(reds7) < 7:
+        for n in range(1, 34):
+            if n not in reds7:
+                reds7.append(n)
+            if len(reds7) >= 7:
+                break
+    reds7 = sorted(reds7)[:7]
+
+    blue = _pick_blue_prefer_low(blue_ranked, seed=seed, salt=73)
+    # 避免与最新开奖整注完全相同
+    key = tuple(reds7 + [blue])
+    if key in exclude:
+        alt_blue = _pick_blue_prefer_low(
+            [b for b in blue_ranked if b != blue] or blue_ranked,
+            seed=seed,
+            salt=79,
+        )
+        blue = alt_blue
+
+    bets = comb(len(reds7), 6)  # 7
+    amount = bets * int(SSQ_GAME.get("price_per_bet") or 2)
+    conf = (
+        sum(analysis["red_score_map"].get(n, 0.5) for n in reds7) / len(reds7)
+        + analysis["blue_score_map"].get(blue, 0.5)
+    ) / 2
+    # 样例单式：和值最接近目标的一注
+    target = float(sum_stats.get("mean") or 102)
+    sample_reds = sorted(reds7[:6])
+    best_diff = abs(sum(sample_reds) - target)
+    from itertools import combinations
+    for combo in combinations(reds7, 6):
+        diff = abs(sum(combo) - target)
+        if diff < best_diff:
+            best_diff = diff
+            sample_reds = sorted(combo)
+
+    return {
+        "id": "pick-fushi",
+        "mode": "fushi",
+        "source": "frequency",
+        "label": "复式参考",
+        "red": reds7,
+        "blue": blue,
+        "blue_pool": [blue],
+        "digits": sample_reds + [blue],
+        "display": (
+            "复式红 " + " ".join(_fmt_ball(x) for x in reds7)
+            + " + 蓝 " + _fmt_ball(blue)
+        ),
+        "confidence": round(conf, 4),
+        "bets": bets,
+        "amount": amount,
+        "red_sum": sum(sample_reds),
+        "reason": (
+            f"最低红球复式：7 红 + 1 蓝，注数 {bets}（C(7,6)），金额 {amount} 元；"
+            f"红球和值参考 {sum_stats.get('target_lo')}–{sum_stats.get('target_hi')} "
+            f"（样例单式和值 {sum(sample_reds)}）；"
+            f"蓝球优先 01–{_BLUE_LOW_MAX:02d}"
+            f"（近窗约 {float(blue_zone.get('low_rate') or 0):.0%}）。"
+        ),
+    }
+
+
 def build_ssq_recommendations(
     analysis: dict[str, Any],
     *,
     seed: int = 0,
     exclude: set[tuple[int, ...]] | None = None,
     include_dantuo: bool = True,
+    include_fushi: bool = True,
 ) -> list[dict]:
     red_map = analysis["red_score_map"]
     blue_map = analysis["blue_score_map"]
     sum_stats = analysis.get("sum_stats") or {}
     blue_zone = analysis.get("blue_zone") or {}
-    singles = _pick_ssq_sets(analysis, count=4 if include_dantuo else 5, seed=seed, exclude=exclude)
+    single_n = 5 - int(include_dantuo) - int(include_fushi)
+    singles = _pick_ssq_sets(analysis, count=max(1, single_n), seed=seed, exclude=exclude)
     recs = []
     for i, (reds, blue) in enumerate(singles):
         conf = (sum(red_map[n] for n in reds) / 6 + blue_map[blue]) / 2
@@ -690,7 +789,7 @@ def build_ssq_recommendations(
             f"蓝球倾向 01–{_BLUE_LOW_MAX:02d}"
             f"（历史约 {float(blue_zone.get('low_rate') or 0):.0%}）"
         )
-        if i == 3:
+        if i == single_n - 1 and single_n >= 3:
             reason = "冷号回补 + 和值拟合；蓝球仍优先低区 " + reason
         recs.append({
             "id": f"pick-{i + 1}",
@@ -705,7 +804,10 @@ def build_ssq_recommendations(
             "confidence": round(conf, 4),
             "reason": reason,
             "bets": 1,
+            "amount": 2,
         })
+    if include_fushi:
+        recs.append(build_ssq_fushi(analysis, seed=seed, exclude=exclude))
     if include_dantuo:
         recs.append(build_ssq_dantuo(analysis, seed=seed))
     return recs
@@ -745,7 +847,11 @@ async def ai_refine_ssq(analysis: dict[str, Any], draws: list[dict], base_recs: 
         return []
 
     recent = [{"issue": d["issue"], "result": d["result"]} for d in draws[:12]]
-    seed = [{"display": r["display"], "confidence": r["confidence"]} for r in base_recs[:5] if r.get("mode") != "dantuo"]
+    seed = [
+        {"display": r["display"], "confidence": r["confidence"]}
+        for r in base_recs
+        if r.get("mode") not in ("dantuo", "fushi")
+    ][:5]
     sum_stats = analysis.get("sum_stats") or {}
     blue_zone = analysis.get("blue_zone") or {}
     prompt = (
@@ -853,16 +959,19 @@ async def get_ssq_recommendations(
         exclude.add(tuple(int(x) for x in draws[0]["digits"][:7]))
 
     analysis = analyze_ssq(draws)
-    freq_recs = build_ssq_recommendations(analysis, seed=seed, exclude=exclude, include_dantuo=True)
+    freq_recs = build_ssq_recommendations(
+        analysis, seed=seed, exclude=exclude, include_dantuo=True, include_fushi=True,
+    )
     ai_picks: list[dict] = []
     configured = configured_digital_models()
     if use_ai and configured:
         ai_picks = await ai_refine_ssq(analysis, draws, freq_recs)
 
+    fushi_rec = next((r for r in freq_recs if r.get("mode") == "fushi"), None)
     dantuo_rec = next((r for r in freq_recs if r.get("mode") == "dantuo"), None)
-    singles = [r for r in freq_recs if r.get("mode") != "dantuo"]
+    singles = [r for r in freq_recs if r.get("mode") not in ("dantuo", "fushi")]
 
-    # AI 精选只并入单式，最后固定附带胆拖参考
+    # AI 精选只并入单式，最后固定附带复式与胆拖参考
     merged: list[dict] = []
     seen: set[tuple] = set()
     for rec in list(ai_picks) + singles:
@@ -871,11 +980,17 @@ async def get_ssq_recommendations(
             continue
         seen.add(key)
         merged.append(rec)
-        if len(merged) >= 4:
+        if len(merged) >= 3:
             break
+    if fushi_rec:
+        merged.append(fushi_rec)
     if dantuo_rec:
         merged.append(dantuo_rec)
     for i, rec in enumerate(merged):
+        if rec.get("mode") == "fushi":
+            rec["id"] = "pick-fushi"
+            rec["label"] = "复式参考"
+            continue
         if rec.get("mode") == "dantuo":
             rec["id"] = "pick-dantuo"
             rec["label"] = "胆拖参考"
@@ -916,13 +1031,14 @@ async def get_ssq_recommendations(
             "sum_constraint": True,
             "blue_zone_prefer": f"01-{_BLUE_LOW_MAX:02d}",
             "dantuo": True,
+            "fushi": True,
             "desc": (
                 f"基于第 {latest_issue} 期后统计；红球参考历史和值"
                 f"（约 {sum_stats.get('target_lo')}–{sum_stats.get('target_hi')}，"
                 f"均值 {sum_stats.get('mean')}）；"
                 f"蓝球倾向 01–{_BLUE_LOW_MAX:02d}"
                 f"（近窗约 {float(blue_zone.get('low_rate') or 0):.0%}）；"
-                "并给出胆拖参考"
+                "并给出最低金额复式（7红+1蓝）与 2 胆胆拖参考"
                 + (f"；换号批次 {rotate}" if rotate else "")
                 + (
                     f"；并由 {'+'.join(model_names)} 精选部分单式。"
@@ -933,6 +1049,7 @@ async def get_ssq_recommendations(
         },
         "disclaimer": "历史频率、和值区间与 AI 建议均不代表下期必然开出，请勿作为必中依据。双色球为福利彩票玩法。",
         "recommendations": merged,
+        "fushi": fushi_rec,
         "dantuo": dantuo_rec,
         "sum_stats": sum_stats,
         "blue_zone": blue_zone,
@@ -952,7 +1069,7 @@ async def get_ssq_recommendations(
     save_primary_prediction(
         "ssq",
         latest_issue or None,
-        [r for r in merged if r.get("mode") != "dantuo"] or merged,
+        [r for r in merged if r.get("mode") not in ("dantuo", "fushi")] or merged,
         rotate=rotate,
     )
     rec_cache_set(cache_key, payload)

@@ -180,6 +180,26 @@
                   class="rec-ball rec-ball--blue"
                 >{{ formatBall(d) }}</span>
                 <span v-if="rec.bets" class="dantuo-bets">{{ t('pailie.betCount', { n: rec.bets }) }}</span>
+                <span v-if="rec.amount" class="dantuo-bets">{{ t('pailie.amountYuan', { n: rec.amount }) }}</span>
+              </div>
+            </div>
+            <div
+              v-else-if="activeGame === 'ssq' && rec.mode === 'fushi'"
+              class="rec-nums rec-nums--dantuo"
+            >
+              <div class="dantuo-row">
+                <span class="dantuo-label">{{ t('pailie.fushiRed') }}</span>
+                <span
+                  v-for="(d, di) in (rec.red || [])"
+                  :key="'fr' + di"
+                  class="rec-ball rec-ball--red"
+                >{{ formatBall(d) }}</span>
+              </div>
+              <div class="dantuo-row">
+                <span class="dantuo-label">{{ t('pailie.ssqBlue') }}</span>
+                <span class="rec-ball rec-ball--blue">{{ formatBall(rec.blue) }}</span>
+                <span v-if="rec.bets" class="dantuo-bets">{{ t('pailie.betCount', { n: rec.bets }) }}</span>
+                <span v-if="rec.amount" class="dantuo-bets">{{ t('pailie.amountYuan', { n: rec.amount }) }}</span>
               </div>
             </div>
             <div
@@ -820,6 +840,13 @@ function applyRecommend(rec) {
     ElMessage.success(t('pailie.appliedDantuo'))
     return
   }
+  if (rec.mode === 'fushi' && activeGame.value === 'ssq') {
+    const reds = (rec.digits || rec.red || []).slice(0, 6).map(Number)
+    ssqRed.value = reds.sort((a, b) => a - b)
+    ssqBlue.value = Number(rec.blue)
+    ElMessage.success(t('pailie.appliedFushi'))
+    return
+  }
   if (!rec?.digits?.length) return
   if (activeGame.value === 'ssq' || rec.mode === 'ssq') {
     const digits = rec.digits
@@ -936,6 +963,7 @@ function removeTicket(idx) {
 function ticketModeLabel(tk) {
   if (tk.mode === 'ssq' || tk.game === 'ssq') return t('pailie.modeSsq')
   if (tk.mode === 'dantuo') return t('pailie.modeDantuo')
+  if (tk.mode === 'fushi') return t('pailie.modeFushi')
   if (tk.mode === 'dlt' || tk.game === 'dlt') return t('pailie.modeDlt')
   if (tk.mode === 'group3') return t('pailie.modeGroup3')
   if (tk.mode === 'group6') return t('pailie.modeGroup6')
