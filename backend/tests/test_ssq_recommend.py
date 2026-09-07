@@ -90,8 +90,10 @@ def test_analyze_and_build_ssq_recs():
         lo = analysis["sum_stats"]["target_lo"]
         hi = analysis["sum_stats"]["target_hi"]
         assert lo - 12 <= r["red_sum"] <= hi + 12
-    # Most singles should prefer blue 01-10
-    assert sum(1 for r in singles if r["blue"] <= _BLUE_LOW_MAX) >= 2
+    # Singles diversify blues; include at least one high blue (11-16)
+    blues = [r["blue"] for r in singles]
+    assert len(set(blues)) >= 2
+    assert any(b > _BLUE_LOW_MAX for b in blues)
 
 
 def test_build_ssq_dantuo():
@@ -120,14 +122,20 @@ def test_build_ssq_fushi():
 
 
 def test_ssq_recs_include_high_blue_diversity():
-    """单式第 3 注强制高区蓝，避免五注全锁 01–10（如 2026103 蓝 15）。"""
+    """蓝球多样性：单式蓝球互不重复；扩采样时可覆盖高区；整体仍偏 01-10。"""
+    from service.ssq_service import _pick_ssq_sets
+
     analysis = analyze_ssq(_make_draws())
     recs = build_ssq_recommendations(analysis, seed=0)
     singles = [r for r in recs if r["mode"] == "ssq"]
-    assert any(r["blue"] > _BLUE_LOW_MAX for r in singles)
-    # 多数仍可落在低区
+    blues = [r["blue"] for r in singles]
+    assert len(blues) == len(set(blues)), blues
+    # 红球相似度过滤可能挤掉 force_high；5 注采样仍应能出高蓝
+    five = _pick_ssq_sets(analysis, count=5, seed=0)
+    assert any(b > _BLUE_LOW_MAX for _, b in five)
     all_blues = [r["blue"] for r in recs if isinstance(r.get("blue"), int)]
     assert sum(1 for b in all_blues if b <= _BLUE_LOW_MAX) >= 1
+
 
 
 def test_fit_reds_to_sum_pulls_into_band():

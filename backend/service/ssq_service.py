@@ -501,6 +501,44 @@ def _pick_blue_prefer_low(
     return int(picked) if picked is not None else 1
 
 
+def _jaccard_red(a: list[int], b: list[int]) -> float:
+    sa, sb = set(a), set(b)
+    if not sa and not sb:
+        return 0.0
+    return len(sa & sb) / max(1, len(sa | sb))
+
+
+def _zone_balanced_reds(pool: list[int], *, per_zone: int = 2) -> list[int]:
+    """从候选池尽量按 01–11 / 12–22 / 23–33 各取 per_zone 个。"""
+    buckets = [
+        [n for n in pool if 1 <= n <= 11],
+        [n for n in pool if 12 <= n <= 22],
+        [n for n in pool if 23 <= n <= 33],
+    ]
+    out: list[int] = []
+    for bucket in buckets:
+        taken = 0
+        for n in bucket:
+            if n in out:
+                continue
+            out.append(n)
+            taken += 1
+            if taken >= per_zone:
+                break
+    for n in pool:
+        if n not in out:
+            out.append(n)
+        if len(out) >= 6:
+            break
+    while len(out) < 6:
+        for n in range(1, 34):
+            if n not in out:
+                out.append(n)
+            if len(out) >= 6:
+                break
+    return sorted(out[:6])
+
+
 def _pick_ssq_sets(
     analysis: dict[str, Any],
     count: int = 5,
@@ -526,6 +564,11 @@ def _pick_ssq_sets(
 
     picks: list[tuple[list[int], int]] = []
     used: set[tuple[int, ...]] = set()
+    used_blues: set[int] = set()
+
+    def pick_blue(**kwargs) -> int:
+        ranked = [b for b in blue_ranked if b not in used_blues] or list(blue_ranked)
+        return _pick_blue_prefer_low(ranked, **kwargs)
 
     def add(reds: list[int], blue: int, *, fit_sum: bool = True) -> None:
         reds = sorted(set(int(x) for x in reds))
@@ -538,6 +581,7 @@ def _pick_ssq_sets(
         if key in used or key in exclude:
             return
         used.add(key)
+        used_blues.add(int(blue))
         picks.append((reds, blue))
 
     # 高区占比：用样本统计；缺省约 28%
@@ -546,12 +590,10 @@ def _pick_ssq_sets(
     high_share = max(0.18, min(0.45, 1.0 - low_rate))
 
     # 1 主推：热红 + 倾向低区蓝，和值拟合
-    add(red_ranked[:6], _pick_blue_prefer_low(
-        blue_ranked, seed=seed, salt=1, high_share=high_share * 0.5,
+    add(red_ranked[:6], pick_blue(seed=seed, salt=1, high_share=high_share * 0.5,
     ))
     # 2 次热红 + 另一蓝（可高区）
-    add(red_ranked[1:7], _pick_blue_prefer_low(
-        blue_ranked, seed=seed, salt=2, allow_high=True, high_share=high_share,
+    add(red_ranked[1:7], pick_blue(seed=seed, salt=2, allow_high=True, high_share=high_share,
     ))
     # 3 热红混冷红 — 固定一注高区蓝，避免最终只取 3 单式时整包锁死 01–10
     mix = sorted(set(red_ranked[:4] + cold_red[:2]))[:6]
@@ -563,13 +605,12 @@ def _pick_ssq_sets(
                 break
     add(
         sorted(mix[:6]),
-        _pick_blue_prefer_low(blue_ranked, seed=seed, salt=3, force_high=True),
+        pick_blue(seed=seed, salt=3, force_high=True),
     )
     # 4 冷号回补
     add(
         sorted(cold_red[:6]),
-        _pick_blue_prefer_low(
-            blue_ranked, seed=seed, salt=4, allow_high=True, high_share=high_share,
+        pick_blue(seed=seed, salt=4, allow_high=True, high_share=high_share,
         ),
         fit_sum=True,
     )
@@ -577,8 +618,7 @@ def _pick_ssq_sets(
     odd = [n for n in red_ranked if n % 2 == 1]
     even = [n for n in red_ranked if n % 2 == 0]
     bal = sorted((odd[:3] + even[:3])[:6])
-    add(bal, _pick_blue_prefer_low(
-        blue_ranked, seed=seed, salt=5, allow_high=True, high_share=high_share,
+    add(bal, pick_blue(seed=seed, salt=5, allow_high=True, high_share=high_share,
     ))
 
     offset = 2
@@ -588,8 +628,7 @@ def _pick_ssq_sets(
             chunk = (red_ranked + cold_red + list(range(1, 34)))[:6]
         add(
             chunk,
-            _pick_blue_prefer_low(
-                blue_ranked,
+            pick_blue(
                 seed=seed,
                 salt=10 + offset,
                 allow_high=True,
@@ -620,12 +659,41 @@ def build_ssq_dantuo(
     )
     cold = rotate_ranked(list(analysis["cold_digits"]), seed, top_k=6, salt=47)
 
-    dan = sorted(red_ranked[:2])
-    tuo_pool = [n for n in red_ranked[2:] + cold if n not in dan]
-    tuo: list[int] = []
-    for n in tuo_pool:
-        if n not in tuo:
-            tuo.append(n)
+    dan_candidates = red_ranked[:8]
+    dan: list[int] = []
+    # 两胆尽量分属不同区间，提高覆盖
+    for n in dan_candidates:
+        if not dan:
+            dan.append(n)
+            continue
+        z0 = 0 if dan[0] <= 11 else (1 if dan[0] <= 22 else 2)
+        zn = 0 if n <= 11 else (1 if n <= 22 else 2)
+        if zn != z0:
+            dan.append(n)
+            break
+    if len(dan) < 2:
+        for n in dan_candidates + cold:
+            if n not in dan:
+                dan.append(n)
+            if len(dan) >= 2:
+                break
+    dan = sorted(dan[:2])
+    tuo_pool = [n for n in _zone_balanced_reds(red_ranked[2:] + cold + red_ranked, per_zone=2) if n not in dan]
+    # zone_balanced returns 6; we need 5 tuo — rebuild
+    tuo_pool = [n for n in red_ranked + cold + list(range(1, 34)) if n not in dan]
+    # 拖码也尽量跨区
+    tuo = []
+    for bucket in (
+        [n for n in tuo_pool if 1 <= n <= 11],
+        [n for n in tuo_pool if 12 <= n <= 22],
+        [n for n in tuo_pool if 23 <= n <= 33],
+        tuo_pool,
+    ):
+        for n in bucket:
+            if n not in tuo and n not in dan:
+                tuo.append(n)
+            if len(tuo) >= 5:
+                break
         if len(tuo) >= 5:
             break
     while len(tuo) < 5:
@@ -715,19 +783,20 @@ def build_ssq_fushi(
     sum_stats = analysis.get("sum_stats") or _compute_sum_stats([])
     blue_zone = analysis.get("blue_zone") or {}
     red_ranked = rotate_ranked(
-        [r["digit"] for r in analysis["red_stats"]], seed, top_k=12, salt=61,
+        [r["digit"] for r in analysis["red_stats"]], seed, top_k=16, salt=61,
     )
     blue_ranked = rotate_ranked(
-        [b["digit"] for b in analysis["blue_stats"]], seed, top_k=6, salt=67,
+        [b["digit"] for b in analysis["blue_stats"]], seed, top_k=8, salt=67,
     )
-    cold = rotate_ranked(list(analysis["cold_digits"]), seed, top_k=4, salt=71)
+    cold = rotate_ranked(list(analysis["cold_digits"]), seed, top_k=6, salt=71)
 
-    # 先取 6 码做和值拟合，再补第 7 红
+    # 7 红：三区尽量覆盖，再和值微调其中一注样例
+    base6 = _zone_balanced_reds(red_ranked + cold, per_zone=2)
     base6 = _fit_reds_to_sum(
-        red_ranked[:6],
+        base6,
         red_ranked + cold,
-        lo=int(sum_stats.get("target_lo") or 80),
-        hi=int(sum_stats.get("target_hi") or 124),
+        lo=int(sum_stats.get("target_lo") or 80) - 8,
+        hi=int(sum_stats.get("target_hi") or 124) + 8,
         target=float(sum_stats.get("mean") or 102),
     )
     seventh = next(
