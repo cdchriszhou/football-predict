@@ -101,8 +101,8 @@ def test_build_ssq_dantuo():
     assert len(dt["dan"]) == 2
     assert len(dt["tuo"]) == 5
     assert not set(dt["dan"]) & set(dt["tuo"])
-    assert dt["blue"] <= _BLUE_LOW_MAX
     assert dt["blue_pool"] == [dt["blue"]]
+    assert 1 <= dt["blue"] <= 16
     assert dt["bets"] == 5  # C(5,4)
     assert dt["amount"] == 10
 
@@ -117,7 +117,17 @@ def test_build_ssq_fushi():
     assert 1 <= fs["blue"] <= 16
     assert fs["bets"] == 7
     assert fs["amount"] == 14
-    assert fs["blue"] <= _BLUE_LOW_MAX
+
+
+def test_ssq_recs_include_high_blue_diversity():
+    """单式第 3 注强制高区蓝，避免五注全锁 01–10（如 2026103 蓝 15）。"""
+    analysis = analyze_ssq(_make_draws())
+    recs = build_ssq_recommendations(analysis, seed=0)
+    singles = [r for r in recs if r["mode"] == "ssq"]
+    assert any(r["blue"] > _BLUE_LOW_MAX for r in singles)
+    # 多数仍可落在低区
+    all_blues = [r["blue"] for r in recs if isinstance(r.get("blue"), int)]
+    assert sum(1 for b in all_blues if b <= _BLUE_LOW_MAX) >= 1
 
 
 def test_fit_reds_to_sum_pulls_into_band():

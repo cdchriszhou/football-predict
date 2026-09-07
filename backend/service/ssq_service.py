@@ -53,9 +53,10 @@ _SSQ_URLS = (
     "https://www.cwl.gov.cn/cwl_admin/kjxx/findDrawNotice",
 )
 
-# 蓝球历史高度集中在 01–10；评分与选号时加权
+# 蓝球历史更常落在 01–10；评分轻加权，选号保留约 1/4 高区多样性
 _BLUE_LOW_MAX = 10
-_BLUE_ZONE_BOOST = 0.28
+_BLUE_ZONE_BOOST = 0.12
+_BLUE_HIGH_SHARE = 0.28  # 约等于历史 11–16 占比，避免五注全锁低区
 # 红球和值：落在历史分位区间内更常见
 _SUM_LO_PCT = 0.15
 _SUM_HI_PCT = 0.85
@@ -476,15 +477,25 @@ def _pick_blue_prefer_low(
     seed: int,
     salt: int,
     allow_high: bool = False,
+    force_high: bool = False,
+    high_share: float | None = None,
 ) -> int:
-    """默认从 01–10 选蓝球；allow_high 时才考虑 11–16。"""
+    """倾向 01–10，但按 high_share / force_high 保留 11–16，避免整包锁死低区。"""
     from service.digital_pick import pick_from_pool
 
     low = [b for b in blue_ranked if 1 <= b <= _BLUE_LOW_MAX]
     high = [b for b in blue_ranked if b > _BLUE_LOW_MAX]
-    if allow_high and high and (seed + salt) % 5 == 0:
-        picked = pick_from_pool(high, seed, salt=salt)
-        return int(picked) if picked is not None else (high[0] if high else 1)
+    if not high:
+        high = list(range(_BLUE_LOW_MAX + 1, 17))
+    share = _BLUE_HIGH_SHARE if high_share is None else max(0.0, min(0.6, float(high_share)))
+    # force_high 必出高区；否则按份额掷骰（约等于历史 11–16 占比）
+    roll = (seed * 31 + salt * 17) % 100
+    use_high = bool(force_high) or (allow_high and roll < int(share * 100)) or (
+        (not allow_high) and roll < int(share * 50)
+    )
+    if use_high and high:
+        picked = pick_from_pool(high, seed, salt=salt + 101)
+        return int(picked) if picked is not None else int(high[0])
     pool = low or blue_ranked or list(range(1, _BLUE_LOW_MAX + 1))
     picked = pick_from_pool(pool, seed, salt=salt)
     return int(picked) if picked is not None else 1
@@ -529,11 +540,20 @@ def _pick_ssq_sets(
         used.add(key)
         picks.append((reds, blue))
 
-    # 1 主推：热红 + 低区热蓝，和值拟合
-    add(red_ranked[:6], _pick_blue_prefer_low(blue_ranked, seed=seed, salt=1))
-    # 2 次热红 + 另一低区蓝
-    add(red_ranked[1:7], _pick_blue_prefer_low(blue_ranked, seed=seed, salt=2))
-    # 3 热红混冷红
+    # 高区占比：用样本统计；缺省约 28%
+    zone = analysis.get("blue_zone") or {}
+    low_rate = float(zone.get("low_rate") or (1.0 - _BLUE_HIGH_SHARE))
+    high_share = max(0.18, min(0.45, 1.0 - low_rate))
+
+    # 1 主推：热红 + 倾向低区蓝，和值拟合
+    add(red_ranked[:6], _pick_blue_prefer_low(
+        blue_ranked, seed=seed, salt=1, high_share=high_share * 0.5,
+    ))
+    # 2 次热红 + 另一蓝（可高区）
+    add(red_ranked[1:7], _pick_blue_prefer_low(
+        blue_ranked, seed=seed, salt=2, allow_high=True, high_share=high_share,
+    ))
+    # 3 热红混冷红 — 固定一注高区蓝，避免最终只取 3 单式时整包锁死 01–10
     mix = sorted(set(red_ranked[:4] + cold_red[:2]))[:6]
     if len(mix) < 6:
         for n in red_ranked:
@@ -541,18 +561,25 @@ def _pick_ssq_sets(
                 mix.append(n)
             if len(mix) >= 6:
                 break
-    add(sorted(mix[:6]), _pick_blue_prefer_low(blue_ranked, seed=seed, salt=3))
-    # 4 冷号回补（蓝球仍优先 01–10）
+    add(
+        sorted(mix[:6]),
+        _pick_blue_prefer_low(blue_ranked, seed=seed, salt=3, force_high=True),
+    )
+    # 4 冷号回补
     add(
         sorted(cold_red[:6]),
-        _pick_blue_prefer_low(blue_ranked, seed=seed, salt=4),
+        _pick_blue_prefer_low(
+            blue_ranked, seed=seed, salt=4, allow_high=True, high_share=high_share,
+        ),
         fit_sum=True,
     )
-    # 5 奇偶均衡；偶发允许高区蓝球作多样性
+    # 5 奇偶均衡
     odd = [n for n in red_ranked if n % 2 == 1]
     even = [n for n in red_ranked if n % 2 == 0]
     bal = sorted((odd[:3] + even[:3])[:6])
-    add(bal, _pick_blue_prefer_low(blue_ranked, seed=seed, salt=5, allow_high=True))
+    add(bal, _pick_blue_prefer_low(
+        blue_ranked, seed=seed, salt=5, allow_high=True, high_share=high_share,
+    ))
 
     offset = 2
     while len(picks) < count and offset < 24:
@@ -561,7 +588,14 @@ def _pick_ssq_sets(
             chunk = (red_ranked + cold_red + list(range(1, 34)))[:6]
         add(
             chunk,
-            _pick_blue_prefer_low(blue_ranked, seed=seed, salt=10 + offset, allow_high=(offset % 4 == 0)),
+            _pick_blue_prefer_low(
+                blue_ranked,
+                seed=seed,
+                salt=10 + offset,
+                allow_high=True,
+                force_high=(offset % 3 == 0),
+                high_share=high_share,
+            ),
         )
         offset += 1
 
@@ -656,7 +690,7 @@ def build_ssq_dantuo(
             f"注数 {bets}（C({len(tuo)},{need})），金额 {amount} 元；"
             f"和值倾向 {sum_stats.get('target_lo')}–{sum_stats.get('target_hi')} "
             f"（均值约 {sum_stats.get('mean')}）；"
-            f"蓝球优先 01–{_BLUE_LOW_MAX:02d}。"
+            f"蓝球倾向 01–{_BLUE_LOW_MAX:02d}，并保留高区。"
         ),
         "sum_hint": {
             "target_lo": sum_stats.get("target_lo"),
@@ -709,7 +743,9 @@ def build_ssq_fushi(
                 break
     reds7 = sorted(reds7)[:7]
 
-    blue = _pick_blue_prefer_low(blue_ranked, seed=seed, salt=73)
+    blue = _pick_blue_prefer_low(
+        blue_ranked, seed=seed, salt=73, allow_high=True, force_high=((seed + 73) % 3 == 0),
+    )
     # 避免与最新开奖整注完全相同
     key = tuple(reds7 + [blue])
     if key in exclude:
@@ -758,7 +794,7 @@ def build_ssq_fushi(
             f"最低红球复式：7 红 + 1 蓝，注数 {bets}（C(7,6)），金额 {amount} 元；"
             f"红球和值参考 {sum_stats.get('target_lo')}–{sum_stats.get('target_hi')} "
             f"（样例单式和值 {sum(sample_reds)}）；"
-            f"蓝球优先 01–{_BLUE_LOW_MAX:02d}"
+            f"蓝球倾向 01–{_BLUE_LOW_MAX:02d}，并保留 11–16 多样性"
             f"（近窗约 {float(blue_zone.get('low_rate') or 0):.0%}）。"
         ),
     }
@@ -786,7 +822,7 @@ def build_ssq_recommendations(
             f"红球频率/遗漏/趋势 + 和值约束（本注 {red_sum}，"
             f"目标 {sum_stats.get('target_lo')}–{sum_stats.get('target_hi')}，"
             f"均值约 {sum_stats.get('mean')}）；"
-            f"蓝球倾向 01–{_BLUE_LOW_MAX:02d}"
+            f"蓝球倾向 01–{_BLUE_LOW_MAX:02d}（保留高区）"
             f"（历史约 {float(blue_zone.get('low_rate') or 0):.0%}）"
         )
         if i == single_n - 1 and single_n >= 3:
@@ -858,14 +894,14 @@ async def ai_refine_ssq(analysis: dict[str, Any], draws: list[dict], base_recs: 
         "你是福利彩票双色球选号分析助手。根据历史频率、红球和值分布与蓝球区间给出购彩参考号，不要声称必中。严格输出 JSON。\n"
         "规则: 红球 6 个不重复整数 1-33，蓝球 1 个整数 1-16；"
         f"红球和值尽量落在 {sum_stats.get('target_lo')}–{sum_stats.get('target_hi')}（历史均值约 {sum_stats.get('mean')}）；"
-        f"蓝球优先 01–{_BLUE_LOW_MAX:02d}（近窗约 {float(blue_zone.get('low_rate') or 0):.0%} 落在此区间）。\n"
+        f"蓝球倾向 01–{_BLUE_LOW_MAX:02d}，但不要排除 11–16（近窗低区约 {float(blue_zone.get('low_rate') or 0):.0%}）。\n"
         f"样本期数: {analysis['sample_size']}\n"
         f"热红: {analysis['hot_digits']}, 冷红: {analysis['cold_digits']}\n"
         f"热蓝: {analysis['hot_blue']}, 冷蓝: {analysis['cold_blue']}\n"
         f"频率候选: {json.dumps(seed, ensure_ascii=False)}\n"
         f"近12期: {json.dumps(recent, ensure_ascii=False)}\n"
         '返回: {"picks":[{"red":[1,2,3,4,5,6],"blue":8,"reason":"一句话","confidence":0.7}],"summary":"..."}\n'
-        "要求: picks 恰好 2 注；尽量与候选不完全重复；蓝球尽量选 1–10。"
+        "要求: picks 恰好 2 注；尽量与候选不完全重复；蓝球可覆盖低区与高区，不要两注都挤在同一小区。"
     )
 
     model_results = await gather_digital_llm_json(prompt)
@@ -1037,7 +1073,7 @@ async def get_ssq_recommendations(
                 f"（约 {sum_stats.get('target_lo')}–{sum_stats.get('target_hi')}，"
                 f"均值 {sum_stats.get('mean')}）；"
                 f"蓝球倾向 01–{_BLUE_LOW_MAX:02d}"
-                f"（近窗约 {float(blue_zone.get('low_rate') or 0):.0%}）；"
+                f"（近窗约 {float(blue_zone.get('low_rate') or 0):.0%}，保留高区多样性）；"
                 "并给出最低金额复式（7红+1蓝）与 2 胆胆拖参考"
                 + (f"；换号批次 {rotate}" if rotate else "")
                 + (
