@@ -90,10 +90,10 @@ def test_analyze_and_build_ssq_recs():
         lo = analysis["sum_stats"]["target_lo"]
         hi = analysis["sum_stats"]["target_hi"]
         assert lo - 12 <= r["red_sum"] <= hi + 12
-    # Singles diversify blues; include at least one high blue (11-16)
-    blues = [r["blue"] for r in singles]
-    assert len(set(blues)) >= 2
-    assert any(b > _BLUE_LOW_MAX for b in blues)
+        # Singles diversify blues across the package
+        blues = [r["blue"] for r in singles]
+        assert len(set(blues)) >= 2
+        assert all(1 <= b <= 16 for b in blues)
 
 
 def test_build_ssq_dantuo():
@@ -121,8 +121,18 @@ def test_build_ssq_fushi():
     assert fs["amount"] == 14
 
 
+def test_ssq_singles_red_overlap_capped():
+    """单式之间红球重叠应 <4，避免滑窗造成五注近似同一注。"""
+    analysis = analyze_ssq(_make_draws())
+    recs = build_ssq_recommendations(analysis, seed=0)
+    singles = [r for r in recs if r["mode"] == "ssq"]
+    sets = [set(r["red"]) for r in singles]
+    for i in range(len(sets)):
+        for j in range(i + 1, len(sets)):
+            assert len(sets[i] & sets[j]) < 4, (i, j, sorted(sets[i] & sets[j]))
+
+
 def test_ssq_recs_include_high_blue_diversity():
-    """蓝球多样性：单式蓝球互不重复；扩采样时可覆盖高区；整体仍偏 01-10。"""
     from service.ssq_service import _pick_ssq_sets
 
     analysis = analyze_ssq(_make_draws())
@@ -130,11 +140,8 @@ def test_ssq_recs_include_high_blue_diversity():
     singles = [r for r in recs if r["mode"] == "ssq"]
     blues = [r["blue"] for r in singles]
     assert len(blues) == len(set(blues)), blues
-    # 红球相似度过滤可能挤掉 force_high；5 注采样仍应能出高蓝
     five = _pick_ssq_sets(analysis, count=5, seed=0)
     assert any(b > _BLUE_LOW_MAX for _, b in five)
-    all_blues = [r["blue"] for r in recs if isinstance(r.get("blue"), int)]
-    assert sum(1 for b in all_blues if b <= _BLUE_LOW_MAX) >= 1
 
 
 

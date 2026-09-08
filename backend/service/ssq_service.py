@@ -555,12 +555,12 @@ def _pick_ssq_sets(
     target = float(sum_stats.get("mean") or 102)
 
     red_ranked = rotate_ranked(
-        [r["digit"] for r in analysis["red_stats"]], seed, top_k=10, salt=3,
+        [r["digit"] for r in analysis["red_stats"]], seed, top_k=14, salt=3,
     )
     blue_ranked = rotate_ranked(
-        [b["digit"] for b in analysis["blue_stats"]], seed, top_k=6, salt=11,
+        [b["digit"] for b in analysis["blue_stats"]], seed, top_k=8, salt=11,
     )
-    cold_red = rotate_ranked(list(analysis["cold_digits"]), seed, top_k=6, salt=19)
+    cold_red = rotate_ranked(list(analysis["cold_digits"]), seed, top_k=8, salt=19)
 
     picks: list[tuple[list[int], int]] = []
     used: set[tuple[int, ...]] = set()
@@ -570,73 +570,95 @@ def _pick_ssq_sets(
         ranked = [b for b in blue_ranked if b not in used_blues] or list(blue_ranked)
         return _pick_blue_prefer_low(ranked, **kwargs)
 
-    def add(reds: list[int], blue: int, *, fit_sum: bool = True) -> None:
-        reds = sorted(set(int(x) for x in reds))
+    def too_similar(reds: list[int]) -> bool:
+        # 与已有注红球重叠 ≥4 则视为雷同（今晚 based_on 2026103 的 pick1/2 重叠 5 个）
+        s = set(reds)
+        return any(len(s & set(prev)) >= 4 for prev, _ in picks)
+
+    def add(reds: list[int], blue: int, *, fit_sum: bool = True) -> bool:
+        reds = sorted(set(int(x) for x in reds if 1 <= int(x) <= 33))
+        if len(reds) < 6:
+            for n in red_ranked + cold_red + list(range(1, 34)):
+                if n not in reds:
+                    reds.append(n)
+                if len(reds) >= 6:
+                    break
+        reds = sorted(reds)[:6]
         if fit_sum:
             reds = _fit_reds_to_sum(reds, red_ranked + cold_red, lo=lo, hi=hi, target=target)
         reds = sorted(set(reds))
         if len(reds) != 6 or not (1 <= blue <= 16):
-            return
+            return False
+        if too_similar(reds):
+            return False
         key = tuple(reds + [blue])
         if key in used or key in exclude:
-            return
+            return False
         used.add(key)
         used_blues.add(int(blue))
         picks.append((reds, blue))
+        return True
 
-    # 高区占比：用样本统计；缺省约 28%
     zone = analysis.get("blue_zone") or {}
     low_rate = float(zone.get("low_rate") or (1.0 - _BLUE_HIGH_SHARE))
     high_share = max(0.18, min(0.45, 1.0 - low_rate))
 
-    # 1 主推：热红 + 倾向低区蓝，和值拟合
-    add(red_ranked[:6], pick_blue(seed=seed, salt=1, high_share=high_share * 0.5,
-    ))
-    # 2 次热红 + 另一蓝（可高区）
-    add(red_ranked[1:7], pick_blue(seed=seed, salt=2, allow_high=True, high_share=high_share,
-    ))
-    # 3 热红混冷红 — 固定一注高区蓝，避免最终只取 3 单式时整包锁死 01–10
-    mix = sorted(set(red_ranked[:4] + cold_red[:2]))[:6]
-    if len(mix) < 6:
-        for n in red_ranked:
-            if n not in mix:
-                mix.append(n)
-            if len(mix) >= 6:
-                break
-    add(
-        sorted(mix[:6]),
-        pick_blue(seed=seed, salt=3, force_high=True),
-    )
-    # 4 冷号回补
+    # 1 主推：热红
+    add(red_ranked[:6], pick_blue(seed=seed, salt=1, high_share=high_share * 0.5))
+    # 2 主动避开第 1 注已用红，避免「滑窗」造成 5 码雷同
+    used1 = set(picks[0][0]) if picks else set()
+    base2 = [n for n in red_ranked if n not in used1][:6]
+    if len(base2) < 6:
+        base2 = (base2 + [n for n in cold_red + red_ranked if n not in base2])[:6]
+    add(base2, pick_blue(seed=seed, salt=2, allow_high=True, high_share=high_share))
+    # 3 热混冷 + 强制高区蓝
+    mix: list[int] = []
+    for n in red_ranked[:4] + cold_red[:4]:
+        if n not in mix:
+            mix.append(n)
+        if len(mix) >= 6:
+            break
+    add(sorted(mix[:6]), pick_blue(seed=seed, salt=3, force_high=True))
+    # 4 偏冷
     add(
         sorted(cold_red[:6]),
-        pick_blue(seed=seed, salt=4, allow_high=True, high_share=high_share,
-        ),
-        fit_sum=True,
+        pick_blue(seed=seed, salt=4, allow_high=True, high_share=high_share),
     )
-    # 5 奇偶均衡
-    odd = [n for n in red_ranked if n % 2 == 1]
-    even = [n for n in red_ranked if n % 2 == 0]
-    bal = sorted((odd[:3] + even[:3])[:6])
-    add(bal, pick_blue(seed=seed, salt=5, allow_high=True, high_share=high_share,
-    ))
+    # 5 区间分散
+    add(
+        _zone_balanced_reds(red_ranked + cold_red, per_zone=2),
+        pick_blue(seed=seed, salt=5, allow_high=True, high_share=high_share),
+    )
 
-    offset = 2
-    while len(picks) < count and offset < 24:
-        chunk = red_ranked[offset:offset + 6]
-        if len(chunk) < 6:
-            chunk = (red_ranked + cold_red + list(range(1, 34)))[:6]
+    offset = 0
+    pool = red_ranked + cold_red + list(range(1, 34))
+    while len(picks) < count and offset < 40:
+        start = (offset * 2 + (seed % 5)) % max(1, len(pool) - 6)
+        chunk = []
+        for n in pool[start:] + pool[:start]:
+            if n not in chunk:
+                chunk.append(n)
+            if len(chunk) >= 6:
+                break
         add(
             chunk,
             pick_blue(
                 seed=seed,
-                salt=10 + offset,
+                salt=20 + offset,
                 allow_high=True,
-                force_high=(offset % 3 == 0),
+                force_high=(offset % 4 == 1),
                 high_share=high_share,
             ),
         )
         offset += 1
+
+    # 最终包内若仍无高区蓝，把最后一注蓝球换到 11–16（不改红球）
+    if picks and not any(b > _BLUE_LOW_MAX for _, b in picks):
+        high = [b for b in blue_ranked if b > _BLUE_LOW_MAX] or list(range(11, 17))
+        high = [b for b in high if b not in used_blues] or high
+        reds_last, _ = picks[-1]
+        new_b = int(high[0])
+        picks[-1] = (reds_last, new_b)
 
     return picks[:count]
 
