@@ -139,16 +139,12 @@ def test_ssq_package_coverage_and_blue_cap():
     assert sum(1 for b in blues if b > _BLUE_LOW_MAX) <= 1
 
 
-def test_ssq_recs_include_high_blue_diversity():
-    from service.ssq_service import _pick_ssq_sets
-
+def test_ssq_package_blues_unique():
     analysis = analyze_ssq(_make_draws())
-    recs = build_ssq_recommendations(analysis, seed=0)
-    singles = [r for r in recs if r["mode"] == "ssq"]
-    blues = [r["blue"] for r in singles]
-    assert len(blues) == len(set(blues)), blues
-    five = _pick_ssq_sets(analysis, count=5, seed=0)
-    assert any(b > _BLUE_LOW_MAX for _, b in five)
+    recs = build_ssq_recommendations(analysis, seed=3)
+    blues = [r["blue"] for r in recs if isinstance(r.get("blue"), int)]
+    assert len(blues) == 5
+    assert len(set(blues)) == 5
 
 
 

@@ -721,6 +721,7 @@ def build_ssq_dantuo(
     analysis: dict[str, Any],
     *,
     seed: int = 0,
+    avoid_blues: set[int] | None = None,
 ) -> dict[str, Any]:
     """生成胆拖参考：固定 2 胆 + 5 拖 + 1 蓝。注数 C(5,4)=5，金额 10 元。
 
@@ -733,6 +734,7 @@ def build_ssq_dantuo(
     red_map = analysis.get("red_score_map") or {}
     blue_map = analysis.get("blue_score_map") or {}
     rng = _random.Random((int(seed) ^ 0xDA17) & 0xFFFFFFFF)
+    avoid_blues = {int(x) for x in (avoid_blues or set())}
 
     all_reds = list(range(1, 34))
     # 两胆：轻权抽样，强制不同区间
@@ -811,8 +813,9 @@ def build_ssq_dantuo(
         tuo = sorted(tuo)[:5]
         sample_reds = sorted(dan + tuo[:need])
 
+    blue_pool_cand = [b for b in range(1, 17) if b not in avoid_blues] or list(range(1, 17))
     blue = int(_weighted_sample(
-        list(range(1, 17)),
+        blue_pool_cand,
         1,
         lambda n: 0.75 + 0.25 * float(blue_map.get(n, 0.5)),
         rng,
@@ -866,6 +869,7 @@ def build_ssq_fushi(
     *,
     seed: int = 0,
     exclude: set[tuple[int, ...]] | None = None,
+    avoid_blues: set[int] | None = None,
 ) -> dict[str, Any]:
     """最低红球复式：7 红 + 1 蓝 = C(7,6)×1 = 7 注 = 14 元。"""
     import random as _random
@@ -873,6 +877,7 @@ def build_ssq_fushi(
     from itertools import combinations
 
     exclude = exclude or set()
+    avoid_blues = {int(x) for x in (avoid_blues or set())}
     sum_stats = analysis.get("sum_stats") or _compute_sum_stats([])
     blue_zone = analysis.get("blue_zone") or {}
     red_map = analysis.get("red_score_map") or {}
@@ -895,14 +900,14 @@ def build_ssq_fushi(
                 break
     reds7 = sorted(reds7)[:7]
 
-    # 蓝：按评分轻权，不强制高区
-    blues = list(range(1, 17))
+    # 蓝：避开单式已用蓝，按评分轻权
+    blues = [b for b in range(1, 17) if b not in avoid_blues] or list(range(1, 17))
     blue = int(_weighted_sample(
         blues, 1, lambda n: 0.7 + 0.3 * float(blue_map.get(n, 0.5)), rng,
     )[0])
     key = tuple(reds7 + [blue])
     if key in exclude:
-        alt = [b for b in blues if b != blue]
+        alt = [b for b in blues if b != blue] or blues
         blue = int(_weighted_sample(alt, 1, lambda n: 0.7 + 0.3 * float(blue_map.get(n, 0.5)), rng)[0])
 
     bets = comb(len(reds7), 6)
@@ -987,9 +992,11 @@ def build_ssq_recommendations(
             "amount": 2,
         })
     if include_fushi:
-        recs.append(build_ssq_fushi(analysis, seed=seed, exclude=exclude))
+        used_blues = {int(r["blue"]) for r in recs if isinstance(r.get("blue"), int)}
+        recs.append(build_ssq_fushi(analysis, seed=seed, exclude=exclude, avoid_blues=used_blues))
     if include_dantuo:
-        recs.append(build_ssq_dantuo(analysis, seed=seed))
+        used_blues = {int(r["blue"]) for r in recs if isinstance(r.get("blue"), int)}
+        recs.append(build_ssq_dantuo(analysis, seed=seed, avoid_blues=used_blues))
     return recs
 
 
