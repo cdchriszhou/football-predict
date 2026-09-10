@@ -2,6 +2,8 @@
 
 from service.ssq_service import (
     _BLUE_LOW_MAX,
+    _SUM_EXTREME_HI,
+    _SUM_EXTREME_LO,
     _fit_reds_to_sum,
     _normalize_ssq_row,
     _validate_ssq_ai,
@@ -87,13 +89,13 @@ def test_analyze_and_build_ssq_recs():
         assert all(1 <= n <= 33 for n in r["digits"][:6])
         assert 1 <= r["digits"][6] <= 16
         assert r["bets"] == 1
-        lo = analysis["sum_stats"]["target_lo"]
-        hi = analysis["sum_stats"]["target_hi"]
-        assert lo - 12 <= r["red_sum"] <= hi + 12
+        # 仅避免极端和值；不再强制挤进窄历史分位带
+        assert _SUM_EXTREME_LO - 5 <= r["red_sum"] <= _SUM_EXTREME_HI + 5
         # Singles diversify blues across the package
         blues = [r["blue"] for r in singles]
-        assert len(set(blues)) >= 2
+        assert len(set(blues)) == len(blues)  # 互异
         assert all(1 <= b <= 16 for b in blues)
+        assert sum(1 for b in blues if b > _BLUE_LOW_MAX) <= 1
 
 
 def test_build_ssq_dantuo():
