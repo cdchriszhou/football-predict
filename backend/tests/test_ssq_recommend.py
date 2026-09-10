@@ -123,15 +123,20 @@ def test_build_ssq_fushi():
     assert fs["amount"] == 14
 
 
-def test_ssq_singles_red_overlap_capped():
-    """单式之间红球重叠应 <4，避免滑窗造成五注近似同一注。"""
+def test_ssq_package_coverage_and_blue_cap():
+    """3 注单式应低重叠、高覆盖，且高区蓝至多 1 个。"""
     analysis = analyze_ssq(_make_draws())
     recs = build_ssq_recommendations(analysis, seed=0)
     singles = [r for r in recs if r["mode"] == "ssq"]
     sets = [set(r["red"]) for r in singles]
+    assert len(singles) == 3
     for i in range(len(sets)):
         for j in range(i + 1, len(sets)):
-            assert len(sets[i] & sets[j]) < 4, (i, j, sorted(sets[i] & sets[j]))
+            assert len(sets[i] & sets[j]) <= 2, (i, j, sorted(sets[i] & sets[j]))
+    assert len(set().union(*sets)) >= 14
+    blues = [r["blue"] for r in singles]
+    assert len(set(blues)) == len(blues)
+    assert sum(1 for b in blues if b > _BLUE_LOW_MAX) <= 1
 
 
 def test_ssq_recs_include_high_blue_diversity():
