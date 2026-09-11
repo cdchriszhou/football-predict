@@ -147,6 +147,18 @@ def test_ssq_package_blues_unique():
     assert len(set(blues)) == 5
 
 
+def test_ssq_singles_have_basic_shape():
+    from service.ssq_service import _ticket_shape_ok
+
+    analysis = analyze_ssq(_make_draws())
+    recs = build_ssq_recommendations(analysis, seed=1)
+    singles = [r for r in recs if r["mode"] == "ssq"]
+    for r in singles:
+        assert _ticket_shape_ok(r["red"]), r["red"]
+    dt = next(r for r in recs if r["mode"] == "dantuo")
+    assert dt["tuo"] == sorted(dt["tuo"])
+
+
 
 def test_fit_reds_to_sum_pulls_into_band():
     fitted = _fit_reds_to_sum([1, 2, 3, 4, 5, 6], list(range(1, 34)), lo=90, hi=120, target=102)

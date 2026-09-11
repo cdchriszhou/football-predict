@@ -29,14 +29,14 @@ SSQ_GAME = {
             "name": "单式投注",
             "prize": None,
             "prize_label": "一等奖浮动（最高1000万）",
-            "desc": "6 个红球 + 1 个蓝球全部命中为一等奖；另有二至六等奖。",
+            "desc": "6 个红球 + 1 个蓝球；一等奖需红蓝全中，另有二至六等奖。",
         },
         {
             "id": "dantuo",
             "name": "胆拖投注",
             "prize": None,
             "prize_label": "按单式拆注计奖",
-            "desc": "红球固定 2 个胆码（必出）+ 拖码选满 6 个；注数=C(拖码数, 4)×蓝球数。",
+            "desc": "推荐形态为 2 个胆码（必出）+ 5 个拖码，从拖码中选 4 个凑满 6 红；注数=C(5,4)×蓝球数。",
         },
         {
             "id": "fushi",
@@ -527,11 +527,27 @@ def _pick_blue_prefer_low(
     return int(picked) if picked is not None else 1
 
 
-def _jaccard_red(a: list[int], b: list[int]) -> float:
-    sa, sb = set(a), set(b)
-    if not sa and not sb:
-        return 0.0
-    return len(sa & sb) / max(1, len(sa | sb))
+def _ticket_shape_ok(reds: list[int]) -> bool:
+    """资深彩民常用的基本形态过滤（不追求提高命中，只避免明显怪号）。"""
+    xs = sorted(set(int(x) for x in reds if 1 <= int(x) <= 33))
+    if len(xs) != 6:
+        return False
+    odd = sum(1 for n in xs if n % 2 == 1)
+    if odd <= 1 or odd >= 5:
+        return False
+    z1 = sum(1 for n in xs if n <= 11)
+    z2 = sum(1 for n in xs if 12 <= n <= 22)
+    z3 = sum(1 for n in xs if n >= 23)
+    # 不允许整注落在单一大区
+    if min(z1, z2, z3) == 0 and max(z1, z2, z3) >= 4:
+        return False
+    if max(z1, z2, z3) == 6:
+        return False
+    # 连号至多一组（如 17-18），避免三连/双连号堆叠
+    consec_pairs = sum(1 for a, b in zip(xs, xs[1:]) if b - a == 1)
+    if consec_pairs >= 2:
+        return False
+    return True
 
 
 def _zone_balanced_reds(pool: list[int], *, per_zone: int = 2) -> list[int]:
@@ -602,9 +618,11 @@ def _pick_ssq_sets(
         s = set(reds)
         return any(len(s & set(prev)) >= max_share for prev, _ in picks)
 
-    def accept(reds: list[int], blue: int, *, max_share: int = 3) -> bool:
+    def accept(reds: list[int], blue: int, *, max_share: int = 3, require_shape: bool = True) -> bool:
         reds = sorted(set(int(x) for x in reds if 1 <= int(x) <= 33))
         if len(reds) != 6 or not (1 <= blue <= 16):
+            return False
+        if require_shape and not _ticket_shape_ok(reds):
             return False
         if too_similar(reds, max_share=max_share):
             return False
@@ -618,12 +636,14 @@ def _pick_ssq_sets(
 
     def pick_blue(*, prefer_high: bool = False) -> int:
         high_count = sum(1 for _, b in picks if b > _BLUE_LOW_MAX)
-        if high_count >= 1 or (not prefer_high and rng.random() < low_rate):
+        # 约按历史高区占比决定是否放 1 个高区蓝，避免「每包必有高区」的刻板印象
+        want_high = prefer_high and high_count == 0 and rng.random() < max(0.22, min(0.35, 1.0 - low_rate))
+        if high_count >= 1 or (not want_high and rng.random() < low_rate):
             cand = [b for b in all_blues if b <= _BLUE_LOW_MAX and b not in used_blues]
             if not cand:
                 cand = [b for b in all_blues if b not in used_blues] or all_blues
             return int(_weighted_sample(cand, 1, blue_w, rng)[0])
-        if prefer_high and high_count == 0:
+        if want_high:
             cand = [b for b in all_blues if b > _BLUE_LOW_MAX and b not in used_blues]
             if cand:
                 return int(_weighted_sample(cand, 1, blue_w, rng)[0])
@@ -653,6 +673,8 @@ def _pick_ssq_sets(
             cset = set(cand)
             if too_similar(cand, max_share=3):
                 continue
+            if not _ticket_shape_ok(cand):
+                continue
             score = len(cset - cov) * 10 - abs(sum(cand) - target) * 0.01
             if score > best_score:
                 best_score = score
@@ -660,8 +682,8 @@ def _pick_ssq_sets(
         return best
 
     # --- 显式构造互补单式（最终常只保留 3 注，必须每注都有用）---
-    # 1) 近均匀：最接近随机基线
-    for _ in range(12):
+    # 1) 近均匀：最接近随机基线，带基本形态
+    for _ in range(24):
         reds = soft_extreme(sorted(rng.sample(all_reds, 6)))
         if accept(reds, pick_blue()):
             break
@@ -671,35 +693,39 @@ def _pick_ssq_sets(
         avoid = set(picks[0][0])
         pool2 = [n for n in (cold + all_reds) if n not in avoid] or all_reds
         cands = []
-        for _ in range(20):
+        for _ in range(30):
             cands.append(soft_extreme(_weighted_sample(pool2, 6, red_w, rng)))
         chosen = maximize_new_coverage(cands)
-        if chosen:
-            accept(chosen, pick_blue())
+        if chosen and accept(chosen, pick_blue()):
+            pass
         else:
-            accept(soft_extreme(sorted(rng.sample(all_reds, 6))), pick_blue(), max_share=4)
+            for _ in range(20):
+                if accept(soft_extreme(sorted(rng.sample(all_reds, 6))), pick_blue(), max_share=4):
+                    break
 
-    # 3) 三区平衡 + 强制补高区蓝（整包仅此一次）
+    # 3) 三区平衡；高区蓝按历史占比概率出现（非整包必出）
     cands = []
-    for _ in range(20):
+    for _ in range(30):
         cands.append(
             soft_extreme(
                 _zone_balanced_reds(_weighted_sample(all_reds, 18, red_w, rng) + all_reds, per_zone=2)
             )
         )
     chosen = maximize_new_coverage(cands)
-    if chosen:
-        accept(chosen, pick_blue(prefer_high=True))
+    if chosen and accept(chosen, pick_blue(prefer_high=True)):
+        pass
     else:
-        accept(
-            soft_extreme(_zone_balanced_reds(all_reds, per_zone=2)),
-            pick_blue(prefer_high=True),
-            max_share=4,
-        )
+        for _ in range(20):
+            if accept(
+                soft_extreme(_zone_balanced_reds(all_reds, per_zone=2)),
+                pick_blue(prefer_high=True),
+                max_share=4,
+            ):
+                break
 
     # 4+) 继续用「新增覆盖最大」补齐
     guard = 0
-    while len(picks) < count and guard < 60:
+    while len(picks) < count and guard < 80:
         guard += 1
         cov = covered()
         prefer = [n for n in all_reds if n not in cov] or all_reds
@@ -712,7 +738,9 @@ def _pick_ssq_sets(
         if chosen and accept(chosen, pick_blue()):
             continue
         reds = soft_extreme(sorted(rng.sample(all_reds, 6)))
-        accept(reds, pick_blue(), max_share=4)
+        # 最后兜底放宽形态，保证能出满注
+        if not accept(reds, pick_blue(), max_share=4):
+            accept(reds, pick_blue(), max_share=4, require_shape=False)
 
     return picks[:count]
 
@@ -792,6 +820,7 @@ def build_ssq_dantuo(
             if len(tuo) >= 5:
                 break
 
+    tuo = sorted(tuo)[:5]
     need = 6 - len(dan)
     sample_reds = sorted(dan + tuo[:need])
     s = sum(sample_reds)
@@ -841,7 +870,7 @@ def build_ssq_dantuo(
         "source": "frequency",
         "label": "胆拖参考",
         "dan": dan,
-        "tuo": sorted(tuo)[:5],
+        "tuo": tuo,
         "blue": blue,
         "blue_pool": blue_pool,
         "red": sample_reds,
