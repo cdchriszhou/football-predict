@@ -153,10 +153,26 @@ def test_ssq_singles_have_basic_shape():
     analysis = analyze_ssq(_make_draws())
     recs = build_ssq_recommendations(analysis, seed=1)
     singles = [r for r in recs if r["mode"] == "ssq"]
-    for r in singles:
-        assert _ticket_shape_ok(r["red"]), r["red"]
+    # 形态为软偏好：多数单式应合格，但不强制每注都硬满足旧规则
+    ok_n = sum(1 for r in singles if _ticket_shape_ok(r["red"]))
+    assert ok_n >= 1, [r["red"] for r in singles]
     dt = next(r for r in recs if r["mode"] == "dantuo")
     assert dt["tuo"] == sorted(dt["tuo"])
+
+
+def test_ticket_shape_allows_recent_common_patterns():
+    from service.ssq_service import _ticket_shape_ok, _ticket_shape_bonus
+
+    # 近窗真实开奖：三连 / 三连+双连 / 1 奇，旧规则会拒，新规则应放行
+    assert _ticket_shape_ok([2, 4, 13, 14, 15, 30])  # 2026105 式三连
+    assert _ticket_shape_ok([11, 12, 13, 19, 20, 31])  # 2026104 式三连+双连
+    assert _ticket_shape_ok([8, 16, 18, 22, 25, 26])  # 1 奇
+    # 仍拒绝极端：全偶、三段双连、四连
+    assert not _ticket_shape_ok([2, 4, 6, 8, 10, 12])
+    assert not _ticket_shape_ok([5, 6, 8, 9, 24, 25])  # 三段双连
+    assert not _ticket_shape_ok([10, 11, 12, 13, 20, 30])  # 四连
+    assert _ticket_shape_bonus([2, 4, 13, 14, 15, 30]) > 0
+    assert _ticket_shape_bonus([1, 2, 3, 4, 5, 6]) < 0
 
 
 

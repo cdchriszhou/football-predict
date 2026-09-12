@@ -528,12 +528,13 @@ def _pick_blue_prefer_low(
 
 
 def _ticket_shape_ok(reds: list[int]) -> bool:
-    """资深彩民常用的基本形态过滤（不追求提高命中，只避免明显怪号）。"""
+    """只挡极端怪号；允许常见双连/三连与 1–5 奇偶（贴近近窗真实开奖）。"""
     xs = sorted(set(int(x) for x in reds if 1 <= int(x) <= 33))
     if len(xs) != 6:
         return False
     odd = sum(1 for n in xs if n % 2 == 1)
-    if odd <= 1 or odd >= 5:
+    # 仅拒绝全奇/全偶；1 奇或 5 奇在真实开奖中偶见
+    if odd == 0 or odd == 6:
         return False
     z1 = sum(1 for n in xs if n <= 11)
     z2 = sum(1 for n in xs if 12 <= n <= 22)
@@ -543,12 +544,28 @@ def _ticket_shape_ok(reds: list[int]) -> bool:
         return False
     if max(z1, z2, z3) == 6:
         return False
-    # 连号至多一组（如 17-18），避免三连/双连号堆叠
-    consec_pairs = sum(1 for a, b in zip(xs, xs[1:]) if b - a == 1)
-    if consec_pairs >= 2:
+    # 连号段：允许双连/三连，至多两段；禁止四连及以上或三段双连堆叠
+    runs: list[int] = []
+    i = 0
+    while i < len(xs):
+        j = i
+        while j + 1 < len(xs) and xs[j + 1] - xs[j] == 1:
+            j += 1
+        if j > i:
+            runs.append(j - i + 1)
+            i = j + 1
+        else:
+            i += 1
+    if any(r >= 4 for r in runs):
+        return False
+    if len(runs) >= 3:
         return False
     return True
 
+
+def _ticket_shape_bonus(reds: list[int]) -> float:
+    """形态软分：合格加分，不合格轻罚（不硬拒，避免系统性偏离真实分布）。"""
+    return 3.0 if _ticket_shape_ok(reds) else -1.0
 
 def _zone_balanced_reds(pool: list[int], *, per_zone: int = 2) -> list[int]:
     """从候选池尽量按 01–11 / 12–22 / 23–33 各取 per_zone 个。"""
@@ -618,10 +635,17 @@ def _pick_ssq_sets(
         s = set(reds)
         return any(len(s & set(prev)) >= max_share for prev, _ in picks)
 
-    def accept(reds: list[int], blue: int, *, max_share: int = 3, require_shape: bool = True) -> bool:
+    def accept(
+        reds: list[int],
+        blue: int,
+        *,
+        max_share: int = 3,
+        require_shape: bool = False,
+    ) -> bool:
         reds = sorted(set(int(x) for x in reds if 1 <= int(x) <= 33))
         if len(reds) != 6 or not (1 <= blue <= 16):
             return False
+        # 形态默认不硬拒（由 _ticket_shape_bonus 软偏好）；极端场景可显式 require_shape
         if require_shape and not _ticket_shape_ok(reds):
             return False
         if too_similar(reds, max_share=max_share):
@@ -633,7 +657,6 @@ def _pick_ssq_sets(
         used_blues.add(int(blue))
         picks.append((reds, int(blue)))
         return True
-
     def pick_blue(*, prefer_high: bool = False) -> int:
         high_count = sum(1 for _, b in picks if b > _BLUE_LOW_MAX)
         # 约按历史高区占比决定是否放 1 个高区蓝，避免「每包必有高区」的刻板印象
@@ -667,25 +690,32 @@ def _pick_ssq_sets(
 
     def maximize_new_coverage(candidates: list[list[int]]) -> list[int] | None:
         best = None
-        best_score = -1
+        best_score = -1e9
         cov = covered()
         for cand in candidates:
             cset = set(cand)
             if too_similar(cand, max_share=3):
                 continue
-            if not _ticket_shape_ok(cand):
-                continue
-            score = len(cset - cov) * 10 - abs(sum(cand) - target) * 0.01
+            # 形态为软偏好：不合格也可入选，避免把真实常见连号形态系统性滤掉
+            score = (
+                len(cset - cov) * 10
+                - abs(sum(cand) - target) * 0.01
+                + _ticket_shape_bonus(cand)
+            )
             if score > best_score:
                 best_score = score
                 best = cand
         return best
-
     # --- 显式构造互补单式（最终常只保留 3 注，必须每注都有用）---
-    # 1) 近均匀：最接近随机基线，带基本形态
-    for _ in range(24):
-        reds = soft_extreme(sorted(rng.sample(all_reds, 6)))
-        if accept(reds, pick_blue()):
+    # 1) 近均匀：最接近随机基线；优先形态合格，不合格也可接受
+    for prefer_ok in (True, False):
+        for _ in range(24):
+            reds = soft_extreme(sorted(rng.sample(all_reds, 6)))
+            if prefer_ok and not _ticket_shape_ok(reds):
+                continue
+            if accept(reds, pick_blue()):
+                break
+        if picks:
             break
 
     # 2) 避开第 1 注，偏冷/未覆盖号
@@ -1278,7 +1308,7 @@ async def get_ssq_recommendations(
                 f"基于第 {latest_issue} 期后统计；红球全号池轻加权+"
                 f"低重叠覆盖（极端和值才软修正；常见带约 "
                 f"{sum_stats.get('target_lo')}–{sum_stats.get('target_hi')}）；"
-                f"蓝球互异且整包至多 1 个高区；"
+                f"蓝球互异且整包至多 1 个高区；形态仅软偏好（允双连/三连）；"
                 "含最低金额复式与 2 胆胆拖；仅供参考"
                 + (f"；换号批次 {rotate}" if rotate else "")
                 + (
