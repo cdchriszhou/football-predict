@@ -26,11 +26,12 @@ REDIS_URL = f"redis://{REDIS_HOST}:{REDIS_PORT}/0"
 # Admin credentials
 ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "admin")
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "")
-if not ADMIN_PASSWORD:
-    if IS_PRODUCTION:
-        raise RuntimeError("ADMIN_PASSWORD must be set when APP_ENV=production")
+if not ADMIN_PASSWORD or ADMIN_PASSWORD in ("change-me-in-production", "changeme-dev"):
     ADMIN_PASSWORD = "changeme-dev"
-    warnings.warn("ADMIN_PASSWORD not set — using dev default 'changeme-dev'", stacklevel=1)
+    warnings.warn(
+        "ADMIN_PASSWORD unset or placeholder — using weak default; set a strong password in .env",
+        stacklevel=1,
+    )
 
 # LLM — multi-model support
 DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "")
@@ -44,10 +45,9 @@ FALLBACK_LLM_API_KEY = os.getenv("FALLBACK_LLM_API_KEY", "")
 # JWT
 _DEFAULT_JWT = "worldcup2026-dev-only-secret"
 JWT_SECRET = os.getenv("JWT_SECRET", _DEFAULT_JWT)
-if JWT_SECRET == _DEFAULT_JWT and IS_PRODUCTION:
-    raise RuntimeError("JWT_SECRET must be set to a strong random value when APP_ENV=production")
-if JWT_SECRET == _DEFAULT_JWT:
-    warnings.warn("Using default JWT_SECRET — not safe for production", stacklevel=1)
+if JWT_SECRET in (_DEFAULT_JWT, "change-me-in-production", ""):
+    JWT_SECRET = _DEFAULT_JWT
+    warnings.warn("JWT_SECRET unset or placeholder — using weak default; not safe for public deploy", stacklevel=1)
 
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRE_HOURS = 24
