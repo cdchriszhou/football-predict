@@ -1337,10 +1337,11 @@ async def get_ssq_recommendations(
         "cached": False,
     }
     from service.digital_rec_store import save_primary_prediction
+    # 完整保存 3 单式 + 复式 + 胆拖，供「近期开奖」对照命中
     save_primary_prediction(
         "ssq",
         latest_issue or None,
-        [r for r in merged if r.get("mode") not in ("dantuo", "fushi")] or merged,
+        merged,
         rotate=rotate,
     )
     rec_cache_set(cache_key, payload)

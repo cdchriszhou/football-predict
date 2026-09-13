@@ -42,23 +42,87 @@ def _key(game_id: str, based_on_issue: str) -> str:
     return f"{game_id}:{based_on_issue}"
 
 
+def _ints(values: Any) -> list[int] | None:
+    if not isinstance(values, list) or not values:
+        return None
+    try:
+        return [int(x) for x in values]
+    except (TypeError, ValueError):
+        return None
+
+
+def _optional_int(value: Any) -> int | None:
+    if value is None or value == "":
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _pick_from_rec(rec: dict) -> dict[str, Any] | None:
+    """从推荐对象抽出可持久化/回放的一注（含单式、复式、胆拖）。"""
+    if not isinstance(rec, dict):
+        return None
+    mode = str(rec.get("mode") or "").strip() or None
+    red = _ints(rec.get("red"))
+    dan = _ints(rec.get("dan"))
+    tuo = _ints(rec.get("tuo"))
+    blue = _optional_int(rec.get("blue"))
+    digits = _ints(rec.get("digits"))
+
+    # 复式：以完整 7 红 + 蓝作为对照号码（不是样例单式 6+1）
+    if mode == "fushi":
+        if not red or blue is None:
+            return None
+        digits = list(red) + [blue]
+    # 胆拖：胆 + 拖 + 蓝，便于开奖后逐球对照
+    elif mode == "dantuo":
+        if not dan or not tuo or blue is None:
+            return None
+        digits = list(dan) + list(tuo) + [blue]
+    elif not digits:
+        return None
+
+    pick: dict[str, Any] = {
+        "digits": digits,
+        "display": str(rec.get("display") or " ".join(str(x) for x in digits)),
+        "source": rec.get("source") or "frequency",
+    }
+    if mode:
+        pick["mode"] = mode
+    if red:
+        pick["red"] = red
+    if dan:
+        pick["dan"] = dan
+    if tuo:
+        pick["tuo"] = tuo
+    if blue is not None:
+        pick["blue"] = blue
+    label = rec.get("label")
+    if label:
+        pick["label"] = str(label)
+    bets = rec.get("bets")
+    if bets is not None:
+        try:
+            pick["bets"] = int(bets)
+        except (TypeError, ValueError):
+            pass
+    amount = rec.get("amount")
+    if amount is not None:
+        try:
+            pick["amount"] = int(amount)
+        except (TypeError, ValueError):
+            pass
+    return pick
+
+
 def _normalize_picks(recommendations: list[dict]) -> list[dict[str, Any]]:
     picks: list[dict[str, Any]] = []
     for rec in recommendations[:5]:
-        if not isinstance(rec, dict):
-            continue
-        digits = rec.get("digits")
-        if not isinstance(digits, list) or not digits:
-            continue
-        try:
-            digits_i = [int(x) for x in digits]
-        except (TypeError, ValueError):
-            continue
-        picks.append({
-            "digits": digits_i,
-            "display": str(rec.get("display") or " ".join(str(x) for x in digits_i)),
-            "source": rec.get("source") or "frequency",
-        })
+        pick = _pick_from_rec(rec)
+        if pick:
+            picks.append(pick)
     return picks
 
 
@@ -69,7 +133,7 @@ def save_primary_prediction(
     *,
     rotate: int = 0,
 ) -> None:
-    """保存当期全部推荐（最多 5 注）。仅 rotate=0，避免「换一批」覆盖主记录。"""
+    """保存当期全部推荐（最多 5 注，含复式/胆拖）。仅 rotate=0，避免「换一批」覆盖主记录。"""
     if rotate or not game_id or not based_on_issue or not recommendations:
         return
     picks = _normalize_picks(recommendations)
@@ -106,34 +170,29 @@ def get_stored_picks(game_id: str, based_on_issue: str | None) -> list[dict[str,
         for p in picks[:5]:
             if not isinstance(p, dict):
                 continue
-            digits = p.get("digits")
-            if not isinstance(digits, list):
-                continue
-            try:
-                digits_i = [int(x) for x in digits]
-            except (TypeError, ValueError):
-                continue
-            if not digits_i:
-                continue
-            out.append({
-                "digits": digits_i,
-                "display": str(p.get("display") or " ".join(str(x) for x in digits_i)),
-                "source": p.get("source") or hit.get("source") or "frequency",
-            })
+            # 旧记录可能缺 mode/red/dan；用 _pick_from_rec 统一补齐 digits
+            pick = _pick_from_rec(p)
+            if not pick:
+                digits = _ints(p.get("digits"))
+                if not digits:
+                    continue
+                pick = {
+                    "digits": digits,
+                    "display": str(p.get("display") or " ".join(str(x) for x in digits)),
+                    "source": p.get("source") or hit.get("source") or "frequency",
+                }
+            else:
+                pick["source"] = pick.get("source") or hit.get("source") or "frequency"
+            out.append(pick)
         if out:
             return out
-    digits = hit.get("digits")
-    if isinstance(digits, list) and digits:
-        try:
-            digits_i = [int(x) for x in digits]
-        except (TypeError, ValueError):
-            return []
-        if digits_i:
-            return [{
-                "digits": digits_i,
-                "display": str(hit.get("display") or " ".join(str(x) for x in digits_i)),
-                "source": hit.get("source") or "frequency",
-            }]
+    digits = _ints(hit.get("digits"))
+    if digits:
+        return [{
+            "digits": digits,
+            "display": str(hit.get("display") or " ".join(str(x) for x in digits)),
+            "source": hit.get("source") or "frequency",
+        }]
     return []
 
 

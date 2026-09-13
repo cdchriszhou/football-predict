@@ -439,16 +439,55 @@
         <el-table :data="historyTableRows" stripe size="small" empty-text="—">
           <el-table-column prop="issue" :label="t('pailie.colIssue')" min-width="90" />
           <el-table-column prop="result" :label="t('pailie.colResult')" min-width="180" />
-          <el-table-column :label="t('pailie.colPredict')" min-width="220">
+          <el-table-column :label="t('pailie.colPredict')" min-width="280">
             <template #default="{ row }">
               <div v-if="historyPredictions(row).length" class="hist-pred-list">
                 <div
                   v-for="(pred, pi) in historyPredictions(row)"
                   :key="'pred-' + pi"
                   class="hist-pred"
+                  :class="{
+                    'hist-pred--fushi': pred.mode === 'fushi',
+                    'hist-pred--dantuo': pred.mode === 'dantuo',
+                  }"
                 >
-                  <span class="hist-pred-idx">{{ pi + 1 }}</span>
-                  <template v-if="activeGame === 'ssq'">
+                  <span class="hist-pred-idx">{{ historyPredLabel(pred, pi) }}</span>
+                  <template v-if="activeGame === 'ssq' && pred.mode === 'fushi'">
+                    <span class="hist-pred-tag">{{ t('pailie.fushiRed') }}</span>
+                    <span
+                      v-for="(d, di) in (pred.red || pred.digits.slice(0, -1))"
+                      :key="'pfr' + pi + '-' + di"
+                      class="hist-pred-ball hist-pred-ball--red"
+                      :class="{ 'hist-pred-ball--hit': pred.hits?.[di] }"
+                    >{{ formatBall(d) }}</span>
+                    <span class="hist-pred-plus">+</span>
+                    <span
+                      class="hist-pred-ball hist-pred-ball--blue"
+                      :class="{ 'hist-pred-ball--hit': pred.hits?.[ (pred.red || pred.digits.slice(0, -1)).length ] }"
+                    >{{ formatBall(pred.blue ?? pred.digits[pred.digits.length - 1]) }}</span>
+                  </template>
+                  <template v-else-if="activeGame === 'ssq' && pred.mode === 'dantuo'">
+                    <span class="hist-pred-tag">{{ t('pailie.danCode') }}</span>
+                    <span
+                      v-for="(d, di) in (pred.dan || [])"
+                      :key="'pd' + pi + '-' + di"
+                      class="hist-pred-ball hist-pred-ball--red"
+                      :class="{ 'hist-pred-ball--hit': pred.hits?.[di] }"
+                    >{{ formatBall(d) }}</span>
+                    <span class="hist-pred-tag">{{ t('pailie.tuoCode') }}</span>
+                    <span
+                      v-for="(d, di) in (pred.tuo || [])"
+                      :key="'pt' + pi + '-' + di"
+                      class="hist-pred-ball hist-pred-ball--red hist-pred-ball--tuo"
+                      :class="{ 'hist-pred-ball--hit': pred.hits?.[ (pred.dan || []).length + di ] }"
+                    >{{ formatBall(d) }}</span>
+                    <span class="hist-pred-plus">+</span>
+                    <span
+                      class="hist-pred-ball hist-pred-ball--blue"
+                      :class="{ 'hist-pred-ball--hit': pred.hits?.[ (pred.dan || []).length + (pred.tuo || []).length ] }"
+                    >{{ formatBall(pred.blue ?? pred.digits[pred.digits.length - 1]) }}</span>
+                  </template>
+                  <template v-else-if="activeGame === 'ssq'">
                     <span
                       v-for="(d, di) in pred.digits.slice(0, 6)"
                       :key="'pr' + pi + '-' + di"
@@ -634,6 +673,12 @@ function historyPredictions(row) {
     return [{ digits: row.prediction_digits, hits: row.prediction_hits || [] }]
   }
   return []
+}
+
+function historyPredLabel(pred, index) {
+  if (pred?.mode === 'fushi') return t('pailie.modeFushi')
+  if (pred?.mode === 'dantuo') return t('pailie.modeDantuo')
+  return String(index + 1)
 }
 
 function poolAmountDisplay(gameId) {
@@ -1671,7 +1716,7 @@ onUnmounted(() => {
 .hist-pred-list {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
   padding: 2px 0;
 }
 .hist-pred {
@@ -1681,11 +1726,21 @@ onUnmounted(() => {
   gap: 4px;
 }
 .hist-pred-idx {
-  width: 14px;
+  min-width: 28px;
   font-size: 11px;
   color: #909399;
   font-variant-numeric: tabular-nums;
   flex-shrink: 0;
+  font-weight: 600;
+}
+.hist-pred--fushi .hist-pred-idx,
+.hist-pred--dantuo .hist-pred-idx {
+  color: #c62828;
+}
+.hist-pred-tag {
+  font-size: 10px;
+  color: #909399;
+  margin-left: 2px;
 }
 .hist-pred-plus {
   font-size: 12px;
@@ -1715,6 +1770,10 @@ onUnmounted(() => {
   color: #c62828;
   background: #fdecea;
 }
+.hist-pred-ball--tuo {
+  opacity: 0.9;
+  border: 1px dashed #ef9a9a;
+}
 .hist-pred-ball--blue {
   color: #1565c0;
   background: #e3f2fd;
@@ -1726,6 +1785,7 @@ onUnmounted(() => {
 .hist-pred-ball--hit {
   color: #fff !important;
   background: #2e7d32 !important;
+  border-color: #1b5e20 !important;
 }
 @media (max-width: 640px) {
   .page-header {

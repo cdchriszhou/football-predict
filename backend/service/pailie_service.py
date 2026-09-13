@@ -421,8 +421,20 @@ async def _fetch_history(game_id: str, limit: int = 100, *, force_refresh: bool 
     return collected
 
 
-def _prediction_hits(game_id: str, pred: list[int], actual: list[int]) -> list[bool]:
-    """按玩法规则标记预测各位/各球是否命中。"""
+def _prediction_hits(
+    game_id: str,
+    pred: list[int],
+    actual: list[int],
+    *,
+    mode: str | None = None,
+) -> list[bool]:
+    """按玩法规则标记预测各位/各球是否命中。
+
+    双色球：
+    - 单式：6 红 + 1 蓝
+    - 复式：7 红 + 1 蓝（digits 全长 8）
+    - 胆拖：胆 + 拖 + 蓝（通常 2+5+1）
+    """
     if not pred:
         return []
     if game_id == "ssq":
@@ -430,6 +442,25 @@ def _prediction_hits(game_id: str, pred: list[int], actual: list[int]) -> list[b
             return [False] * len(pred)
         reds = set(int(x) for x in actual[:6])
         blue = int(actual[6])
+        m = (mode or "").strip()
+        if m == "fushi":
+            # 7 红 + 1 蓝
+            hits = []
+            for i, p in enumerate(pred):
+                if i < len(pred) - 1:
+                    hits.append(int(p) in reds)
+                else:
+                    hits.append(int(p) == blue)
+            return hits
+        if m == "dantuo":
+            # 胆/拖均为红球集合命中，末位蓝球
+            hits = []
+            for i, p in enumerate(pred):
+                if i < len(pred) - 1:
+                    hits.append(int(p) in reds)
+                else:
+                    hits.append(int(p) == blue)
+            return hits
         hits = []
         for i, p in enumerate(pred):
             if i < 6:
@@ -457,6 +488,51 @@ def _prediction_hits(game_id: str, pred: list[int], actual: list[int]) -> list[b
         i < len(actual) and int(pred[i]) == int(actual[i])
         for i in range(len(pred))
     ]
+
+
+def _prediction_payload(pick: dict[str, Any], actual_i: list[int], game_id: str) -> dict[str, Any] | None:
+    """把一注预测整理成前端对照结构（含 mode / 复式红 / 胆拖）。"""
+    digits = pick.get("digits") or []
+    if not digits:
+        return None
+    try:
+        digits_i = [int(x) for x in digits]
+    except (TypeError, ValueError):
+        return None
+    mode = pick.get("mode")
+    payload: dict[str, Any] = {
+        "digits": digits_i,
+        "display": pick.get("display") or " ".join(str(x) for x in digits_i),
+        "hits": _prediction_hits(game_id, digits_i, actual_i, mode=mode),
+        "source": pick.get("source") or "frequency",
+    }
+    if mode:
+        payload["mode"] = mode
+    for key in ("red", "dan", "tuo"):
+        vals = pick.get(key)
+        if isinstance(vals, list) and vals:
+            try:
+                payload[key] = [int(x) for x in vals]
+            except (TypeError, ValueError):
+                pass
+    if pick.get("blue") is not None:
+        try:
+            payload["blue"] = int(pick["blue"])
+        except (TypeError, ValueError):
+            pass
+    if pick.get("label"):
+        payload["label"] = str(pick["label"])
+    if pick.get("bets") is not None:
+        try:
+            payload["bets"] = int(pick["bets"])
+        except (TypeError, ValueError):
+            pass
+    if pick.get("amount") is not None:
+        try:
+            payload["amount"] = int(pick["amount"])
+        except (TypeError, ValueError):
+            pass
+    return payload
 
 
 def _retro_picks(game_id: str, prior_draws: list[dict]) -> list[dict[str, Any]]:
@@ -489,25 +565,18 @@ def _retro_picks(game_id: str, prior_draws: list[dict]) -> list[dict[str, Any]]:
         analysis = _analyze_draws(draws, alphabets)
         recs = _build_recommendations(game_id, draws, analysis, seed=seed)
 
+    from service.digital_rec_store import _pick_from_rec
+
     out: list[dict[str, Any]] = []
     for rec in (recs or [])[:5]:
-        digits = rec.get("digits") or []
-        try:
-            digits_i = [int(x) for x in digits]
-        except (TypeError, ValueError):
-            continue
-        if not digits_i:
-            continue
-        out.append({
-            "digits": digits_i,
-            "display": str(rec.get("display") or " ".join(str(x) for x in digits_i)),
-            "source": rec.get("source") or "frequency",
-        })
+        pick = _pick_from_rec(rec if isinstance(rec, dict) else {})
+        if pick:
+            out.append(pick)
     return out
 
 
 def enrich_draws_with_predictions(game_id: str, rows: list[dict]) -> list[dict]:
-    """为历史开奖行附加最多 5 注预测号码与各位命中标记。"""
+    """为历史开奖行附加最多 5 注预测号码与各位命中标记（含复式/胆拖）。"""
     from service.digital_rec_store import get_stored_picks
 
     out: list[dict] = []
@@ -520,6 +589,16 @@ def enrich_draws_with_predictions(game_id: str, rows: list[dict]) -> list[dict]:
             picks = get_stored_picks(game_id, based_on)
         if not picks and prior:
             picks = _retro_picks(game_id, prior)
+        elif game_id == "ssq" and prior:
+            # 旧记录只存了 3 注单式：用回放补上复式/胆拖，便于全面对照
+            modes = {str(p.get("mode") or "ssq") for p in picks}
+            if "fushi" not in modes or "dantuo" not in modes:
+                retro = _retro_picks(game_id, prior)
+                for r in retro:
+                    m = str(r.get("mode") or "")
+                    if m in ("fushi", "dantuo") and m not in modes:
+                        picks.append(r)
+                        modes.add(m)
 
         actual = row.get("digits") or []
         try:
@@ -530,15 +609,9 @@ def enrich_draws_with_predictions(game_id: str, rows: list[dict]) -> list[dict]:
         predictions: list[dict[str, Any]] = []
         if picks and actual_i:
             for p in picks:
-                digits = p.get("digits") or []
-                if not digits:
-                    continue
-                predictions.append({
-                    "digits": digits,
-                    "display": p.get("display") or " ".join(str(x) for x in digits),
-                    "hits": _prediction_hits(game_id, digits, actual_i),
-                    "source": p.get("source") or "frequency",
-                })
+                payload = _prediction_payload(p, actual_i, game_id)
+                if payload:
+                    predictions.append(payload)
 
         if predictions:
             item["predictions"] = predictions
@@ -548,8 +621,6 @@ def enrich_draws_with_predictions(game_id: str, rows: list[dict]) -> list[dict]:
             item["prediction_hits"] = predictions[0]["hits"]
         out.append(item)
     return out
-
-
 def _history_pool_row(r: dict) -> dict[str, Any]:
     return {
         "issue": r["issue"],
