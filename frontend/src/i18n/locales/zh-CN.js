@@ -331,7 +331,7 @@ export default {
     rulesTitle: '玩法与奖金',
     pickTitle: '选号',
     recommendTitle: '号码推荐（每玩法 5 注）',
-    recommendHint: '双色球参考历史红球和值与蓝球 01–10；含最低金额复式（7红+1蓝=14元）与 2 胆胆拖；开奖后按新期号轮换，可点「换一批」。',
+    recommendHint: '双色球参考历史红球和值与蓝球区间；复式=主推扩1红同蓝（14元），胆拖胆码锚定主推；开奖后按新期号轮换，可点「换一批」。',
     recommendEmpty: '暂无足够开奖数据生成推荐',
     sampleSize: '样本 {n} 期',
     basedOnIssue: '基于第 {issue} 期后',

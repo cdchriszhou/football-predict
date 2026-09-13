@@ -780,10 +780,12 @@ def build_ssq_dantuo(
     *,
     seed: int = 0,
     avoid_blues: set[int] | None = None,
+    anchor_reds: list[int] | None = None,
 ) -> dict[str, Any]:
     """生成胆拖参考：固定 2 胆 + 5 拖 + 1 蓝。注数 C(5,4)=5，金额 10 元。
 
-    胆码不用「热号 Top2」（回测 50 期双胆齐中率约 0），改为全池轻权 + 分属不同区间。
+    若提供主推单式 anchor_reds，则 2 胆从主推中跨区抽取（与复式同属一包，避免脱节）；
+    否则全池轻权 + 分属不同区间。
     """
     import random as _random
     from math import comb
@@ -795,34 +797,65 @@ def build_ssq_dantuo(
     avoid_blues = {int(x) for x in (avoid_blues or set())}
 
     all_reds = list(range(1, 34))
-    # 两胆：轻权抽样，强制不同区间
+    anchor = sorted({int(x) for x in (anchor_reds or []) if 1 <= int(x) <= 33})
+
     dan: list[int] = []
-    for _ in range(40):
-        if len(dan) >= 2:
-            break
-        n = int(_weighted_sample(
-            [x for x in all_reds if x not in dan],
-            1,
-            lambda x: 0.85 + 0.15 * float(red_map.get(x, 0.5)),
-            rng,
-        )[0])
-        if not dan:
-            dan.append(n)
-            continue
-        z0 = 0 if dan[0] <= 11 else (1 if dan[0] <= 22 else 2)
-        zn = 0 if n <= 11 else (1 if n <= 22 else 2)
-        if zn != z0:
-            dan.append(n)
-    while len(dan) < 2:
-        for n in all_reds:
-            if n not in dan:
-                dan.append(n)
+    if len(anchor) >= 2:
+        # 主推锚定：两胆尽量跨区，优先取自主推红球
+        for _ in range(40):
             if len(dan) >= 2:
                 break
+            cand = [x for x in anchor if x not in dan]
+            if not cand:
+                break
+            n = int(_weighted_sample(
+                cand,
+                1,
+                lambda x: 0.85 + 0.15 * float(red_map.get(x, 0.5)),
+                rng,
+            )[0])
+            if not dan:
+                dan.append(n)
+                continue
+            z0 = 0 if dan[0] <= 11 else (1 if dan[0] <= 22 else 2)
+            zn = 0 if n <= 11 else (1 if n <= 22 else 2)
+            if zn != z0 or len(cand) == 1:
+                dan.append(n)
+        while len(dan) < 2:
+            for n in anchor + all_reds:
+                if n not in dan:
+                    dan.append(n)
+                if len(dan) >= 2:
+                    break
+    else:
+        # 无锚定：全池轻权，强制不同区间
+        for _ in range(40):
+            if len(dan) >= 2:
+                break
+            n = int(_weighted_sample(
+                [x for x in all_reds if x not in dan],
+                1,
+                lambda x: 0.85 + 0.15 * float(red_map.get(x, 0.5)),
+                rng,
+            )[0])
+            if not dan:
+                dan.append(n)
+                continue
+            z0 = 0 if dan[0] <= 11 else (1 if dan[0] <= 22 else 2)
+            zn = 0 if n <= 11 else (1 if n <= 22 else 2)
+            if zn != z0:
+                dan.append(n)
+        while len(dan) < 2:
+            for n in all_reds:
+                if n not in dan:
+                    dan.append(n)
+                if len(dan) >= 2:
+                    break
     dan = sorted(dan[:2])
 
-    # 拖码：跨区覆盖，避开胆码
-    pool = [n for n in all_reds if n not in dan]
+    # 拖码：跨区覆盖，避开胆码；优先补主推未入胆的号，再扩全池
+    prefer = [n for n in anchor if n not in dan]
+    pool = prefer + [n for n in all_reds if n not in dan and n not in prefer]
     tuo: list[int] = []
     for bucket in (
         [n for n in pool if 1 <= n <= 11],
@@ -862,6 +895,7 @@ def build_ssq_dantuo(
             hi=_SUM_EXTREME_HI,
             target=float(sum_stats.get("mean") or 102),
         )
+        # 和值修正不得拆掉胆码
         tuo = sorted((set(sample6) | set(tuo)) - set(dan))
         while len(tuo) < 5:
             for n in all_reds:
@@ -894,6 +928,7 @@ def build_ssq_dantuo(
         + " | 拖 " + " ".join(_fmt_ball(x) for x in tuo)
         + " | 蓝 " + _fmt_ball(blue)
     )
+    anchor_note = "胆码取自主推单式并跨区；" if len(anchor) >= 2 else "固定 2 胆（跨区轻权，非热号 Top2）；"
     return {
         "id": "pick-dantuo",
         "mode": "dantuo",
@@ -910,8 +945,8 @@ def build_ssq_dantuo(
         "bets": bets,
         "amount": amount,
         "reason": (
-            f"固定 2 胆（跨区轻权，非热号 Top2）+ 5 拖；"
-            f"注数 {bets}（C({len(tuo)},{need})），金额 {amount} 元；"
+            f"{anchor_note}"
+            f"拖码 5 个；注数 {bets}（C({len(tuo)},{need})），金额 {amount} 元；"
             f"样例和值 {sum(sample_reds)}。仅供参考，不保证命中。"
         ),
         "sum_hint": {
@@ -929,8 +964,14 @@ def build_ssq_fushi(
     seed: int = 0,
     exclude: set[tuple[int, ...]] | None = None,
     avoid_blues: set[int] | None = None,
+    anchor_reds: list[int] | None = None,
+    prefer_blue: int | None = None,
 ) -> dict[str, Any]:
-    """最低红球复式：7 红 + 1 蓝 = C(7,6)×1 = 7 注 = 14 元。"""
+    """最低红球复式：7 红 + 1 蓝 = C(7,6)×1 = 7 注 = 14 元。
+
+    若提供主推单式，则「主推 6 红 + 再扩 1 红」，蓝球沿用主推（典型复式扩号买法），
+    避免复式与主推完全脱节。
+    """
     import random as _random
     from math import comb
     from itertools import combinations
@@ -944,13 +985,37 @@ def build_ssq_fushi(
     rng = _random.Random((int(seed) ^ 0xF151) & 0xFFFFFFFF)
 
     all_reds = list(range(1, 34))
-    # 轻权抽 12 再做三区平衡取 7
-    pool = _weighted_sample(
-        all_reds, 12, lambda n: 0.8 + 0.2 * float(red_map.get(n, 0.5)), rng,
-    )
-    base6 = _zone_balanced_reds(pool + all_reds, per_zone=2)
-    seventh = next((n for n in pool + all_reds if n not in base6), None)
-    reds7 = sorted(set(base6) | ({seventh} if seventh else set()))
+    anchor = sorted({int(x) for x in (anchor_reds or []) if 1 <= int(x) <= 33})
+
+    if len(anchor) >= 6:
+        base6 = anchor[:6]
+        outside = [n for n in all_reds if n not in base6]
+        # 扩一红：轻权 + 优先补主推偏少的大区
+        z_cnt = [
+            sum(1 for n in base6 if 1 <= n <= 11),
+            sum(1 for n in base6 if 12 <= n <= 22),
+            sum(1 for n in base6 if 23 <= n <= 33),
+        ]
+        weak = min(range(3), key=lambda i: z_cnt[i])
+        weak_bucket = [
+            n for n in outside
+            if (weak == 0 and n <= 11) or (weak == 1 and 12 <= n <= 22) or (weak == 2 and n >= 23)
+        ] or outside
+        seventh = int(_weighted_sample(
+            weak_bucket,
+            1,
+            lambda n: 0.8 + 0.2 * float(red_map.get(n, 0.5)),
+            rng,
+        )[0])
+        reds7 = sorted(set(base6) | {seventh})
+    else:
+        # 无锚定：轻权抽 12 再做三区平衡取 7
+        pool = _weighted_sample(
+            all_reds, 12, lambda n: 0.8 + 0.2 * float(red_map.get(n, 0.5)), rng,
+        )
+        base6 = _zone_balanced_reds(pool + all_reds, per_zone=2)
+        seventh = next((n for n in pool + all_reds if n not in base6), None)
+        reds7 = sorted(set(base6) | ({seventh} if seventh else set()))
     while len(reds7) < 7:
         for n in all_reds:
             if n not in reds7:
@@ -959,15 +1024,19 @@ def build_ssq_fushi(
                 break
     reds7 = sorted(reds7)[:7]
 
-    # 蓝：避开单式已用蓝，按评分轻权
-    blues = [b for b in range(1, 17) if b not in avoid_blues] or list(range(1, 17))
-    blue = int(_weighted_sample(
-        blues, 1, lambda n: 0.7 + 0.3 * float(blue_map.get(n, 0.5)), rng,
-    )[0])
+    # 蓝：锚定主推时沿用主推蓝；否则避开单式已用蓝
+    if prefer_blue is not None and 1 <= int(prefer_blue) <= 16:
+        blue = int(prefer_blue)
+    else:
+        blues = [b for b in range(1, 17) if b not in avoid_blues] or list(range(1, 17))
+        blue = int(_weighted_sample(
+            blues, 1, lambda n: 0.7 + 0.3 * float(blue_map.get(n, 0.5)), rng,
+        )[0])
     key = tuple(reds7 + [blue])
-    if key in exclude:
-        alt = [b for b in blues if b != blue] or blues
-        blue = int(_weighted_sample(alt, 1, lambda n: 0.7 + 0.3 * float(blue_map.get(n, 0.5)), rng)[0])
+    if key in exclude and prefer_blue is None:
+        alt = [b for b in range(1, 17) if b != blue and b not in avoid_blues] or [b for b in range(1, 17) if b != blue]
+        if alt:
+            blue = int(_weighted_sample(alt, 1, lambda n: 0.7 + 0.3 * float(blue_map.get(n, 0.5)), rng)[0])
 
     bets = comb(len(reds7), 6)
     amount = bets * int(SSQ_GAME.get("price_per_bet") or 2)
@@ -984,6 +1053,15 @@ def build_ssq_fushi(
             best_diff = diff
             sample_reds = sorted(combo)
 
+    anchored = len(anchor) >= 6
+    if prefer_blue is not None:
+        blue_note = "沿用主推"
+    else:
+        blue_note = f"按频率轻权（低区历史约 {float(blue_zone.get('low_rate') or 0):.0%}）"
+    if anchored:
+        head = f"由主推单式扩 1 红成最低复式：7 红 + 同蓝，注数 {bets}（C(7,6)），金额 {amount} 元；"
+    else:
+        head = f"最低红球复式：7 红 + 1 蓝，注数 {bets}（C(7,6)），金额 {amount} 元；"
     return {
         "id": "pick-fushi",
         "mode": "fushi",
@@ -1002,9 +1080,8 @@ def build_ssq_fushi(
         "amount": amount,
         "red_sum": sum(sample_reds),
         "reason": (
-            f"最低红球复式：7 红 + 1 蓝，注数 {bets}（C(7,6)），金额 {amount} 元；"
-            f"红球全池轻加权+三区覆盖（样例单式和值 {sum(sample_reds)}）；"
-            f"蓝球按频率轻权，低区历史约 {float(blue_zone.get('low_rate') or 0):.0%}。"
+            head
+            + f"红球样例单式和值 {sum(sample_reds)}；蓝球{blue_note}。"
             "仅供参考，不保证命中。"
         ),
     }
@@ -1050,12 +1127,30 @@ def build_ssq_recommendations(
             "bets": 1,
             "amount": 2,
         })
+    anchor_reds = list(recs[0]["red"]) if recs else None
+    anchor_blue = int(recs[0]["blue"]) if recs else None
     if include_fushi:
-        used_blues = {int(r["blue"]) for r in recs if isinstance(r.get("blue"), int)}
-        recs.append(build_ssq_fushi(analysis, seed=seed, exclude=exclude, avoid_blues=used_blues))
+        # 复式锚定主推：蓝球沿用主推，故不把主推蓝放进 avoid
+        used_blues = {
+            int(r["blue"]) for r in recs
+            if isinstance(r.get("blue"), int) and int(r["blue"]) != anchor_blue
+        }
+        recs.append(build_ssq_fushi(
+            analysis,
+            seed=seed,
+            exclude=exclude,
+            avoid_blues=used_blues,
+            anchor_reds=anchor_reds,
+            prefer_blue=anchor_blue,
+        ))
     if include_dantuo:
         used_blues = {int(r["blue"]) for r in recs if isinstance(r.get("blue"), int)}
-        recs.append(build_ssq_dantuo(analysis, seed=seed, avoid_blues=used_blues))
+        recs.append(build_ssq_dantuo(
+            analysis,
+            seed=seed,
+            avoid_blues=used_blues,
+            anchor_reds=anchor_reds,
+        ))
     return recs
 
 
@@ -1254,6 +1349,38 @@ async def get_ssq_recommendations(
             merged.append(rec)
             if len([m for m in merged if m.get("mode") == "ssq"]) >= 3:
                 break
+
+    # 复式/胆拖锚定最终主推（可能已被 AI 替换），避免与展示主推脱节
+    primary = next((m for m in merged if m.get("mode") == "ssq"), None)
+    if primary is not None:
+        anchor_reds = list(primary.get("red") or (primary.get("digits") or [])[:6])
+        try:
+            anchor_blue = int(primary.get("blue") if primary.get("blue") is not None else primary["digits"][6])
+        except (TypeError, ValueError, IndexError, KeyError):
+            anchor_blue = None
+        other_blues = {
+            int(m["blue"]) for m in merged
+            if m.get("mode") == "ssq" and isinstance(m.get("blue"), int) and int(m["blue"]) != anchor_blue
+        }
+        fushi_rec = build_ssq_fushi(
+            analysis,
+            seed=seed,
+            exclude=exclude,
+            avoid_blues=other_blues,
+            anchor_reds=anchor_reds,
+            prefer_blue=anchor_blue,
+        )
+        used_after_fushi = set(other_blues)
+        if anchor_blue is not None:
+            used_after_fushi.add(int(anchor_blue))
+        if isinstance(fushi_rec.get("blue"), int):
+            used_after_fushi.add(int(fushi_rec["blue"]))
+        dantuo_rec = build_ssq_dantuo(
+            analysis,
+            seed=seed,
+            avoid_blues=used_after_fushi,
+            anchor_reds=anchor_reds,
+        )
     if fushi_rec:
         merged.append(fushi_rec)
     if dantuo_rec:
@@ -1309,7 +1436,7 @@ async def get_ssq_recommendations(
                 f"低重叠覆盖（极端和值才软修正；常见带约 "
                 f"{sum_stats.get('target_lo')}–{sum_stats.get('target_hi')}）；"
                 f"蓝球互异且整包至多 1 个高区；形态仅软偏好（允双连/三连）；"
-                "含最低金额复式与 2 胆胆拖；仅供参考"
+                "复式由主推扩 1 红同蓝、胆拖胆码锚定主推；仅供参考"
                 + (f"；换号批次 {rotate}" if rotate else "")
                 + (
                     f"；并由 {'+'.join(model_names)} 精选部分单式。"

@@ -140,11 +140,28 @@ def test_ssq_package_coverage_and_blue_cap():
 
 
 def test_ssq_package_blues_unique():
+    """单式蓝互异；复式沿用主推蓝；胆拖蓝避开已用。"""
     analysis = analyze_ssq(_make_draws())
     recs = build_ssq_recommendations(analysis, seed=3)
-    blues = [r["blue"] for r in recs if isinstance(r.get("blue"), int)]
-    assert len(blues) == 5
-    assert len(set(blues)) == 5
+    singles = [r for r in recs if r["mode"] == "ssq"]
+    fushi = next(r for r in recs if r["mode"] == "fushi")
+    dantuo = next(r for r in recs if r["mode"] == "dantuo")
+    single_blues = [r["blue"] for r in singles]
+    assert len(set(single_blues)) == len(single_blues)
+    assert fushi["blue"] == singles[0]["blue"]
+    assert dantuo["blue"] not in set(single_blues) | {fushi["blue"]}
+
+
+def test_fushi_and_dantuo_anchor_primary():
+    analysis = analyze_ssq(_make_draws())
+    recs = build_ssq_recommendations(analysis, seed=7)
+    primary = next(r for r in recs if r["mode"] == "ssq")
+    fushi = next(r for r in recs if r["mode"] == "fushi")
+    dantuo = next(r for r in recs if r["mode"] == "dantuo")
+    assert set(primary["red"]).issubset(set(fushi["red"]))
+    assert len(set(fushi["red"]) - set(primary["red"])) == 1
+    assert fushi["blue"] == primary["blue"]
+    assert set(dantuo["dan"]).issubset(set(primary["red"]))
 
 
 def test_ssq_singles_have_basic_shape():
