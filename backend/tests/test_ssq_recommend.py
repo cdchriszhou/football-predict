@@ -204,3 +204,87 @@ def test_validate_ssq_ai():
     assert _validate_ssq_ai({"digits": [10, 11, 12, 13, 14, 15, 3]}) == ([10, 11, 12, 13, 14, 15], 3)
     assert _validate_ssq_ai({"red": [1, 2, 3], "blue": 8}) is None
     assert _validate_ssq_ai({"red": [1, 2, 3, 4, 5, 6], "blue": 99}) is None
+
+
+def test_ssq_reference_score_not_win_prob():
+    """参考度与频率脱钩并压低，避免被读成中奖概率。"""
+    from service.ssq_service import _REF_SCORE_SINGLE, _REF_SCORE_FUSHI, _REF_SCORE_DANTUO
+
+    analysis = analyze_ssq(_make_draws())
+    recs = build_ssq_recommendations(analysis, seed=11)
+    for r in recs:
+        assert r["confidence"] <= 0.40
+        assert "中奖率" in (r.get("reason") or "") or "参考" in (r.get("label") or "") or r["mode"] in (
+            "fushi",
+            "dantuo",
+            "ssq",
+        )
+    singles = [r for r in recs if r["mode"] == "ssq"]
+    assert all(r["confidence"] == _REF_SCORE_SINGLE for r in singles)
+    assert next(r for r in recs if r["mode"] == "fushi")["confidence"] == _REF_SCORE_FUSHI
+    assert next(r for r in recs if r["mode"] == "dantuo")["confidence"] == _REF_SCORE_DANTUO
+    assert all("参考" in r["label"] for r in singles)
+
+
+def test_enforce_repairs_degenerate_package():
+    """出口防退化：重叠蓝、高重叠红、复式/胆拖脱节应被修好。"""
+    from service.ssq_service import _enforce_ssq_package_invariants
+
+    analysis = analyze_ssq(_make_draws())
+    bad = [
+        {
+            "mode": "ssq",
+            "source": "frequency",
+            "red": [1, 2, 3, 4, 5, 6],
+            "blue": 8,
+            "digits": [1, 2, 3, 4, 5, 6, 8],
+            "confidence": 0.9,
+            "label": "坏1",
+        },
+        {
+            "mode": "ssq",
+            "source": "frequency",
+            "red": [1, 2, 3, 4, 7, 8],  # overlap 4 with first
+            "blue": 8,  # dup blue
+            "digits": [1, 2, 3, 4, 7, 8, 8],
+            "confidence": 0.88,
+            "label": "坏2",
+        },
+        {
+            "mode": "ssq",
+            "source": "frequency",
+            "red": [1, 2, 3, 9, 10, 11],  # overlap 3 with first -> still too high for share>=3
+            "blue": 12,  # second high blue
+            "digits": [1, 2, 3, 9, 10, 11, 12],
+            "confidence": 0.85,
+            "label": "坏3",
+        },
+        {
+            "mode": "fushi",
+            "red": [20, 21, 22, 23, 24, 25, 26],
+            "blue": 1,
+            "digits": [20, 21, 22, 23, 24, 25, 1],
+        },
+        {
+            "mode": "dantuo",
+            "dan": [30, 31],
+            "tuo": [1, 2, 3, 4, 5],
+            "blue": 2,
+            "digits": [1, 2, 3, 4, 5, 30, 2],
+        },
+    ]
+    fixed = _enforce_ssq_package_invariants(bad, analysis, seed=99)
+    singles = [r for r in fixed if r["mode"] == "ssq"]
+    fushi = next(r for r in fixed if r["mode"] == "fushi")
+    dantuo = next(r for r in fixed if r["mode"] == "dantuo")
+    sets = [set(r["red"]) for r in singles]
+    blues = [r["blue"] for r in singles]
+    assert len(set(blues)) == len(blues)
+    assert sum(1 for b in blues if b > _BLUE_LOW_MAX) <= 1
+    for i in range(len(sets)):
+        for j in range(i + 1, len(sets)):
+            assert len(sets[i] & sets[j]) <= 2
+    assert set(singles[0]["red"]).issubset(set(fushi["red"]))
+    assert fushi["blue"] == singles[0]["blue"]
+    assert set(dantuo["dan"]).issubset(set(singles[0]["red"]))
+    assert all(r["confidence"] <= 0.40 for r in fixed)

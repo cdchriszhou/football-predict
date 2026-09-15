@@ -1,4 +1,4 @@
-"""福利彩票双色球 — 开奖拉取、频率推荐与可选 AI 精选。"""
+"""福利彩票双色球 — 开奖拉取与分散参考号包（非提奖预测）。"""
 
 from __future__ import annotations
 
@@ -22,7 +22,11 @@ SSQ_GAME = {
     "blue_max": 16,
     "price_per_bet": 2,
     "draw_cycle": "tue_thu_sun",
-    "note": "红球从 01–33 中选 6 个（不重复），蓝球从 01–16 中选 1 个；每周二、四、日开奖。推荐为全号池轻加权参考号（非必中），含最低金额复式与 2 胆胆拖。",
+    "note": (
+        "红球从 01–33 中选 6 个（不重复），蓝球从 01–16 中选 1 个；每周二、四、日开奖。"
+        "系统给出全号池轻加权、低重叠的分散参考号包（含最低复式与 2 胆胆拖），"
+        "用于对照与试玩，不代表更高中奖率。"
+    ),
     "play_types": [
         {
             "id": "single",
@@ -36,7 +40,7 @@ SSQ_GAME = {
             "name": "胆拖投注",
             "prize": None,
             "prize_label": "按单式拆注计奖",
-            "desc": "推荐形态为 2 个胆码（必出）+ 5 个拖码，从拖码中选 4 个凑满 6 红；注数=C(5,4)×蓝球数。",
+            "desc": "参考形态为 2 个胆码（票面必选）+ 5 个拖码，从拖码中选 4 个凑满 6 红；注数=C(5,4)×蓝球数。",
         },
         {
             "id": "fushi",
@@ -47,6 +51,15 @@ SSQ_GAME = {
         },
     ],
 }
+
+# 结构防退化阈值（组包出口硬约束）
+_MAX_SINGLE_RED_SHARE = 3
+_MAX_HIGH_BLUE_IN_SINGLES = 1
+# 参考分与频率脱钩并压低，避免被读成「中奖概率」
+_REF_SCORE_SINGLE = 0.32
+_REF_SCORE_FUSHI = 0.34
+_REF_SCORE_DANTUO = 0.33
+_REF_SCORE_AI = 0.31
 
 _SSQ_URLS = (
     "https://www.cwl.gov.cn/cwl_admin/front/cwlkj/search/kjxx/findDrawNotice",
@@ -917,12 +930,7 @@ def build_ssq_dantuo(
     bets = comb(len(tuo), need) * len(blue_pool) if 0 < need <= len(tuo) else 0
     amount = bets * int(SSQ_GAME.get("price_per_bet") or 2)
 
-    conf = (
-        sum(red_map.get(n, 0.5) for n in dan) / max(1, len(dan))
-        + sum(red_map.get(n, 0.5) for n in tuo) / max(1, len(tuo))
-        + blue_map.get(blue, 0.5)
-    ) / 3
-
+    conf = _REF_SCORE_DANTUO
     display = (
         "胆 " + " ".join(_fmt_ball(x) for x in dan)
         + " | 拖 " + " ".join(_fmt_ball(x) for x in tuo)
@@ -941,13 +949,14 @@ def build_ssq_dantuo(
         "red": sample_reds,
         "digits": sample_reds + [blue],
         "display": display,
-        "confidence": round(min(0.72, conf), 4),
+        "confidence": conf,
         "bets": bets,
         "amount": amount,
         "reason": (
             f"{anchor_note}"
             f"拖码 5 个；注数 {bets}（C({len(tuo)},{need})），金额 {amount} 元；"
-            f"样例和值 {sum(sample_reds)}。仅供参考，不保证命中。"
+            f"样例和值 {sum(sample_reds)}。"
+            "分散参考号包的一种玩法形态，不提高中奖率。"
         ),
         "sum_hint": {
             "target_lo": sum_stats.get("target_lo"),
@@ -1040,10 +1049,7 @@ def build_ssq_fushi(
 
     bets = comb(len(reds7), 6)
     amount = bets * int(SSQ_GAME.get("price_per_bet") or 2)
-    conf = (
-        sum(red_map.get(n, 0.5) for n in reds7) / len(reds7)
-        + blue_map.get(blue, 0.5)
-    ) / 2
+    conf = _REF_SCORE_FUSHI
     target = float(sum_stats.get("mean") or 102)
     sample_reds = sorted(reds7[:6])
     best_diff = abs(sum(sample_reds) - target)
@@ -1057,7 +1063,7 @@ def build_ssq_fushi(
     if prefer_blue is not None:
         blue_note = "沿用主推"
     else:
-        blue_note = f"按频率轻权（低区历史约 {float(blue_zone.get('low_rate') or 0):.0%}）"
+        blue_note = f"按轻权抽样（低区历史约 {float(blue_zone.get('low_rate') or 0):.0%}，非预测）"
     if anchored:
         head = f"由主推单式扩 1 红成最低复式：7 红 + 同蓝，注数 {bets}（C(7,6)），金额 {amount} 元；"
     else:
@@ -1075,16 +1081,185 @@ def build_ssq_fushi(
             "复式红 " + " ".join(_fmt_ball(x) for x in reds7)
             + " + 蓝 " + _fmt_ball(blue)
         ),
-        "confidence": round(min(0.72, conf), 4),
+        "confidence": conf,
         "bets": bets,
         "amount": amount,
         "red_sum": sum(sample_reds),
         "reason": (
             head
             + f"红球样例单式和值 {sum(sample_reds)}；蓝球{blue_note}。"
-            "仅供参考，不保证命中。"
+            "分散参考形态，不提高中奖率。"
         ),
     }
+
+
+def _ssq_single_reds(rec: dict) -> list[int]:
+    reds = rec.get("red")
+    if isinstance(reds, list) and len(reds) >= 6:
+        return sorted({int(x) for x in reds if 1 <= int(x) <= 33})[:6]
+    digits = rec.get("digits") or []
+    return sorted({int(x) for x in digits[:6] if 1 <= int(x) <= 33})[:6]
+
+
+def _ssq_single_blue(rec: dict) -> int | None:
+    b = rec.get("blue")
+    if isinstance(b, int) and 1 <= b <= 16:
+        return int(b)
+    digits = rec.get("digits") or []
+    if len(digits) >= 7:
+        try:
+            b2 = int(digits[6])
+        except (TypeError, ValueError):
+            return None
+        if 1 <= b2 <= 16:
+            return b2
+    return None
+
+
+def _rewrite_ssq_single(rec: dict, reds: list[int], blue: int, *, idx: int) -> dict:
+    reds = sorted({int(x) for x in reds if 1 <= int(x) <= 33})[:6]
+    blue = int(blue)
+    red_sum = sum(reds)
+    out = dict(rec)
+    out.update({
+        "id": f"pick-{idx}",
+        "mode": "ssq",
+        "digits": reds + [blue],
+        "red": reds,
+        "blue": blue,
+        "red_sum": red_sum,
+        "display": " ".join(_fmt_ball(x) for x in reds) + " + " + _fmt_ball(blue),
+        "confidence": _REF_SCORE_AI if out.get("source") == "ai" else _REF_SCORE_SINGLE,
+        "bets": out.get("bets") or 1,
+        "amount": out.get("amount") or 2,
+    })
+    if out.get("source") != "ai":
+        out["reason"] = (
+            f"分散参考单式（和值 {red_sum}）；全号池轻加权抽样，"
+            "与频率冷热脱钩展示参考度，不代表更高中奖率。"
+        )
+    else:
+        reason = str(out.get("reason") or "AI 生成的分散参考号")
+        if "中奖" not in reason and "必中" not in reason:
+            reason = reason.rstrip("。") + "。AI 参考号，不提高中奖率。"
+        out["reason"] = reason
+    return out
+
+
+def _enforce_ssq_package_invariants(
+    recs: list[dict],
+    analysis: dict[str, Any],
+    *,
+    seed: int = 0,
+) -> list[dict]:
+    """组包出口防退化：蓝互异、高区蓝≤1、单式重叠≤3、复式/胆拖锚定主推。"""
+    import random as _random
+
+    if not recs:
+        return recs
+
+    singles = [dict(r) for r in recs if r.get("mode") not in ("fushi", "dantuo")]
+    had_fushi = any(r.get("mode") == "fushi" for r in recs)
+    had_dantuo = any(r.get("mode") == "dantuo" for r in recs)
+    if not singles:
+        return list(recs)
+
+    rng = _random.Random((int(seed) ^ 0xE17A) & 0xFFFFFFFF)
+    all_reds = list(range(1, 34))
+    all_blues = list(range(1, 17))
+
+    def too_similar(reds: list[int], others: list[list[int]], max_share: int = _MAX_SINGLE_RED_SHARE) -> bool:
+        s = set(reds)
+        return any(len(s & set(o)) >= max_share for o in others)
+
+    # --- 修复单式红球过度重叠 ---
+    fixed_singles: list[dict] = []
+    for i, rec in enumerate(singles):
+        reds = _ssq_single_reds(rec)
+        blue = _ssq_single_blue(rec) or 1
+        prev = [_ssq_single_reds(x) for x in fixed_singles]
+        if len(reds) != 6 or too_similar(reds, prev):
+            replaced = False
+            for _ in range(40):
+                cand = sorted(rng.sample(all_reds, 6))
+                if too_similar(cand, prev, max_share=_MAX_SINGLE_RED_SHARE):
+                    continue
+                reds = cand
+                replaced = True
+                break
+            if not replaced:
+                # 兜底：尽量避开已覆盖号
+                covered = set().union(*(set(p) for p in prev)) if prev else set()
+                prefer = [n for n in all_reds if n not in covered] or all_reds
+                reds = sorted(_weighted_sample(prefer + all_reds, 6, lambda _n: 1.0, rng))
+        fixed_singles.append(_rewrite_ssq_single(rec, reds, blue, idx=i + 1))
+
+    # --- 蓝球互异 + 高区至多 1 ---
+    used: set[int] = set()
+    high_n = 0
+    for i, rec in enumerate(fixed_singles):
+        blue = _ssq_single_blue(rec) or 1
+        need_new = blue in used or (blue > _BLUE_LOW_MAX and high_n >= _MAX_HIGH_BLUE_IN_SINGLES)
+        if need_new:
+            low_pool = [b for b in all_blues if b <= _BLUE_LOW_MAX and b not in used]
+            high_pool = [b for b in all_blues if b > _BLUE_LOW_MAX and b not in used]
+            allow_high = high_n < _MAX_HIGH_BLUE_IN_SINGLES and high_pool and rng.random() < _BLUE_HIGH_SHARE
+            pool = (high_pool if allow_high else low_pool) or low_pool or high_pool or [
+                b for b in all_blues if b not in used
+            ] or all_blues
+            blue = int(pool[0])
+        if blue > _BLUE_LOW_MAX:
+            high_n += 1
+        used.add(blue)
+        fixed_singles[i] = _rewrite_ssq_single(rec, _ssq_single_reds(rec), blue, idx=i + 1)
+
+    primary = fixed_singles[0]
+    anchor_reds = _ssq_single_reds(primary)
+    anchor_blue = _ssq_single_blue(primary)
+    out: list[dict] = list(fixed_singles)
+
+    if had_fushi and anchor_blue is not None:
+        other_blues = {
+            b for b in (_ssq_single_blue(r) for r in fixed_singles[1:])
+            if b is not None and b != anchor_blue
+        }
+        out.append(build_ssq_fushi(
+            analysis,
+            seed=seed,
+            avoid_blues=other_blues,
+            anchor_reds=anchor_reds,
+            prefer_blue=anchor_blue,
+        ))
+    if had_dantuo:
+        used_blues = {b for b in (_ssq_single_blue(r) for r in out) if b is not None}
+        # 复式蓝与主推相同，胆拖需避开主推蓝
+        out.append(build_ssq_dantuo(
+            analysis,
+            seed=seed,
+            avoid_blues=used_blues,
+            anchor_reds=anchor_reds,
+        ))
+
+    for i, rec in enumerate(out):
+        if rec.get("mode") == "fushi":
+            rec["id"] = "pick-fushi"
+            rec["label"] = "复式参考"
+            rec["confidence"] = _REF_SCORE_FUSHI
+            continue
+        if rec.get("mode") == "dantuo":
+            rec["id"] = "pick-dantuo"
+            rec["label"] = "胆拖参考"
+            rec["confidence"] = _REF_SCORE_DANTUO
+            continue
+        rec["id"] = f"pick-{i + 1}"
+        if rec.get("source") == "ai":
+            model_label = rec.get("model_label") or "AI"
+            rec["label"] = f"参考 {i + 1} · {model_label}"
+            rec["confidence"] = _REF_SCORE_AI
+        else:
+            rec["label"] = f"参考 {i + 1}"
+            rec["confidence"] = _REF_SCORE_SINGLE
+    return out
 
 
 def build_ssq_recommendations(
@@ -1095,34 +1270,30 @@ def build_ssq_recommendations(
     include_dantuo: bool = True,
     include_fushi: bool = True,
 ) -> list[dict]:
-    red_map = analysis["red_score_map"]
-    blue_map = analysis["blue_score_map"]
     sum_stats = analysis.get("sum_stats") or {}
-    blue_zone = analysis.get("blue_zone") or {}
     single_n = 5 - int(include_dantuo) - int(include_fushi)
     singles = _pick_ssq_sets(analysis, count=max(1, single_n), seed=seed, exclude=exclude)
     recs = []
     for i, (reds, blue) in enumerate(singles):
-        conf = (sum(red_map[n] for n in reds) / 6 + blue_map[blue]) / 2
         red_sum = sum(reds)
         reason = (
-            f"全号池轻加权选号（本注和值 {red_sum}；历史常见约 "
-            f"{sum_stats.get('target_lo')}–{sum_stats.get('target_hi')}）；"
-            f"蓝球互异并保留高低区；仅供参考，不保证命中。"
+            f"分散参考单式（和值 {red_sum}；历史常见约 "
+            f"{sum_stats.get('target_lo')}–{sum_stats.get('target_hi')}）。"
+            "全号池轻加权、低重叠组包；参考度≠中奖概率，不提高中奖率。"
         )
         if i == single_n - 1 and single_n >= 3:
-            reason = "冷号/区间分散策略；" + reason
+            reason = "补覆盖/区间分散；" + reason
         recs.append({
             "id": f"pick-{i + 1}",
             "mode": "ssq",
             "source": "frequency",
-            "label": f"推荐 {i + 1}",
+            "label": f"参考 {i + 1}",
             "digits": reds + [blue],
             "red": reds,
             "blue": blue,
             "red_sum": red_sum,
             "display": " ".join(_fmt_ball(x) for x in reds) + " + " + _fmt_ball(blue),
-            "confidence": round(min(0.72, conf), 4),
+            "confidence": _REF_SCORE_SINGLE,
             "reason": reason,
             "bets": 1,
             "amount": 2,
@@ -1130,7 +1301,6 @@ def build_ssq_recommendations(
     anchor_reds = list(recs[0]["red"]) if recs else None
     anchor_blue = int(recs[0]["blue"]) if recs else None
     if include_fushi:
-        # 复式锚定主推：蓝球沿用主推，故不把主推蓝放进 avoid
         used_blues = {
             int(r["blue"]) for r in recs
             if isinstance(r.get("blue"), int) and int(r["blue"]) != anchor_blue
@@ -1151,7 +1321,7 @@ def build_ssq_recommendations(
             avoid_blues=used_blues,
             anchor_reds=anchor_reds,
         ))
-    return recs
+    return _enforce_ssq_package_invariants(recs, analysis, seed=seed)
 
 
 def _validate_ssq_ai(item: dict) -> tuple[list[int], int] | None:
@@ -1177,7 +1347,7 @@ def _validate_ssq_ai(item: dict) -> tuple[list[int], int] | None:
 
 
 async def ai_refine_ssq(analysis: dict[str, Any], draws: list[dict], base_recs: list[dict]) -> list[dict]:
-    """DeepSeek / 千问 / GLM 并行精选双色球，按共识融合。"""
+    """DeepSeek / 千问 / GLM 并行生成双色球参考号，按共识融合（非提奖）。"""
     from service.digital_ai import (
         configured_digital_models,
         fuse_ai_picks,
@@ -1196,17 +1366,19 @@ async def ai_refine_ssq(analysis: dict[str, Any], draws: list[dict], base_recs: 
     sum_stats = analysis.get("sum_stats") or {}
     blue_zone = analysis.get("blue_zone") or {}
     prompt = (
-        "你是福利彩票双色球选号分析助手。根据历史频率、红球和值分布与蓝球区间给出购彩参考号，不要声称必中。严格输出 JSON。\n"
+        "你是福利彩票双色球「分散参考号」助手。根据历史形态给出购彩参考号，"
+        "明确这不提高中奖率、不要声称更可能中奖或必中。严格输出 JSON。\n"
         "规则: 红球 6 个不重复整数 1-33，蓝球 1 个整数 1-16；"
         f"红球和值尽量落在 {sum_stats.get('target_lo')}–{sum_stats.get('target_hi')}（历史均值约 {sum_stats.get('mean')}）；"
-        f"蓝球倾向 01–{_BLUE_LOW_MAX:02d}，但不要排除 11–16（近窗低区约 {float(blue_zone.get('low_rate') or 0):.0%}）。\n"
+        f"蓝球可覆盖 01–{_BLUE_LOW_MAX:02d} 与 11–16（近窗低区约 {float(blue_zone.get('low_rate') or 0):.0%}）。\n"
         f"样本期数: {analysis['sample_size']}\n"
-        f"热红: {analysis['hot_digits']}, 冷红: {analysis['cold_digits']}\n"
+        f"热红(仅形态参考): {analysis['hot_digits']}, 冷红: {analysis['cold_digits']}\n"
         f"热蓝: {analysis['hot_blue']}, 冷蓝: {analysis['cold_blue']}\n"
-        f"频率候选: {json.dumps(seed, ensure_ascii=False)}\n"
+        f"候选参考: {json.dumps(seed, ensure_ascii=False)}\n"
         f"近12期: {json.dumps(recent, ensure_ascii=False)}\n"
-        '返回: {"picks":[{"red":[1,2,3,4,5,6],"blue":8,"reason":"一句话","confidence":0.7}],"summary":"..."}\n'
-        "要求: picks 恰好 2 注；尽量与候选不完全重复；蓝球可覆盖低区与高区，不要两注都挤在同一小区。"
+        '返回: {"picks":[{"red":[1,2,3,4,5,6],"blue":8,"reason":"一句话说明分散/形态","confidence":0.3}],"summary":"..."}\n'
+        "要求: picks 恰好 2 注；与候选低重叠；confidence 用 0.28–0.35 的参考度（不是中奖概率）；"
+        "蓝球可覆盖低区与高区，不要两注都挤在同一小区。"
     )
 
     model_results = await gather_digital_llm_json(prompt)
@@ -1217,16 +1389,26 @@ async def ai_refine_ssq(analysis: dict[str, Any], draws: list[dict], base_recs: 
 
     def build_rec(validated, conf, reason, _models):
         reds, blue = validated
+        # 压低并钳制，避免模型返回的高 confidence 被当成命中率
+        try:
+            conf_f = float(conf)
+        except (TypeError, ValueError):
+            conf_f = _REF_SCORE_AI
+        conf_f = min(_REF_SCORE_AI + 0.04, max(0.28, conf_f if conf_f <= 0.4 else _REF_SCORE_AI))
+        text = str(reason or "AI 分散参考号")
+        if "中奖率" not in text:
+            text = text.rstrip("。") + "。AI 参考号，不提高中奖率。"
         return {
             "mode": "ssq",
-            "label": "AI 精选",
+            "label": "AI 参考",
             "digits": reds + [blue],
             "red": reds,
             "blue": blue,
             "display": " ".join(_fmt_ball(x) for x in reds) + " + " + _fmt_ball(blue),
-            "confidence": conf,
-            "reason": reason,
+            "confidence": round(conf_f, 4),
+            "reason": text,
             "bets": 1,
+            "amount": 2,
         }
 
     return fuse_ai_picks(
@@ -1280,7 +1462,7 @@ async def get_ssq_recommendations(
     if not draws:
         return {
             "reachable": False,
-            "message": "暂时无法获取双色球官方开奖数据，无法生成频率推荐。请稍后刷新。",
+            "message": "暂时无法获取双色球官方开奖数据，无法生成参考号。请稍后刷新。",
             "game": "ssq",
             "window": window,
             "sample_size": 0,
@@ -1312,7 +1494,7 @@ async def get_ssq_recommendations(
     dantuo_rec = next((r for r in freq_recs if r.get("mode") == "dantuo"), None)
     singles = [r for r in freq_recs if r.get("mode") not in ("dantuo", "fushi")]
 
-    # AI 精选只并入单式，且不得与已有单式红球高度重叠；最后附带复式与胆拖
+    # AI 参考号只并入单式，且不得与已有单式红球高度重叠；最后附带复式与胆拖
     merged: list[dict] = []
     seen: set[tuple] = set()
 
@@ -1350,56 +1532,14 @@ async def get_ssq_recommendations(
             if len([m for m in merged if m.get("mode") == "ssq"]) >= 3:
                 break
 
-    # 复式/胆拖锚定最终主推（可能已被 AI 替换），避免与展示主推脱节
-    primary = next((m for m in merged if m.get("mode") == "ssq"), None)
-    if primary is not None:
-        anchor_reds = list(primary.get("red") or (primary.get("digits") or [])[:6])
-        try:
-            anchor_blue = int(primary.get("blue") if primary.get("blue") is not None else primary["digits"][6])
-        except (TypeError, ValueError, IndexError, KeyError):
-            anchor_blue = None
-        other_blues = {
-            int(m["blue"]) for m in merged
-            if m.get("mode") == "ssq" and isinstance(m.get("blue"), int) and int(m["blue"]) != anchor_blue
-        }
-        fushi_rec = build_ssq_fushi(
-            analysis,
-            seed=seed,
-            exclude=exclude,
-            avoid_blues=other_blues,
-            anchor_reds=anchor_reds,
-            prefer_blue=anchor_blue,
-        )
-        used_after_fushi = set(other_blues)
-        if anchor_blue is not None:
-            used_after_fushi.add(int(anchor_blue))
-        if isinstance(fushi_rec.get("blue"), int):
-            used_after_fushi.add(int(fushi_rec["blue"]))
-        dantuo_rec = build_ssq_dantuo(
-            analysis,
-            seed=seed,
-            avoid_blues=used_after_fushi,
-            anchor_reds=anchor_reds,
-        )
+    # 挂上复式/胆拖后统一结构防退化（按最终主推重锚定）
     if fushi_rec:
         merged.append(fushi_rec)
     if dantuo_rec:
         merged.append(dantuo_rec)
-    for i, rec in enumerate(merged):
-        if rec.get("mode") == "fushi":
-            rec["id"] = "pick-fushi"
-            rec["label"] = "复式参考"
-            continue
-        if rec.get("mode") == "dantuo":
-            rec["id"] = "pick-dantuo"
-            rec["label"] = "胆拖参考"
-            continue
-        rec["id"] = f"pick-{i + 1}"
-        if rec.get("source") == "ai":
-            model_label = rec.get("model_label") or "AI"
-            rec["label"] = f"推荐 {i + 1} · {model_label}"
-        else:
-            rec["label"] = f"推荐 {i + 1}"
+    merged = _enforce_ssq_package_invariants(merged, analysis, seed=seed)
+    fushi_rec = next((r for r in merged if r.get("mode") == "fushi"), None)
+    dantuo_rec = next((r for r in merged if r.get("mode") == "dantuo"), None)
 
     model_names = sorted({
         model_display_name(m)
@@ -1431,21 +1571,26 @@ async def get_ssq_recommendations(
             "blue_zone_prefer": f"01-{_BLUE_LOW_MAX:02d}",
             "dantuo": True,
             "fushi": True,
+            "reference_only": True,
+            "structure_guard": True,
             "desc": (
-                f"基于第 {latest_issue} 期后统计；红球全号池轻加权+"
-                f"低重叠覆盖（极端和值才软修正；常见带约 "
+                f"基于第 {latest_issue} 期后生成分散参考号包（非提奖预测）："
+                f"红球全号池轻加权+低重叠；极端和值才软修正（常见带约 "
                 f"{sum_stats.get('target_lo')}–{sum_stats.get('target_hi')}）；"
-                f"蓝球互异且整包至多 1 个高区；形态仅软偏好（允双连/三连）；"
-                "复式由主推扩 1 红同蓝、胆拖胆码锚定主推；仅供参考"
+                f"蓝球互异且整包至多 1 个高区；形态软偏好；"
+                "复式由主推扩 1 红同蓝、胆拖胆码锚定主推；参考度≠中奖概率"
                 + (f"；换号批次 {rotate}" if rotate else "")
                 + (
-                    f"；并由 {'+'.join(model_names)} 精选部分单式。"
+                    f"；含 {'+'.join(model_names)} 参考单式。"
                     if ai_picks and model_names
-                    else ("；并由 AI 精选部分单式。" if ai_picks else "。可点「换一批」换号。")
+                    else ("；含 AI 参考单式。" if ai_picks else "。可点「换一批」换号。")
                 )
             ),
         },
-        "disclaimer": "历史频率与推荐号不代表下期必然开出，请勿作为必中依据。双色球为福利彩票玩法。",
+        "disclaimer": (
+            "本页为分散参考号包，历史频率与 AI 均不提高中奖率，也不代表下期更可能开出；"
+            "请勿作为必中或投注依据。双色球为福利彩票玩法。"
+        ),
         "recommendations": merged,
         "fushi": fushi_rec,
         "dantuo": dantuo_rec,
@@ -1464,7 +1609,7 @@ async def get_ssq_recommendations(
         "cached": False,
     }
     from service.digital_rec_store import save_primary_prediction
-    # 完整保存 3 单式 + 复式 + 胆拖，供「近期开奖」对照命中
+    # 完整保存 3 单式 + 复式 + 胆拖，供「近期开奖」对照
     save_primary_prediction(
         "ssq",
         latest_issue or None,

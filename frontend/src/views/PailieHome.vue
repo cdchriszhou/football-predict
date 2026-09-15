@@ -150,7 +150,7 @@
                 </el-tag>
                 {{ recLabel(rec) }}
               </span>
-              <span class="rec-conf">{{ Math.round((rec.confidence || 0) * 100) }}%</span>
+              <span class="rec-conf">{{ t('pailie.confidence', { n: Math.round((rec.confidence || 0) * 100) }) }}</span>
             </div>
             <div
               v-if="activeGame === 'ssq' && rec.mode === 'dantuo'"
