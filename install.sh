@@ -119,8 +119,21 @@ log "Playwright Chromium installed"
 
 echo "[5/5] Installing frontend dependencies..."
 cd "$FRONTEND_DIR"
-npm install
-log "Frontend packages installed"
+# Production packages already ship frontend/dist + server.js (no npm deps).
+# Skip npm install when dist is present to avoid hanging on slow/blocked registry.
+if [ -f "$FRONTEND_DIR/dist/index.html" ] && [ -f "$FRONTEND_DIR/server.js" ]; then
+    log "frontend/dist present — skipping npm install (production static server needs no node_modules)"
+else
+    warn "frontend/dist missing — running npm install (may be slow; use a mirror if it hangs)"
+    # Prefer China-friendly mirror when default registry is unreachable
+    if ! npm ping --registry https://registry.npmjs.org >/dev/null 2>&1; then
+        warn "npmjs.org unreachable — trying npmmirror"
+        npm install --registry=https://registry.npmmirror.com
+    else
+        npm install
+    fi
+    log "Frontend packages installed"
+fi
 
 # ── Environment file ───────────────────────────────────────
 
