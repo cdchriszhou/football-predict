@@ -24,15 +24,17 @@ def _has_column(inspector, table: str, col: str) -> bool:
 def upgrade() -> None:
     conn = op.get_bind()
     inspector = sa.inspect(conn)
+    tables = set(inspector.get_table_names())
 
-    if not _has_column(inspector, 'matches', 'competition_slug'):
+    # Fresh/empty DB: tables are created by create_all; do not ALTER missing tables.
+    if 'matches' in tables and not _has_column(inspector, 'matches', 'competition_slug'):
         with op.batch_alter_table('matches') as batch_op:
             batch_op.add_column(
                 sa.Column('competition_slug', sa.String(40), nullable=False, server_default='worldcup-2026')
             )
         op.create_index('ix_matches_competition_slug', 'matches', ['competition_slug'])
 
-    if not _has_column(inspector, 'teams', 'competition_slug'):
+    if 'teams' in tables and not _has_column(inspector, 'teams', 'competition_slug'):
         with op.batch_alter_table('teams') as batch_op:
             batch_op.add_column(
                 sa.Column('competition_slug', sa.String(40), nullable=False, server_default='worldcup-2026')

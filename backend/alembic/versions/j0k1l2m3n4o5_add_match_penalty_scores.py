@@ -18,6 +18,8 @@ depends_on: Union[str, Sequence[str], None] = None
 def upgrade() -> None:
     conn = op.get_bind()
     inspector = sa.inspect(conn)
+    if 'matches' not in inspector.get_table_names():
+        return
     cols = {c['name'] for c in inspector.get_columns('matches')}
     if 'penalty_a' not in cols:
         op.add_column('matches', sa.Column('penalty_a', sa.Integer(), nullable=True, comment='点球大战主队得分'))
@@ -28,6 +30,8 @@ def upgrade() -> None:
 def downgrade() -> None:
     conn = op.get_bind()
     inspector = sa.inspect(conn)
+    if 'matches' not in inspector.get_table_names():
+        return
     cols = {c['name'] for c in inspector.get_columns('matches')}
     if 'penalty_b' in cols:
         op.drop_column('matches', 'penalty_b')

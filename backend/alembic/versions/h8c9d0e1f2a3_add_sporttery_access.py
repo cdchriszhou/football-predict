@@ -24,6 +24,8 @@ def _has_column(inspector, table: str, col: str) -> bool:
 def upgrade() -> None:
     conn = op.get_bind()
     inspector = sa.inspect(conn)
+    if 'users' not in inspector.get_table_names():
+        return
     if not _has_column(inspector, 'users', 'can_access_sporttery'):
         with op.batch_alter_table('users') as batch_op:
             batch_op.add_column(

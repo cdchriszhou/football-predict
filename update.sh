@@ -288,9 +288,9 @@ if [ -f "$DEPLOY_DIR/backend/requirements.txt" ]; then
     log "Python dependencies up to date"
 fi
 
-# Database migrations
+# Database migrations (create_all first, then alembic — same order as init_db)
 if [ -f "$DEPLOY_DIR/backend/alembic.ini" ]; then
-    log "Running database migrations..."
+    log "Bootstrapping database schema..."
     if [ -f "$DEPLOY_DIR/lib/ensure-venv.sh" ]; then
         source "$DEPLOY_DIR/lib/ensure-venv.sh"
         ensure_python_venv "$DEPLOY_DIR/backend"
@@ -298,9 +298,14 @@ if [ -f "$DEPLOY_DIR/backend/alembic.ini" ]; then
         # shellcheck disable=SC1090
         source "$DEPLOY_DIR/backend/venv/bin/activate"
     fi
-    (cd "$DEPLOY_DIR/backend" && python -m alembic upgrade head) 2>&1 | sed 's/^/  /' || warn "Alembic migration failed — check logs"
+    if [ -f "$DEPLOY_DIR/backend/scripts/bootstrap_schema.py" ]; then
+        (cd "$DEPLOY_DIR/backend" && python scripts/bootstrap_schema.py) 2>&1 | sed 's/^/  /' \
+            || warn "Schema bootstrap failed — check logs"
+    else
+        (cd "$DEPLOY_DIR/backend" && python -m alembic upgrade head) 2>&1 | sed 's/^/  /' \
+            || warn "Alembic migration failed — check logs"
+    fi
 fi
-
 
 # ── Restart services ────────────────────────────────────────
 

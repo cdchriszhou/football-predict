@@ -24,6 +24,8 @@ def _has_column(inspector, table: str, col: str) -> bool:
 def upgrade() -> None:
     conn = op.get_bind()
     inspector = sa.inspect(conn)
+    if 'teams' not in inspector.get_table_names():
+        return
     cols = [
         ('points', sa.Integer()),
         ('played', sa.Integer()),

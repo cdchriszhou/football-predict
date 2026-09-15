@@ -24,27 +24,30 @@ def _has_column(inspector, table: str, col: str) -> bool:
 def upgrade() -> None:
     conn = op.get_bind()
     inspector = sa.inspect(conn)
+    tables = set(inspector.get_table_names())
 
     match_cols = [
         ('season', sa.String(20), None),
         ('matchday', sa.Integer(), None),
         ('external_id', sa.Integer(), None),
     ]
-    for col, typ, default in match_cols:
-        if not _has_column(inspector, 'matches', col):
-            with op.batch_alter_table('matches') as batch_op:
-                batch_op.add_column(sa.Column(col, typ, nullable=True))
+    if 'matches' in tables:
+        for col, typ, default in match_cols:
+            if not _has_column(inspector, 'matches', col):
+                with op.batch_alter_table('matches') as batch_op:
+                    batch_op.add_column(sa.Column(col, typ, nullable=True))
 
     team_cols = [
         ('external_id', sa.Integer(), None),
         ('season', sa.String(20), None),
     ]
-    for col, typ, default in team_cols:
-        if not _has_column(inspector, 'teams', col):
-            with op.batch_alter_table('teams') as batch_op:
-                batch_op.add_column(sa.Column(col, typ, nullable=True))
+    if 'teams' in tables:
+        for col, typ, default in team_cols:
+            if not _has_column(inspector, 'teams', col):
+                with op.batch_alter_table('teams') as batch_op:
+                    batch_op.add_column(sa.Column(col, typ, nullable=True))
 
-    if not _has_column(inspector, 'players', 'nationality'):
+    if 'players' in tables and not _has_column(inspector, 'players', 'nationality'):
         with op.batch_alter_table('players') as batch_op:
             batch_op.add_column(sa.Column('nationality', sa.String(50), nullable=True))
 
