@@ -1,7 +1,8 @@
 #!/bin/bash
 # ============================================================
-#  2026 World Cup Predictor — Ubuntu Dependency Installer
-#  Run once on a fresh Ubuntu system before ./start.sh
+#  2026 World Cup Predictor — One-shot installer (Ubuntu)
+#  Usage:  cd /mnt/worldcup-predict && ./install.sh
+#  Then:   ./start-prod.sh
 # ============================================================
 
 set -e
@@ -38,104 +39,94 @@ warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
 err()  { echo -e "${RED}[ERROR]${NC} $1"; }
 
 echo "=============================================="
-echo " 2026 World Cup Predictor — Install Dependencies"
+echo " 2026 World Cup Predictor — Install"
 echo "=============================================="
 
-# Check Ubuntu
 if [ -f /etc/os-release ]; then
+    # shellcheck disable=SC1091
     . /etc/os-release
     echo "  Detected: $NAME $VERSION_ID"
-else
-    echo "  Non-Ubuntu system — proceeding anyway"
 fi
 echo ""
 
 # ── 1. System packages ───────────────────────────────────
 
-echo "[1/5] Installing system packages..."
-
+echo "[1/6] System packages..."
 sudo apt update -qq 2>&1 | tail -1
-
 sudo apt install -y -qq python3 python3-venv python3-pip
 log "Python 3 + venv + pip"
-
 sudo apt install -y -qq redis-server
-log "Redis server"
+log "Redis"
 
-# Node.js 20.x from NodeSource
 if ! command -v node &> /dev/null; then
     NODE_MAJOR=20
-    curl -fsSL https://deb.nodesource.com/setup_${NODE_MAJOR}.x | sudo -E bash -
+    curl -fsSL "https://deb.nodesource.com/setup_${NODE_MAJOR}.x" | sudo -E bash -
     sudo apt install -y -qq nodejs
     log "Node.js $(node -v)"
 else
     log "Node.js $(node -v) (already installed)"
 fi
 
-# Playwright Chromium system deps
+# Playwright OS libs (best-effort; package names differ by Ubuntu version)
 sudo apt install -y -qq \
     libnss3 libnspr4 libatk-bridge2.0-0 libdrm2 libxkbcommon0 \
     libxcomposite1 libxdamage1 libxrandr2 libgbm1 libpango-1.0-0 \
-    libcairo2 libasound2t64 libatspi2.0-0 libx11-xcb1 libxcursor1 \
+    libcairo2 libatspi2.0-0 libx11-xcb1 libxcursor1 \
     libxfixes3 libxi6 libxrender1 libxtst6 libcups2 libdbus-1-3 \
-    libwayland-client0
-log "Playwright system dependencies"
+    libwayland-client0 2>/dev/null \
+    || sudo apt install -y -qq \
+        libnss3 libatk-bridge2.0-0 libdrm2 libxkbcommon0 \
+        libxcomposite1 libxdamage1 libxrandr2 libgbm1 \
+        libasound2t64 2>/dev/null \
+    || warn "Some Playwright system libs missing — crawl browser may fail later"
+log "System packages ready"
 
-# ── 2. Start & enable Redis ──────────────────────────────
+# ── 2. Redis ─────────────────────────────────────────────
 
-echo "[2/5] Configuring Redis..."
-
+echo "[2/6] Redis..."
 if systemctl is-active --quiet redis-server 2>/dev/null; then
-    log "Redis is already running"
+    log "Redis already running"
 else
     sudo systemctl start redis-server 2>/dev/null \
         || sudo service redis-server start 2>/dev/null \
-        || warn "Could not start Redis"
-    log "Redis started"
+        || warn "Could not start Redis (app can fall back to memory cache)"
 fi
 sudo systemctl enable redis-server 2>/dev/null || true
-log "Redis enabled on boot"
 
-# ── 3. Python venv + dependencies ────────────────────────
+# ── 3. Python ────────────────────────────────────────────
 
-echo "[3/5] Installing Python dependencies..."
-
+echo "[3/6] Python dependencies..."
 ensure_python_venv "$BACKEND_DIR"
-log "Python venv ready"
-
+log "venv ready"
 pip install --upgrade pip -q
-log "pip upgraded"
-
-pip install -r "$BACKEND_DIR/requirements.txt"
+pip install -r "$BACKEND_DIR/requirements.txt" -q
 log "Python packages installed"
 
-# ── 4. Playwright browser ─────────────────────────────────
+# ── 4. Playwright browser (optional, non-fatal) ──────────
 
-echo "[4/5] Installing Playwright Chromium..."
-playwright install chromium
-log "Playwright Chromium installed"
-
-# ── 5. Frontend dependencies ──────────────────────────────
-
-echo "[5/5] Installing frontend dependencies..."
-cd "$FRONTEND_DIR"
-# Production packages already ship frontend/dist + server.js (no npm deps).
-# Skip npm install when dist is present to avoid hanging on slow/blocked registry.
-if [ -f "$FRONTEND_DIR/dist/index.html" ] && [ -f "$FRONTEND_DIR/server.js" ]; then
-    log "frontend/dist present — skipping npm install (production static server needs no node_modules)"
+echo "[4/6] Playwright Chromium (optional)..."
+if playwright install chromium; then
+    log "Playwright Chromium installed"
 else
-    warn "frontend/dist missing — running npm install (may be slow; use a mirror if it hangs)"
-    # Prefer China-friendly mirror when default registry is unreachable
-    if ! npm ping --registry https://registry.npmjs.org >/dev/null 2>&1; then
-        warn "npmjs.org unreachable — trying npmmirror"
-        npm install --registry=https://registry.npmmirror.com
-    else
-        npm install
-    fi
+    warn "Playwright install failed/skipped — app still starts; league crawl may need it later"
+fi
+
+# ── 5. Frontend (skip npm for production packages) ───────
+
+echo "[5/6] Frontend..."
+cd "$FRONTEND_DIR"
+if [ -f "$FRONTEND_DIR/dist/index.html" ] && [ -f "$FRONTEND_DIR/server.js" ]; then
+    log "frontend/dist ready — skip npm install"
+else
+    warn "No dist/ — installing npm deps via npmmirror"
+    npm install --registry=https://registry.npmmirror.com
     log "Frontend packages installed"
 fi
 
-# ── Environment file ───────────────────────────────────────
+# ── 6. .env + database schema ────────────────────────────
+
+echo "[6/6] Config & database..."
+cd "$DIR"
 
 if [ -f "$DIR/lib/merge-env.sh" ]; then
     # shellcheck source=lib/merge-env.sh
@@ -146,34 +137,55 @@ if [ -f "$DIR/lib/merge-env.sh" ]; then
     fi
     merge_env_file "$DIR/.env.example" "$DIR/.env"
 fi
-
 if [ -f "$DIR/lib/fix-crlf.sh" ]; then
     # shellcheck source=lib/fix-crlf.sh
     source "$DIR/lib/fix-crlf.sh"
     fix_crlf_dotenv "$DIR"
 fi
 
-# ── Done ──────────────────────────────────────────────────
+# Ensure production defaults exist (do not overwrite strong secrets)
+if [ -f "$DIR/.env" ]; then
+    grep -q '^APP_ENV=' "$DIR/.env" 2>/dev/null || echo 'APP_ENV=production' >> "$DIR/.env"
+    # shellcheck disable=SC1091
+    set -a; . "$DIR/.env"; set +a
+fi
+
+ensure_python_venv "$BACKEND_DIR"
+if [ -f "$BACKEND_DIR/scripts/bootstrap_schema.py" ]; then
+    (cd "$BACKEND_DIR" && python scripts/bootstrap_schema.py) \
+        && log "Database schema ready" \
+        || warn "Schema bootstrap failed — check backend logs / .env DATABASE_URL"
+else
+    (cd "$BACKEND_DIR" && python -m alembic upgrade head) \
+        && log "Alembic migrations applied" \
+        || warn "Alembic failed — check backend logs"
+fi
+
+NEED_ENV=0
+if [ -z "${ADMIN_PASSWORD:-}" ] || [ "$ADMIN_PASSWORD" = "change-me-in-production" ]; then
+    NEED_ENV=1
+fi
+if [ -z "${JWT_SECRET:-}" ] || [ "$JWT_SECRET" = "change-me-in-production" ]; then
+    NEED_ENV=1
+fi
 
 echo ""
 echo "=============================================="
-echo "  Installation complete!"
+echo "  Install complete"
+echo "=============================================="
+if [ "$NEED_ENV" -eq 1 ]; then
+    echo ""
+    echo "  请编辑密码后再启动："
+    echo "    nano $DIR/.env"
+    echo "    设置 ADMIN_PASSWORD 与 JWT_SECRET，保存后执行："
+    echo "    ./start-prod.sh"
+else
+    echo ""
+    echo "  直接启动："
+    echo "    ./start-prod.sh"
+fi
 echo ""
-echo "  Edit .env (set APP_ENV=production, ADMIN_PASSWORD, JWT_SECRET), then:"
-echo "    ./start.sh   # Launch backend + frontend"
-echo "    ./stop.sh    # Stop all services"
-echo ""
-echo "  Development:"
-echo "    ./start.sh   -> http://localhost:5173"
-echo "  Production (Linux):"
-echo "    cd frontend && npm run build && cd .."
-echo "    ./start-prod.sh -> http://localhost:4173 (login: server URL empty)"
-echo "    Backend API: http://localhost:8888/docs"
-echo "  Production (Windows):"
-echo "    install.bat then start-prod.bat / stop-prod.bat"
-echo ""
-echo "  External access — open firewall ports:"
-echo "    sudo ufw allow 5173/tcp"
-echo "    sudo ufw allow 8888/tcp"
-echo "    (Also configure your cloud security group)"
+echo "  前端: http://<服务器IP>:4173  （登录页服务器地址留空）"
+echo "  后端: http://<服务器IP>:8888/docs"
+echo "  停止: ./stop-prod.sh"
 echo "=============================================="
