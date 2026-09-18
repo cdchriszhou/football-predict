@@ -557,6 +557,9 @@ def _ticket_shape_ok(reds: list[int]) -> bool:
         return False
     if max(z1, z2, z3) == 6:
         return False
+    # 拒绝「两翼有号、中区全空」的双峰怪号（如 3-0-3）；近窗约 83% 三区都有号
+    if z2 == 0 and z1 >= 2 and z3 >= 2:
+        return False
     # 连号段：允许双连/三连，至多两段；禁止四连及以上或三段双连堆叠
     runs: list[int] = []
     i = 0
@@ -672,9 +675,9 @@ def _pick_ssq_sets(
         return True
     def pick_blue(*, prefer_high: bool = False) -> int:
         high_count = sum(1 for _, b in picks if b > _BLUE_LOW_MAX)
-        # 约按历史高区占比决定是否放 1 个高区蓝，避免「每包必有高区」的刻板印象
-        want_high = prefer_high and high_count == 0 and rng.random() < max(0.22, min(0.35, 1.0 - low_rate))
-        if high_count >= 1 or (not want_high and rng.random() < low_rate):
+        # 三注单式整包固定预留恰好 1 个高区蓝（历史高区约 28%）：prefer_high 时若尚无则必出
+        want_high = prefer_high and high_count == 0
+        if high_count >= _MAX_HIGH_BLUE_IN_SINGLES or (not want_high and rng.random() < low_rate):
             cand = [b for b in all_blues if b <= _BLUE_LOW_MAX and b not in used_blues]
             if not cand:
                 cand = [b for b in all_blues if b not in used_blues] or all_blues
@@ -746,7 +749,7 @@ def _pick_ssq_sets(
                 if accept(soft_extreme(sorted(rng.sample(all_reds, 6))), pick_blue(), max_share=4):
                     break
 
-    # 3) 三区平衡；高区蓝按历史占比概率出现（非整包必出）
+    # 3) 三区平衡；此注负责给出整包唯一高区蓝
     cands = []
     for _ in range(30):
         cands.append(
@@ -1152,7 +1155,7 @@ def _enforce_ssq_package_invariants(
     *,
     seed: int = 0,
 ) -> list[dict]:
-    """组包出口防退化：蓝互异、高区蓝≤1、单式重叠≤3、复式/胆拖锚定主推。"""
+    """组包出口防退化：蓝互异、高区蓝恰好 1、单式重叠≤3、复式/胆拖锚定主推。"""
     import random as _random
 
     if not recs:
@@ -1172,29 +1175,33 @@ def _enforce_ssq_package_invariants(
         s = set(reds)
         return any(len(s & set(o)) >= max_share for o in others)
 
-    # --- 修复单式红球过度重叠 ---
+    # --- 修复单式红球过度重叠（优先形态合格）---
     fixed_singles: list[dict] = []
     for i, rec in enumerate(singles):
         reds = _ssq_single_reds(rec)
         blue = _ssq_single_blue(rec) or 1
         prev = [_ssq_single_reds(x) for x in fixed_singles]
-        if len(reds) != 6 or too_similar(reds, prev):
+        if len(reds) != 6 or too_similar(reds, prev) or not _ticket_shape_ok(reds):
             replaced = False
-            for _ in range(40):
-                cand = sorted(rng.sample(all_reds, 6))
-                if too_similar(cand, prev, max_share=_MAX_SINGLE_RED_SHARE):
-                    continue
-                reds = cand
-                replaced = True
-                break
+            for prefer_ok in (True, False):
+                for _ in range(40):
+                    cand = sorted(rng.sample(all_reds, 6))
+                    if too_similar(cand, prev, max_share=_MAX_SINGLE_RED_SHARE):
+                        continue
+                    if prefer_ok and not _ticket_shape_ok(cand):
+                        continue
+                    reds = cand
+                    replaced = True
+                    break
+                if replaced:
+                    break
             if not replaced:
-                # 兜底：尽量避开已覆盖号
                 covered = set().union(*(set(p) for p in prev)) if prev else set()
                 prefer = [n for n in all_reds if n not in covered] or all_reds
                 reds = sorted(_weighted_sample(prefer + all_reds, 6, lambda _n: 1.0, rng))
         fixed_singles.append(_rewrite_ssq_single(rec, reds, blue, idx=i + 1))
 
-    # --- 蓝球互异 + 高区至多 1 ---
+    # --- 蓝球互异 + 高区恰好 1（≥2 注时）---
     used: set[int] = set()
     high_n = 0
     for i, rec in enumerate(fixed_singles):
@@ -1203,15 +1210,50 @@ def _enforce_ssq_package_invariants(
         if need_new:
             low_pool = [b for b in all_blues if b <= _BLUE_LOW_MAX and b not in used]
             high_pool = [b for b in all_blues if b > _BLUE_LOW_MAX and b not in used]
-            allow_high = high_n < _MAX_HIGH_BLUE_IN_SINGLES and high_pool and rng.random() < _BLUE_HIGH_SHARE
+            # 末注且尚无高区时强制补高区，避免整包只有低区蓝
+            force_high = (
+                high_n == 0
+                and i == len(fixed_singles) - 1
+                and len(fixed_singles) >= 2
+                and bool(high_pool)
+            )
+            allow_high = force_high or (
+                high_n < _MAX_HIGH_BLUE_IN_SINGLES and high_pool and rng.random() < _BLUE_HIGH_SHARE
+            )
             pool = (high_pool if allow_high else low_pool) or low_pool or high_pool or [
                 b for b in all_blues if b not in used
             ] or all_blues
-            blue = int(pool[0])
+            blue = int(_weighted_sample(pool, 1, lambda _n: 1.0, rng)[0]) if len(pool) > 1 else int(pool[0])
         if blue > _BLUE_LOW_MAX:
             high_n += 1
         used.add(blue)
         fixed_singles[i] = _rewrite_ssq_single(rec, _ssq_single_reds(rec), blue, idx=i + 1)
+
+    # 兜底：≥2 注单式时高区蓝必须恰好 1 个
+    if len(fixed_singles) >= 2:
+        high_idx = [
+            i for i, r in enumerate(fixed_singles)
+            if (_ssq_single_blue(r) or 0) > _BLUE_LOW_MAX
+        ]
+        used_now = {b for b in (_ssq_single_blue(r) for r in fixed_singles) if b is not None}
+        if not high_idx:
+            high_pool = [b for b in range(_BLUE_LOW_MAX + 1, 17) if b not in used_now]
+            if high_pool:
+                idx = len(fixed_singles) - 1
+                nb = int(_weighted_sample(high_pool, 1, lambda _n: 1.0, rng)[0])
+                fixed_singles[idx] = _rewrite_ssq_single(
+                    fixed_singles[idx], _ssq_single_reds(fixed_singles[idx]), nb, idx=idx + 1,
+                )
+        elif len(high_idx) > _MAX_HIGH_BLUE_IN_SINGLES:
+            low_pool = [b for b in range(1, _BLUE_LOW_MAX + 1) if b not in used_now]
+            for idx in high_idx[1:]:
+                if not low_pool:
+                    break
+                nb = int(low_pool.pop(0))
+                used_now.add(nb)
+                fixed_singles[idx] = _rewrite_ssq_single(
+                    fixed_singles[idx], _ssq_single_reds(fixed_singles[idx]), nb, idx=idx + 1,
+                )
 
     primary = fixed_singles[0]
     anchor_reds = _ssq_single_reds(primary)
@@ -1577,7 +1619,7 @@ async def get_ssq_recommendations(
                 f"基于第 {latest_issue} 期后生成分散参考号包（非提奖预测）："
                 f"红球全号池轻加权+低重叠；极端和值才软修正（常见带约 "
                 f"{sum_stats.get('target_lo')}–{sum_stats.get('target_hi')}）；"
-                f"蓝球互异且整包至多 1 个高区；形态软偏好；"
+                f"蓝球互异且整包恰好 1 个高区；形态软偏好（拒双峰空中区）；"
                 "复式由主推扩 1 红同蓝、胆拖胆码锚定主推；参考度≠中奖概率"
                 + (f"；换号批次 {rotate}" if rotate else "")
                 + (

@@ -91,11 +91,11 @@ def test_analyze_and_build_ssq_recs():
         assert r["bets"] == 1
         # 仅避免极端和值；不再强制挤进窄历史分位带
         assert _SUM_EXTREME_LO - 5 <= r["red_sum"] <= _SUM_EXTREME_HI + 5
-        # Singles diversify blues across the package
+        # Singles diversify blues across the package; exactly one high-zone blue
         blues = [r["blue"] for r in singles]
         assert len(set(blues)) == len(blues)  # 互异
         assert all(1 <= b <= 16 for b in blues)
-        assert sum(1 for b in blues if b > _BLUE_LOW_MAX) <= 1
+        assert sum(1 for b in blues if b > _BLUE_LOW_MAX) == 1
 
 
 def test_build_ssq_dantuo():
@@ -124,7 +124,7 @@ def test_build_ssq_fushi():
 
 
 def test_ssq_package_coverage_and_blue_cap():
-    """3 注单式应低重叠、高覆盖，且高区蓝至多 1 个。"""
+    """3 注单式应低重叠、高覆盖，且高区蓝恰好 1 个。"""
     analysis = analyze_ssq(_make_draws())
     recs = build_ssq_recommendations(analysis, seed=0)
     singles = [r for r in recs if r["mode"] == "ssq"]
@@ -136,8 +136,16 @@ def test_ssq_package_coverage_and_blue_cap():
     assert len(set().union(*sets)) >= 14
     blues = [r["blue"] for r in singles]
     assert len(set(blues)) == len(blues)
-    assert sum(1 for b in blues if b > _BLUE_LOW_MAX) <= 1
+    assert sum(1 for b in blues if b > _BLUE_LOW_MAX) == 1
 
+
+def test_ssq_package_exactly_one_high_blue_across_seeds():
+    analysis = analyze_ssq(_make_draws())
+    for seed in range(12):
+        recs = build_ssq_recommendations(analysis, seed=seed)
+        singles = [r for r in recs if r["mode"] == "ssq"]
+        assert sum(1 for r in singles if int(r["blue"]) > _BLUE_LOW_MAX) == 1, seed
+        assert len({int(r["blue"]) for r in singles}) == len(singles)
 
 def test_ssq_package_blues_unique():
     """单式蓝互异；复式沿用主推蓝；胆拖蓝避开已用。"""
@@ -184,13 +192,14 @@ def test_ticket_shape_allows_recent_common_patterns():
     assert _ticket_shape_ok([2, 4, 13, 14, 15, 30])  # 2026105 式三连
     assert _ticket_shape_ok([11, 12, 13, 19, 20, 31])  # 2026104 式三连+双连
     assert _ticket_shape_ok([8, 16, 18, 22, 25, 26])  # 1 奇
-    # 仍拒绝极端：全偶、三段双连、四连
+    # 仍拒绝极端：全偶、三段双连、四连、双峰空中区
     assert not _ticket_shape_ok([2, 4, 6, 8, 10, 12])
     assert not _ticket_shape_ok([5, 6, 8, 9, 24, 25])  # 三段双连
     assert not _ticket_shape_ok([10, 11, 12, 13, 20, 30])  # 四连
+    assert not _ticket_shape_ok([3, 8, 9, 24, 26, 32])  # 3-0-3 空中区
     assert _ticket_shape_bonus([2, 4, 13, 14, 15, 30]) > 0
     assert _ticket_shape_bonus([1, 2, 3, 4, 5, 6]) < 0
-
+    assert _ticket_shape_bonus([3, 8, 9, 24, 26, 32]) < 0
 
 
 def test_fit_reds_to_sum_pulls_into_band():
