@@ -70,10 +70,11 @@ def test_analyze_and_build_ssq_recs():
     assert analysis["blue_zone"]["low_max"] == _BLUE_LOW_MAX
     assert analysis["blue_zone"]["low_rate"] >= 0.9
 
-    # 01-10 blues should outrank after zone boost on average
+    # 01-10 blues appear more in mock draws; zone boost is off, but hot still favors low
     low_avg = sum(analysis["blue_score_map"][n] for n in range(1, 11)) / 10
     high_avg = sum(analysis["blue_score_map"][n] for n in range(11, 17)) / 6
     assert low_avg >= high_avg
+    assert analysis["blue_zone"]["boost"] == 0.0
 
     recs = build_ssq_recommendations(analysis)
     assert len(recs) == 5
@@ -233,6 +234,19 @@ def test_ssq_reference_score_not_win_prob():
     assert next(r for r in recs if r["mode"] == "fushi")["confidence"] == _REF_SCORE_FUSHI
     assert next(r for r in recs if r["mode"] == "dantuo")["confidence"] == _REF_SCORE_DANTUO
     assert all("参考" in r["label"] for r in singles)
+    assert [r["strategy"] for r in singles] == ["near_uniform", "complement", "zone_balance"]
+    assert all(r.get("strategy_label") for r in singles)
+
+
+def test_ssq_theory_baseline_hypergeometric():
+    from service.ssq_service import ssq_theory_baseline
+
+    t = ssq_theory_baseline(tickets=3)
+    assert abs(t["red_single_expected"] - round(36 / 33, 4)) < 1e-9
+    assert 1.7 < t["red_max_of_n_expected"] < 1.9
+    assert abs(t["blue_single_p"] - 0.0625) < 1e-9
+    assert abs(t["blue_any_of_n_distinct_p"] - 0.1875) < 1e-9
+    assert "分散对照" in t["note_zh"]
 
 
 def test_enforce_repairs_degenerate_package():
@@ -297,3 +311,4 @@ def test_enforce_repairs_degenerate_package():
     assert fushi["blue"] == singles[0]["blue"]
     assert set(dantuo["dan"]).issubset(set(singles[0]["red"]))
     assert all(r["confidence"] <= 0.40 for r in fixed)
+    assert all("·" in r["label"] for r in singles)

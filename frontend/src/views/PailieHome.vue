@@ -85,6 +85,16 @@
                 · {{ t('pailie.basedOnIssue', { issue: recommend.based_on_issue }) }}
               </template>
             </p>
+            <p
+              v-if="activeGame === 'ssq' && recommend?.theory_baseline"
+              class="note theory-note"
+            >
+              {{ t('pailie.ssqTheory', {
+                red: Number(recommend.theory_baseline.red_single_expected).toFixed(2),
+                max3: Number(recommend.theory_baseline.red_max_of_n_expected).toFixed(2),
+                blue: `${Math.round(Number(recommend.theory_baseline.blue_any_of_n_distinct_p) * 100)}%`,
+              }) }}
+            </p>
           </div>
           <div class="rec-toolbar">
             <el-radio-group v-model="windowSize" size="small" @change="onWindowChange">
@@ -1317,6 +1327,11 @@ onUnmounted(() => {
   color: #606266;
   margin: 0 0 12px;
   font-size: 13px;
+}
+.theory-note {
+  color: #909399;
+  font-size: 12px;
+  margin-top: -6px;
 }
 .play-grid {
   display: grid;

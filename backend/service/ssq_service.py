@@ -24,7 +24,7 @@ SSQ_GAME = {
     "draw_cycle": "tue_thu_sun",
     "note": (
         "红球从 01–33 中选 6 个（不重复），蓝球从 01–16 中选 1 个；每周二、四、日开奖。"
-        "系统给出全号池轻加权、低重叠的分散参考号包（含最低复式与 2 胆胆拖），"
+        "系统给出近均匀抽样、低重叠的分散参考号包（含最低复式与 2 胆胆拖），"
         "用于对照与试玩，不代表更高中奖率。"
     ),
     "play_types": [
@@ -66,9 +66,9 @@ _SSQ_URLS = (
     "https://www.cwl.gov.cn/cwl_admin/kjxx/findDrawNotice",
 )
 
-# 蓝球历史略偏 01–10；仅轻加权，选号以全池轻权抽样为主
+# 蓝球分区仅用于结构覆盖（整包恰好 1 高区），不再给分数加「预测」偏置
 _BLUE_LOW_MAX = 10
-_BLUE_ZONE_BOOST = 0.08
+_BLUE_ZONE_BOOST = 0.0
 _BLUE_HIGH_SHARE = 0.28
 # 红球和值：用更宽分位，避免把号码强行挤进窄带（近几期常有和值 < p15）
 _SUM_LO_PCT = 0.10
@@ -76,6 +76,19 @@ _SUM_HI_PCT = 0.90
 # 仅极端和值才做软修正
 _SUM_EXTREME_LO = 55
 _SUM_EXTREME_HI = 150
+
+# 选号权重近均匀：回测 KL≈0，频率分只作极弱扰动，主目标是分散结构
+_RED_WEIGHT_FLOOR = 0.92
+_RED_WEIGHT_SCORE_SCALE = 0.08
+_BLUE_WEIGHT_FLOOR = 0.90
+_BLUE_WEIGHT_SCORE_SCALE = 0.10
+
+# 三注单式的显式策略位（非命中率排序）
+_SINGLE_STRATEGIES: tuple[tuple[str, str], ...] = (
+    ("near_uniform", "均匀基线"),
+    ("complement", "互补覆盖"),
+    ("zone_balance", "三区形态"),
+)
 
 _SSQ_HEADERS = {
     "User-Agent": (
@@ -89,10 +102,10 @@ _SSQ_HEADERS = {
 _CACHE: dict[str, tuple[float, list[dict]]] = {}
 _CACHE_TTL_SEC = 600
 
-# 降低热号主导，避免系统性弱于随机
-_HOT_WEIGHT = 0.45
+# 频率面板展示用；选号侧已近均匀，不再用热号主导组包
+_HOT_WEIGHT = 0.40
 _COLD_WEIGHT = 0.35
-_TREND_WEIGHT = 0.20
+_TREND_WEIGHT = 0.25
 
 
 def clear_ssq_history_cache() -> None:
@@ -283,6 +296,47 @@ def _score_pool(counts: list[int], gaps: list[int], recent_counts: list[int], sa
     ]
 
 
+def ssq_theory_baseline(*, tickets: int = 3) -> dict[str, Any]:
+    """公平开奖下的超几何 / 组合期望（非模型拟合）。
+
+    红球单注命中数 ~ Hypergeometric(N=33, K=6, n=6)；
+    多注取 max 时用独立近似给出理论均值，供对照而非优化目标。
+    """
+    from math import comb
+
+    n_tickets = max(1, int(tickets))
+    den = comb(33, 6)
+    red_pmf = []
+    for k in range(7):
+        if 6 - k > 27 or k > 6:
+            red_pmf.append(0.0)
+        else:
+            red_pmf.append(comb(6, k) * comb(27, 6 - k) / den)
+    red_single = 6 * 6 / 33
+    # E[max] = Σ_{m≥1} P(M≥m) = Σ_{m=1..6} (1 - F(m-1)^n)
+    cdf = 0.0
+    max_mean = 0.0
+    for m in range(7):
+        if m >= 1:
+            max_mean += 1.0 - (cdf ** n_tickets)
+        cdf += red_pmf[m]
+    blue_single = 1.0 / 16.0
+    blue_any = min(1.0, n_tickets / 16.0)
+    return {
+        "red_single_expected": round(red_single, 4),
+        "red_max_of_n_expected": round(max_mean, 4),
+        "tickets": n_tickets,
+        "blue_single_p": round(blue_single, 4),
+        "blue_any_of_n_distinct_p": round(blue_any, 4),
+        "note_zh": (
+            f"公平开奖：单注红球期望约 {red_single:.2f}，"
+            f"{n_tickets} 注最好一注约 {max_mean:.2f}；"
+            f"互异蓝球命中率约 {blue_any:.0%}。"
+            "参考包目标是分散对照，不以跑赢该基线为优化目标。"
+        ),
+    }
+
+
 def analyze_ssq(draws: list[dict]) -> dict[str, Any]:
     sample = len(draws) or 1
     recent_n = min(20, sample)
@@ -322,9 +376,9 @@ def analyze_ssq(draws: list[dict]) -> dict[str, Any]:
     red_score_map = {i + 1: red_scores[i] for i in range(33)}
     blue_score_map = {i + 1: blue_scores[i] for i in range(16)}
 
-    # 蓝球 01–10 历史占比显著更高：在归一化分上加权，仍保留 11–16 的冷号可能
+    # 蓝球分区分数不再人为抬高；历史占比仅作面板展示
     for n in range(1, 17):
-        if n <= _BLUE_LOW_MAX:
+        if n <= _BLUE_LOW_MAX and _BLUE_ZONE_BOOST:
             blue_score_map[n] = min(1.0, float(blue_score_map[n]) + _BLUE_ZONE_BOOST)
 
     red_sums = [sum(row.get("red") or []) for row in draws if len(row.get("red") or []) == 6]
@@ -635,10 +689,10 @@ def _pick_ssq_sets(
     rng = _random.Random((int(seed) ^ 0x5A17) & 0xFFFFFFFF)
 
     def red_w(n: int) -> float:
-        return 0.85 + 0.15 * float(red_map.get(n, 0.5))
+        return _RED_WEIGHT_FLOOR + _RED_WEIGHT_SCORE_SCALE * float(red_map.get(n, 0.5))
 
     def blue_w(n: int) -> float:
-        return 0.75 + 0.25 * float(blue_map.get(n, 0.5))
+        return _BLUE_WEIGHT_FLOOR + _BLUE_WEIGHT_SCORE_SCALE * float(blue_map.get(n, 0.5))
 
     picks: list[tuple[list[int], int]] = []
     used: set[tuple[int, ...]] = set()
@@ -712,11 +766,11 @@ def _pick_ssq_sets(
             cset = set(cand)
             if too_similar(cand, max_share=3):
                 continue
-            # 形态为软偏好：不合格也可入选，避免把真实常见连号形态系统性滤掉
+            # 覆盖优先；和值仅极弱打平（回测 MAE 大，不适合作目标）
             score = (
                 len(cset - cov) * 10
-                - abs(sum(cand) - target) * 0.01
                 + _ticket_shape_bonus(cand)
+                - abs(sum(cand) - target) * 0.002
             )
             if score > best_score:
                 best_score = score
@@ -827,7 +881,7 @@ def build_ssq_dantuo(
             n = int(_weighted_sample(
                 cand,
                 1,
-                lambda x: 0.85 + 0.15 * float(red_map.get(x, 0.5)),
+                lambda x: _RED_WEIGHT_FLOOR + _RED_WEIGHT_SCORE_SCALE * float(red_map.get(x, 0.5)),
                 rng,
             )[0])
             if not dan:
@@ -851,7 +905,7 @@ def build_ssq_dantuo(
             n = int(_weighted_sample(
                 [x for x in all_reds if x not in dan],
                 1,
-                lambda x: 0.85 + 0.15 * float(red_map.get(x, 0.5)),
+                lambda x: _RED_WEIGHT_FLOOR + _RED_WEIGHT_SCORE_SCALE * float(red_map.get(x, 0.5)),
                 rng,
             )[0])
             if not dan:
@@ -882,7 +936,7 @@ def build_ssq_dantuo(
         bucket_w = _weighted_sample(
             [n for n in bucket if n not in tuo],
             min(2, len([n for n in bucket if n not in tuo])),
-            lambda x: 0.85 + 0.15 * float(red_map.get(x, 0.5)),
+            lambda x: _RED_WEIGHT_FLOOR + _RED_WEIGHT_SCORE_SCALE * float(red_map.get(x, 0.5)),
             rng,
         ) if any(n not in tuo for n in bucket) else []
         for n in bucket_w:
@@ -926,7 +980,7 @@ def build_ssq_dantuo(
     blue = int(_weighted_sample(
         blue_pool_cand,
         1,
-        lambda n: 0.75 + 0.25 * float(blue_map.get(n, 0.5)),
+        lambda n: _BLUE_WEIGHT_FLOOR + _BLUE_WEIGHT_SCORE_SCALE * float(blue_map.get(n, 0.5)),
         rng,
     )[0])
     blue_pool = [blue]
@@ -1119,11 +1173,24 @@ def _ssq_single_blue(rec: dict) -> int | None:
     return None
 
 
+def _single_strategy_for_index(i: int) -> tuple[str, str]:
+    if 0 <= i < len(_SINGLE_STRATEGIES):
+        return _SINGLE_STRATEGIES[i]
+    return ("coverage", "补覆盖")
+
+
 def _rewrite_ssq_single(rec: dict, reds: list[int], blue: int, *, idx: int) -> dict:
     reds = sorted({int(x) for x in reds if 1 <= int(x) <= 33})[:6]
     blue = int(blue)
     red_sum = sum(reds)
     out = dict(rec)
+    strategy_id, strategy_label = _single_strategy_for_index(idx - 1)
+    if out.get("source") == "ai":
+        strategy_id = "ai_reference"
+        strategy_label = out.get("model_label") or "AI"
+    else:
+        strategy_id = out.get("strategy") or strategy_id
+        strategy_label = out.get("strategy_label") or strategy_label
     out.update({
         "id": f"pick-{idx}",
         "mode": "ssq",
@@ -1133,19 +1200,24 @@ def _rewrite_ssq_single(rec: dict, reds: list[int], blue: int, *, idx: int) -> d
         "red_sum": red_sum,
         "display": " ".join(_fmt_ball(x) for x in reds) + " + " + _fmt_ball(blue),
         "confidence": _REF_SCORE_AI if out.get("source") == "ai" else _REF_SCORE_SINGLE,
+        "strategy": strategy_id,
+        "strategy_label": strategy_label,
         "bets": out.get("bets") or 1,
         "amount": out.get("amount") or 2,
     })
-    if out.get("source") != "ai":
-        out["reason"] = (
-            f"分散参考单式（和值 {red_sum}）；全号池轻加权抽样，"
-            "与频率冷热脱钩展示参考度，不代表更高中奖率。"
-        )
-    else:
+    if out.get("source") == "ai":
+        model_label = out.get("model_label") or "AI"
+        out["label"] = f"参考 {idx} · {model_label}"
         reason = str(out.get("reason") or "AI 生成的分散参考号")
         if "中奖" not in reason and "必中" not in reason:
             reason = reason.rstrip("。") + "。AI 参考号，不提高中奖率。"
         out["reason"] = reason
+    else:
+        out["label"] = f"参考 {idx} · {strategy_label}"
+        out["reason"] = (
+            f"分散参考单式（{strategy_label}，和值 {red_sum}）；"
+            "全号池近均匀抽样 + 低重叠组包；参考度≠中奖概率，不提高中奖率。"
+        )
     return out
 
 
@@ -1297,9 +1369,14 @@ def _enforce_ssq_package_invariants(
         if rec.get("source") == "ai":
             model_label = rec.get("model_label") or "AI"
             rec["label"] = f"参考 {i + 1} · {model_label}"
+            rec["strategy"] = "ai_reference"
+            rec["strategy_label"] = model_label
             rec["confidence"] = _REF_SCORE_AI
         else:
-            rec["label"] = f"参考 {i + 1}"
+            sid, slabel = _single_strategy_for_index(i)
+            rec["strategy"] = rec.get("strategy") or sid
+            rec["strategy_label"] = rec.get("strategy_label") or slabel
+            rec["label"] = f"参考 {i + 1} · {rec['strategy_label']}"
             rec["confidence"] = _REF_SCORE_SINGLE
     return out
 
@@ -1312,24 +1389,23 @@ def build_ssq_recommendations(
     include_dantuo: bool = True,
     include_fushi: bool = True,
 ) -> list[dict]:
-    sum_stats = analysis.get("sum_stats") or {}
     single_n = 5 - int(include_dantuo) - int(include_fushi)
     singles = _pick_ssq_sets(analysis, count=max(1, single_n), seed=seed, exclude=exclude)
     recs = []
     for i, (reds, blue) in enumerate(singles):
         red_sum = sum(reds)
+        sid, slabel = _single_strategy_for_index(i)
         reason = (
-            f"分散参考单式（和值 {red_sum}；历史常见约 "
-            f"{sum_stats.get('target_lo')}–{sum_stats.get('target_hi')}）。"
-            "全号池轻加权、低重叠组包；参考度≠中奖概率，不提高中奖率。"
+            f"分散参考单式（{slabel}，和值 {red_sum}）。"
+            "全号池近均匀抽样、低重叠组包；参考度≠中奖概率，不提高中奖率。"
         )
-        if i == single_n - 1 and single_n >= 3:
-            reason = "补覆盖/区间分散；" + reason
         recs.append({
             "id": f"pick-{i + 1}",
             "mode": "ssq",
             "source": "frequency",
-            "label": f"参考 {i + 1}",
+            "label": f"参考 {i + 1} · {slabel}",
+            "strategy": sid,
+            "strategy_label": slabel,
             "digits": reds + [blue],
             "red": reds,
             "blue": blue,
@@ -1591,6 +1667,7 @@ async def get_ssq_recommendations(
 
     sum_stats = analysis.get("sum_stats") or {}
     blue_zone = analysis.get("blue_zone") or {}
+    theory = ssq_theory_baseline(tickets=3)
     payload = {
         "reachable": True,
         "message": None,
@@ -1605,21 +1682,22 @@ async def get_ssq_recommendations(
             "hot_weight": _HOT_WEIGHT,
             "cold_weight": _COLD_WEIGHT,
             "trend_weight": _TREND_WEIGHT,
+            "red_weight_floor": _RED_WEIGHT_FLOOR,
             "ai_enabled": bool(ai_picks),
             "ai_models": model_names,
             "pick_limit": 5,
             "period_seed": True,
             "sum_constraint": "extreme_only",
-            "blue_zone_prefer": f"01-{_BLUE_LOW_MAX:02d}",
+            "selection": "near_uniform_diversified",
+            "blue_zone_structure": f"exactly_1_high_among_singles(>{_BLUE_LOW_MAX:02d})",
             "dantuo": True,
             "fushi": True,
             "reference_only": True,
             "structure_guard": True,
             "desc": (
                 f"基于第 {latest_issue} 期后生成分散参考号包（非提奖预测）："
-                f"红球全号池轻加权+低重叠；极端和值才软修正（常见带约 "
-                f"{sum_stats.get('target_lo')}–{sum_stats.get('target_hi')}）；"
-                f"蓝球互异且整包恰好 1 个高区；形态软偏好（拒双峰空中区）；"
+                f"红球近均匀抽样+低重叠；单式分位：均匀基线/互补覆盖/三区形态；"
+                f"极端和值才软修正；蓝球互异且整包恰好 1 个高区；"
                 "复式由主推扩 1 红同蓝、胆拖胆码锚定主推；参考度≠中奖概率"
                 + (f"；换号批次 {rotate}" if rotate else "")
                 + (
@@ -1629,8 +1707,10 @@ async def get_ssq_recommendations(
                 )
             ),
         },
+        "theory_baseline": theory,
         "disclaimer": (
             "本页为分散参考号包，历史频率与 AI 均不提高中奖率，也不代表下期更可能开出；"
+            f"{theory.get('note_zh', '')}"
             "请勿作为必中或投注依据。双色球为福利彩票玩法。"
         ),
         "recommendations": merged,
