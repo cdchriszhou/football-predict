@@ -1,10 +1,11 @@
 import { defineStore } from 'pinia'
-import { getPrediction, getPredictionsBatch, getPredictionAccuracy } from '@/api/predictions'
+import { getPrediction, getPredictionsBatch, getPredictionAccuracy, getPredictionHistory } from '@/api/predictions'
 
 export const usePredictionsStore = defineStore('predictions', {
   state: () => ({
     cache: {},
     accuracy: null,
+    history: [],
     loading: false
   }),
 
@@ -58,6 +59,12 @@ export const usePredictionsStore = defineStore('predictions', {
       const res = await getPredictionAccuracy(days)
       this.accuracy = res.data
       return res.data
+    },
+
+    async fetchHistory(days = 30, limit = 40) {
+      const res = await getPredictionHistory(days, limit)
+      this.history = res.data?.items || []
+      return this.history
     }
   }
 })

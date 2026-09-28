@@ -241,17 +241,18 @@ async def get_accuracy(
     db: AsyncSession = Depends(get_db),
     current_user: str = Depends(get_current_user),
 ):
-    """Calculate prediction accuracy for completed matches"""
+    """Calculate prediction accuracy for completed matches (by kickoff time)."""
     from datetime import datetime, timedelta
     comp_slug = resolve_competition(competition)
     cutoff = datetime.now() - timedelta(days=days)
 
+    # 按比赛开球时间筛近窗；勿用 Prediction.create_time（多数完赛预测是赛前更早写入的）
     predictions = (await db.execute(
         select(Prediction, Match).join(Match, Prediction.match_id == Match.id).where(
             Match.competition_slug == comp_slug,
             Match.status == MATCH_FINISHED,
-            Prediction.create_time >= cutoff
-        )
+            Match.match_time >= cutoff,
+        ).order_by(Match.match_time.desc())
     )).all()
 
     match_ids = [match.id for _, match in predictions]
@@ -263,19 +264,26 @@ async def get_accuracy(
         for row in odds_rows:
             odds_by_match.setdefault(row.match_id, row)
 
-    total = len(predictions)
-    if total == 0:
-        return success({"total": 0, "accuracy": 0, "message": "No data for accuracy analysis"})
+    if not predictions:
+        return success({
+            "total": 0,
+            "result_accuracy": 0,
+            "score_accuracy": 0,
+            "avg_confidence": 0,
+            "message": "No data for accuracy analysis",
+        })
 
     correct_results = 0
     correct_scores = 0
     confidence_sum = 0.0
+    evaluated = 0
 
     for pred, match in predictions:
         # Skip matches without recorded scores (e.g. finished but not yet synced)
         if match.result_a is None or match.result_b is None:
             continue
 
+        evaluated += 1
         view = await ensure_prediction_consistency(db, pred, match, persist=True)
         wr, dr, lr = view["win_rate"], view["draw_rate"], view["lose_rate"]
 
@@ -300,12 +308,82 @@ async def get_accuracy(
 
         confidence_sum += pred.confidence or 0.8
 
+    if evaluated == 0:
+        return success({
+            "total": 0,
+            "result_accuracy": 0,
+            "score_accuracy": 0,
+            "avg_confidence": 0,
+            "message": "No data for accuracy analysis",
+        })
+
     return success({
-        "total": total,
-        "result_accuracy": round(correct_results / total * 100, 1),
-        "score_accuracy": round(correct_scores / total * 100, 1),
-        "avg_confidence": round(confidence_sum / total, 2)
+        "total": evaluated,
+        "result_accuracy": round(correct_results / evaluated * 100, 1),
+        "score_accuracy": round(correct_scores / evaluated * 100, 1),
+        "avg_confidence": round(confidence_sum / evaluated, 2),
     })
+
+
+@router.get("/history")
+async def list_prediction_history(
+    competition: str = Query("premier-league"),
+    days: int = Query(30, ge=1, le=365),
+    limit: int = Query(40, ge=1, le=100),
+    db: AsyncSession = Depends(get_db),
+    current_user: str = Depends(get_current_user),
+):
+    """Recent finished matches with stored predictions (for 预测记录 page)."""
+    from datetime import datetime, timedelta
+
+    comp_slug = resolve_competition(competition)
+    cutoff = datetime.now() - timedelta(days=days)
+    rows = (await db.execute(
+        select(Prediction, Match)
+        .join(Match, Prediction.match_id == Match.id)
+        .where(
+            Match.competition_slug == comp_slug,
+            Match.status == MATCH_FINISHED,
+            Match.match_time >= cutoff,
+            Match.result_a.is_not(None),
+            Match.result_b.is_not(None),
+        )
+        .order_by(Match.match_time.desc())
+        .limit(limit)
+    )).all()
+
+    items = []
+    for pred, match in rows:
+        view = await ensure_prediction_consistency(db, pred, match, persist=False)
+        wr, dr, lr = view["win_rate"], view["draw_rate"], view["lose_rate"]
+        actual_winner = (
+            "a" if match.result_a > match.result_b
+            else ("b" if match.result_b > match.result_a else "draw")
+        )
+        pred_winner = (
+            "a" if wr > lr and wr > dr
+            else ("b" if lr > wr and lr > dr else "draw")
+        )
+        best_scores = list(view.get("best_scores") or [])
+        actual_score = f"{match.result_a}:{match.result_b}"
+        items.append({
+            "match_id": match.id,
+            "match_time": match.match_time.isoformat() if match.match_time else None,
+            "stage": match.stage,
+            "team_a": match.team_a,
+            "team_b": match.team_b,
+            "actual_score": actual_score,
+            "predicted_scores": best_scores[:3],
+            "upset_score": view.get("upset_score"),
+            "pred_winner": pred_winner,
+            "actual_winner": actual_winner,
+            "result_hit": pred_winner == actual_winner,
+            "score_hit": actual_score in best_scores,
+            "confidence": pred.confidence,
+            "model": pred.model,
+        })
+
+    return success({"items": items, "total": len(items), "days": days})
 
 
 @router.get("/{match_id}")
