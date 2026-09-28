@@ -130,12 +130,12 @@
           <span class="rotate-hint">{{ t('pailie.rotateHint') }}</span>
         </div>
         <el-alert
-          v-if="recommend?.message"
-          type="warning"
+          v-if="recommend?.disclaimer"
+          type="info"
           :closable="false"
           show-icon
           class="history-alert"
-          :title="recommend.message"
+          :title="recommend.disclaimer"
         />
         <el-alert
           v-else-if="recommend && !recommend.reachable"
@@ -143,15 +143,7 @@
           :closable="false"
           show-icon
           class="history-alert"
-          :title="t('pailie.recommendEmpty')"
-        />
-        <el-alert
-          v-if="recommend?.disclaimer"
-          type="info"
-          :closable="false"
-          show-icon
-          class="history-alert"
-          :title="recommend.disclaimer"
+          :title="recommend.message || t('pailie.recommendEmpty')"
         />
 
         <div v-if="recommendCards.length" class="rec-grid">

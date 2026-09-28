@@ -102,7 +102,6 @@ _SSQ_HEADERS = {
 _CACHE: dict[str, tuple[float, list[dict]]] = {}
 _CACHE_TTL_SEC = 600
 _EMPTY_CACHE_TTL_SEC = 45
-_FETCH_META: dict[str, Any] = {"source": "empty", "newest": None, "error": None}
 
 # 频率面板展示用；选号侧已近均匀，不再用热号主导组包
 _HOT_WEIGHT = 0.40
@@ -112,10 +111,6 @@ _TREND_WEIGHT = 0.25
 
 def clear_ssq_history_cache() -> None:
     _CACHE.clear()
-
-
-def get_ssq_fetch_meta() -> dict[str, Any]:
-    return dict(_FETCH_META)
 
 def _parse_money(raw: Any) -> float | None:
     if raw is None:
@@ -206,7 +201,6 @@ def _normalize_ssq_row(raw: dict) -> dict[str, Any] | None:
 
 
 async def fetch_ssq_history(limit: int = 100, *, force_refresh: bool = False) -> list[dict]:
-    global _FETCH_META
     limit = max(1, min(int(limit or 100), 100))
     cache_key = f"ssq:{limit}"
     now = time.monotonic()
@@ -234,7 +228,6 @@ async def fetch_ssq_history(limit: int = 100, *, force_refresh: bool = False) ->
         proxies.append(crawler)
 
     collected: list[dict] = []
-    last_err: str | None = None
     for url in _SSQ_URLS:
         for proxy in proxies:
             try:
@@ -280,45 +273,16 @@ async def fetch_ssq_history(limit: int = 100, *, force_refresh: bool = False) ->
                         collected = rows_all
                         break
             except Exception as e:
-                last_err = str(e)
                 logger.warning("ssq history failed [%s]: %s", url, e)
                 continue
         if collected:
             break
 
     if collected:
-        from service.digital_history_store import save_last_good
-
-        save_last_good("ssq", collected)
-        _FETCH_META = {
-            "source": "live",
-            "newest": collected[0].get("issue"),
-            "error": None,
-        }
         _CACHE[cache_key] = (time.monotonic(), list(collected))
         return collected
 
-    # 官网不可达：回退上次成功快照，避免空结果被缓存 10 分钟
-    from service.digital_history_store import load_last_good
-
-    fallback = load_last_good("ssq", limit)
-    if fallback:
-        newest = fallback[0].get("issue")
-        logger.warning(
-            "ssq history using disk fallback (newest=%s) after live failure: %s",
-            newest,
-            last_err or "empty response",
-        )
-        _FETCH_META = {
-            "source": "disk_fallback",
-            "newest": newest,
-            "error": last_err,
-        }
-        _CACHE[cache_key] = (time.monotonic(), list(fallback))
-        return list(fallback)
-
-    _FETCH_META = {"source": "empty", "newest": None, "error": last_err}
-    # 空结果短缓存，尽快重试 DNS/网络
+    # 空结果短缓存，尽快重试；不用本地快照出号
     _CACHE[cache_key] = (time.monotonic() - _CACHE_TTL_SEC + _EMPTY_CACHE_TTL_SEC, [])
     return []
 
@@ -1602,7 +1566,6 @@ async def get_ssq_recommendations(
         rec_cache_invalidate("ssq")
 
     draws = await fetch_ssq_history(window, force_refresh=force_refresh)
-    fetch_meta = get_ssq_fetch_meta()
     latest_issue = str(draws[0]["issue"]) if draws else ""
     seed = period_seed(latest_issue, rotate)
     cache_key = f"rec:ssq:{window}:{int(bool(use_ai))}:{latest_issue}:{rotate}"
@@ -1610,7 +1573,6 @@ async def get_ssq_recommendations(
         cached = rec_cache_get(cache_key)
         if cached:
             cached["cached"] = True
-            cached.setdefault("history_source", fetch_meta.get("source"))
             from service.digital_rec_store import save_primary_prediction
             save_primary_prediction(
                 "ssq",
@@ -1623,7 +1585,7 @@ async def get_ssq_recommendations(
     if not draws:
         return {
             "reachable": False,
-            "message": "暂时无法获取双色球官方开奖数据，也无法读取本地缓存，无法生成参考号。请检查网络后刷新。",
+            "message": "暂时无法获取双色球官方开奖数据，无法生成参考号。请稍后刷新。",
             "game": "ssq",
             "window": window,
             "sample_size": 0,
@@ -1636,7 +1598,6 @@ async def get_ssq_recommendations(
             "ai_models": [],
             "rotate": rotate,
             "based_on_issue": None,
-            "history_source": "empty",
         }
 
     exclude: set[tuple[int, ...]] = set()
@@ -1752,16 +1713,10 @@ async def get_ssq_recommendations(
             ),
         },
         "theory_baseline": theory,
-        "history_source": fetch_meta.get("source") or "live",
         "disclaimer": (
             "本页为分散参考号包，历史频率与 AI 均不提高中奖率，也不代表下期更可能开出；"
             f"{theory.get('note_zh', '')}"
             "请勿作为必中或投注依据。双色球为福利彩票玩法。"
-        ),
-        "message": (
-            f"官网开奖接口暂不可达，已使用本地缓存（最新期 {latest_issue}），数据可能滞后。"
-            if fetch_meta.get("source") == "disk_fallback"
-            else None
         ),
         "recommendations": merged,
         "fushi": fushi_rec,
