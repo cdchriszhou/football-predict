@@ -380,7 +380,7 @@ async def list_prediction_history(
             "result_hit": pred_winner == actual_winner,
             "score_hit": actual_score in best_scores,
             "confidence": pred.confidence,
-            "model": pred.model,
+            "model": pred.model_used,
         })
 
     return success({"items": items, "total": len(items), "days": days})
