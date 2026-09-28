@@ -36,7 +36,7 @@ LEAGUE_NOTES = [
 ]
 
 DAILY_REPORT_CACHE_TTL = 300
-DAILY_REPORT_CACHE_PREFIX = "score_backtest_daily:v9:"
+DAILY_REPORT_CACHE_PREFIX = "score_backtest_daily:v10:"
 
 
 LEAGUE_HOME_XG = 1.45
@@ -110,12 +110,34 @@ def _ensure_crs_for_backtest(
     return {}, "empty"
 
 
+def _club_rank_lookup(competition_slug: str) -> dict[str, int]:
+    try:
+        from data.league_seed import LEAGUE_TEAMS
+    except Exception:
+        return {}
+    teams = LEAGUE_TEAMS.get(competition_slug or "", [])
+    return {name: rank for name, _en, rank in teams}
+
+
+def _xg_from_table_rank(rank: int, *, home: bool) -> float:
+    r = max(1, min(20, int(rank or 10)))
+    t = (r - 1) / 19.0
+    if home:
+        return round(1.80 - t * 0.65, 2)
+    return round(1.50 - t * 0.60, 2)
+
+
 def _pipeline_ranks(team_a: str, team_b: str, competition_slug: str = "") -> tuple[int, int]:
-    return 10, 10
+    lookup = _club_rank_lookup(competition_slug)
+    return lookup.get(team_a, 10), lookup.get(team_b, 10)
 
 
 def _expected_goals(team_a: str, team_b: str, competition_slug: str = "") -> tuple[float, float]:
-    return LEAGUE_HOME_XG, LEAGUE_AWAY_XG
+    lookup = _club_rank_lookup(competition_slug)
+    if team_a not in lookup and team_b not in lookup:
+        return LEAGUE_HOME_XG, LEAGUE_AWAY_XG
+    ra, rb = _pipeline_ranks(team_a, team_b, competition_slug)
+    return _xg_from_table_rank(ra, home=True), _xg_from_table_rank(rb, home=False)
 
 
 def _correct_draw(wr: float, dr: float, lr: float, sp: dict | None) -> tuple[float, float, float]:
@@ -396,8 +418,19 @@ async def _collect_evaluated_rows(
     evaluated: list[dict] = []
     skipped = 0
     skip_reasons: dict[str, int] = {}
+    from data.match_status import MATCH_FINISH_BUFFER
+    from utils.datetime_helpers import china_now
+
+    now = china_now().replace(tzinfo=None)
 
     for match in rows:
+        kickoff = match.match_time
+        # 开球窗口未结束却带比分的脏数据不进回测（避免出现「2027 完赛」）
+        if kickoff is not None and now < kickoff + MATCH_FINISH_BUFFER:
+            skipped += 1
+            skip_reasons["future_or_live_kickoff"] = skip_reasons.get("future_or_live_kickoff", 0) + 1
+            continue
+
         team_a, team_b = match.team_a, match.team_b
         from utils.score_prediction import actual_score_for_match
         actual = actual_score_for_match(
@@ -428,7 +461,6 @@ async def _collect_evaluated_rows(
         if pred_row:
             wdl = (pred_row.win_rate, pred_row.draw_rate, pred_row.lose_rate)
 
-        kickoff = match.match_time
         published = _picks_from_db_prediction(pred_row)
 
         row = _evaluate_match(

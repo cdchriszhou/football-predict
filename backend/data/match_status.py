@@ -258,7 +258,10 @@ async def clear_placeholder_scores(db: AsyncSession, slug: str) -> int:
 
 
 async def reopen_prematurely_finished_matches(db: AsyncSession, slug: str) -> int:
-    """Reset fixtures wrongly marked finished before kickoff ends (uses canonical kickoff)."""
+    """Reset fixtures wrongly marked finished before kickoff window ends.
+
+    含「已写入比分」的脏数据（如赛程仍在未来却被标 finished），一并清分并改回 upcoming。
+    """
     now = china_now().replace(tzinfo=None)
     rows = (
         await db.execute(
@@ -266,8 +269,6 @@ async def reopen_prematurely_finished_matches(db: AsyncSession, slug: str) -> in
                 Match.competition_slug == slug,
                 Match.status == MATCH_FINISHED,
                 Match.match_time.isnot(None),
-                Match.result_a.is_(None),
-                Match.result_b.is_(None),
             )
         )
     ).scalars().all()
@@ -277,6 +278,8 @@ async def reopen_prematurely_finished_matches(db: AsyncSession, slug: str) -> in
         if kickoff is None or now >= kickoff + MATCH_FINISH_BUFFER:
             continue
         m.status = MATCH_UPCOMING
+        m.result_a = None
+        m.result_b = None
         updated += 1
     if updated:
         await flush_session(db)
