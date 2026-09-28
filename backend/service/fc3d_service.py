@@ -42,11 +42,16 @@ _FC3D_HEADERS = {
 
 _CACHE: dict[str, tuple[float, list[dict]]] = {}
 _CACHE_TTL_SEC = 600
+_EMPTY_CACHE_TTL_SEC = 45
+_FETCH_META: dict[str, Any] = {"source": "empty", "newest": None, "error": None}
 
 
 def clear_fc3d_history_cache() -> None:
     _CACHE.clear()
 
+
+def get_fc3d_fetch_meta() -> dict[str, Any]:
+    return dict(_FETCH_META)
 
 def _parse_money(raw: Any) -> float | None:
     if raw is None:
@@ -128,6 +133,7 @@ def _normalize_fc3d_row(raw: dict) -> dict[str, Any] | None:
 
 
 async def fetch_fc3d_history(limit: int = 100, *, force_refresh: bool = False) -> list[dict]:
+    global _FETCH_META
     limit = max(1, min(int(limit or 100), 100))
     cache_key = f"fc3d:{limit}"
     now = time.monotonic()
@@ -155,6 +161,7 @@ async def fetch_fc3d_history(limit: int = 100, *, force_refresh: bool = False) -
         proxies.append(crawler)
 
     collected: list[dict] = []
+    last_err: str | None = None
     for url in _FC3D_URLS:
         for proxy in proxies:
             try:
@@ -198,10 +205,34 @@ async def fetch_fc3d_history(limit: int = 100, *, force_refresh: bool = False) -
                         collected = rows_all
                         break
             except Exception as e:
+                last_err = str(e)
                 logger.warning("fc3d history failed [%s]: %s", url, e)
                 continue
         if collected:
             break
 
-    _CACHE[cache_key] = (time.monotonic(), list(collected))
-    return collected
+    if collected:
+        from service.digital_history_store import save_last_good
+
+        save_last_good("fc3d", collected)
+        _FETCH_META = {"source": "live", "newest": collected[0].get("issue"), "error": None}
+        _CACHE[cache_key] = (time.monotonic(), list(collected))
+        return collected
+
+    from service.digital_history_store import load_last_good
+
+    fallback = load_last_good("fc3d", limit)
+    if fallback:
+        newest = fallback[0].get("issue")
+        logger.warning(
+            "fc3d history using disk fallback (newest=%s) after live failure: %s",
+            newest,
+            last_err or "empty response",
+        )
+        _FETCH_META = {"source": "disk_fallback", "newest": newest, "error": last_err}
+        _CACHE[cache_key] = (time.monotonic(), list(fallback))
+        return list(fallback)
+
+    _FETCH_META = {"source": "empty", "newest": None, "error": last_err}
+    _CACHE[cache_key] = (time.monotonic() - _CACHE_TTL_SEC + _EMPTY_CACHE_TTL_SEC, [])
+    return []
