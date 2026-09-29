@@ -40,11 +40,11 @@ def test_normalize_ssq_row():
     assert item["pool_balance"] == 1234567890.50
     assert len(item["prize_levels"]) == 4
     assert item["prize_levels"][0]["level"] == "一等奖"
-    assert item["prize_levels"][0]["winning_numbers"] == "01 05 12 18 23 30 + 08"
+    assert item["prize_levels"][0]["winning_numbers"] == "01 05 12 18 23 30 + 蓝08"
     assert item["prize_levels"][0]["stake_amount"] == 5000000.0
     assert item["prize_levels"][0]["stake_count"] == 2
     assert item["prize_levels"][1]["winning_numbers"] == "01 05 12 18 23 30"
-    assert "08" in item["prize_levels"][2]["winning_numbers"]
+    assert "蓝08" in item["prize_levels"][2]["winning_numbers"]
 
 
 def test_normalize_ssq_rejects_bad_red():

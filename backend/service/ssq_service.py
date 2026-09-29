@@ -162,9 +162,12 @@ _SSQ_PRIZE_META: dict[int, dict[str, str]] = {
 
 
 def _ssq_winning_numbers(prize_type: int, reds: list[int], blue: int) -> str:
-    """按奖等给出对照本期开奖号的中奖号码说明（低奖等为组合条件）。"""
+    """按奖等给出对照本期开奖号的中奖号码说明（低奖等为组合条件）。
+
+    蓝球统一写成「蓝XX」，避免与红球同号（如红11+蓝11）时看起来像号码冲突。
+    """
     red_txt = " ".join(_fmt_ball(x) for x in reds)
-    blue_txt = _fmt_ball(blue)
+    blue_txt = f"蓝{_fmt_ball(blue)}"
     full = f"{red_txt} + {blue_txt}"
     if prize_type == 1:
         return full
@@ -176,11 +179,11 @@ def _ssq_winning_numbers(prize_type: int, reds: list[int], blue: int) -> str:
         combos = [" ".join(_fmt_ball(x) for x in c) + f" + {blue_txt}" for c in combinations(reds, 5)]
         return "；".join(combos)
     if prize_type == 4:
-        return f"5红（{red_txt} 任选5）或 4红+蓝（任选4红 + {blue_txt}）"
+        return f"5红（{red_txt} 任选5）或 4红+{blue_txt}（任选4红）"
     if prize_type == 5:
-        return f"4红（{red_txt} 任选4）或 3红+蓝（任选3红 + {blue_txt}）"
+        return f"4红（{red_txt} 任选4）或 3红+{blue_txt}（任选3红）"
     if prize_type == 6:
-        return f"含蓝球 {blue_txt}（2红+蓝 / 1红+蓝 / 仅蓝）"
+        return f"含{blue_txt}（2红+蓝 / 1红+蓝 / 仅蓝）"
     return full
 
 
