@@ -586,12 +586,12 @@
             </template>
           </el-table-column>
           <el-table-column prop="draw_time" :label="t('pailie.colTime')" min-width="110" />
-          <el-table-column :label="t('pailie.colPool')" min-width="140">
+          <el-table-column v-if="activeGame !== 'ssq'" :label="t('pailie.colPool')" min-width="140">
             <template #default="{ row }">
               {{ isThreeDigitGame ? t('pailie.noFloatingPool') : formatPool(row.pool_balance_text) }}
             </template>
           </el-table-column>
-          <el-table-column :label="t('pailie.colSale')" min-width="120">
+          <el-table-column v-if="activeGame !== 'ssq'" :label="t('pailie.colSale')" min-width="120">
             <template #default="{ row }">{{ formatPool(row.sale_amount_text) }}</template>
           </el-table-column>
         </el-table>
