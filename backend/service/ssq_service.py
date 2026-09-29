@@ -151,6 +151,79 @@ def _fmt_ball(n: int) -> str:
     return f"{int(n):02d}"
 
 
+_SSQ_PRIZE_META: dict[int, dict[str, str]] = {
+    1: {"level": "一等奖", "rule": "6红+1蓝"},
+    2: {"level": "二等奖", "rule": "6红"},
+    3: {"level": "三等奖", "rule": "5红+1蓝"},
+    4: {"level": "四等奖", "rule": "5红 或 4红+1蓝"},
+    5: {"level": "五等奖", "rule": "4红 或 3红+1蓝"},
+    6: {"level": "六等奖", "rule": "2红+蓝 / 1红+蓝 / 仅蓝"},
+}
+
+
+def _ssq_winning_numbers(prize_type: int, reds: list[int], blue: int) -> str:
+    """按奖等给出对照本期开奖号的中奖号码说明（低奖等为组合条件）。"""
+    red_txt = " ".join(_fmt_ball(x) for x in reds)
+    blue_txt = _fmt_ball(blue)
+    full = f"{red_txt} + {blue_txt}"
+    if prize_type == 1:
+        return full
+    if prize_type == 2:
+        return red_txt
+    if prize_type == 3:
+        # C(6,5)=6 组，全部列出便于对照
+        from itertools import combinations
+        combos = [" ".join(_fmt_ball(x) for x in c) + f" + {blue_txt}" for c in combinations(reds, 5)]
+        return "；".join(combos)
+    if prize_type == 4:
+        return f"5红（{red_txt} 任选5）或 4红+蓝（任选4红 + {blue_txt}）"
+    if prize_type == 5:
+        return f"4红（{red_txt} 任选4）或 3红+蓝（任选3红 + {blue_txt}）"
+    if prize_type == 6:
+        return f"含蓝球 {blue_txt}（2红+蓝 / 1红+蓝 / 仅蓝）"
+    return full
+
+
+def _parse_ssq_prizegrades(raw_list: Any, reds: list[int], blue: int) -> list[dict[str, Any]]:
+    if not isinstance(raw_list, list):
+        return []
+    out: list[dict[str, Any]] = []
+    for item in raw_list:
+        if not isinstance(item, dict):
+            continue
+        try:
+            ptype = int(item.get("type") or item.get("prizeType") or 0)
+        except (TypeError, ValueError):
+            continue
+        meta = _SSQ_PRIZE_META.get(ptype)
+        if not meta:
+            continue
+        money = _parse_money(item.get("typemoney") or item.get("typeMoney") or item.get("stakeAmount"))
+        count_raw = item.get("typenum") or item.get("typeNum") or item.get("stakeCount")
+        try:
+            stake_count = int(str(count_raw).replace(",", "").strip()) if count_raw not in (None, "") else None
+        except ValueError:
+            stake_count = None
+        # 官方偶发空金额/空注数的占位档（如 type=7），跳过无有效数据项
+        if money is None and stake_count is None:
+            continue
+        out.append({
+            "type": ptype,
+            "level": meta["level"],
+            "rule": meta["rule"],
+            "winning_numbers": _ssq_winning_numbers(ptype, reds, blue),
+            "stake_amount": money,
+            "stake_amount_text": _format_money(money),
+            "stake_count": stake_count,
+            "total_prize": (money * stake_count) if (money is not None and stake_count is not None) else None,
+            "total_prize_text": _format_money(
+                (money * stake_count) if (money is not None and stake_count is not None) else None
+            ),
+        })
+    out.sort(key=lambda x: int(x.get("type") or 99))
+    return out
+
+
 def _normalize_ssq_row(raw: dict) -> dict[str, Any] | None:
     issue = raw.get("code") or raw.get("issue") or raw.get("lotteryDrawNum")
     red_raw = raw.get("red") or raw.get("redBall") or ""
@@ -182,6 +255,11 @@ def _normalize_ssq_row(raw: dict) -> dict[str, Any] | None:
 
     pool = _parse_money(raw.get("poolmoney") or raw.get("poolMoney") or raw.get("pool_balance"))
     sale = _parse_money(raw.get("sales") or raw.get("saleAmount") or raw.get("totalSaleAmount"))
+    prize_levels = _parse_ssq_prizegrades(
+        raw.get("prizegrades") or raw.get("prizeGrades") or raw.get("prize_levels") or [],
+        reds,
+        blue,
+    )
 
     return {
         "issue": str(issue),
@@ -194,7 +272,7 @@ def _normalize_ssq_row(raw: dict) -> dict[str, Any] | None:
         "sale_amount_text": _format_money(sale),
         "pool_balance": pool,
         "pool_balance_text": _format_money(pool),
-        "prize_levels": [],
+        "prize_levels": prize_levels,
         "has_floating_pool": True,
         "kind": "ssq",
     }

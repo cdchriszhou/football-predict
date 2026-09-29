@@ -22,6 +22,13 @@ def test_normalize_ssq_row():
         "date": "2026-07-14",
         "poolmoney": "1,234,567,890.50",
         "sales": "350,000,000",
+        "prizegrades": [
+            {"type": 1, "typenum": "2", "typemoney": "5000000"},
+            {"type": 2, "typenum": "10", "typemoney": "200000"},
+            {"type": 3, "typenum": "100", "typemoney": "3000"},
+            {"type": 6, "typenum": "1000", "typemoney": "5"},
+            {"type": 7, "typenum": "", "typemoney": ""},
+        ],
     }
     item = _normalize_ssq_row(raw)
     assert item is not None
@@ -31,6 +38,13 @@ def test_normalize_ssq_row():
     assert item["digits"] == [1, 5, 12, 18, 23, 30, 8]
     assert "+" in item["result"]
     assert item["pool_balance"] == 1234567890.50
+    assert len(item["prize_levels"]) == 4
+    assert item["prize_levels"][0]["level"] == "一等奖"
+    assert item["prize_levels"][0]["winning_numbers"] == "01 05 12 18 23 30 + 08"
+    assert item["prize_levels"][0]["stake_amount"] == 5000000.0
+    assert item["prize_levels"][0]["stake_count"] == 2
+    assert item["prize_levels"][1]["winning_numbers"] == "01 05 12 18 23 30"
+    assert "08" in item["prize_levels"][2]["winning_numbers"]
 
 
 def test_normalize_ssq_rejects_bad_red():

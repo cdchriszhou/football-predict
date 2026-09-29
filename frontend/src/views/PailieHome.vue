@@ -438,6 +438,7 @@
 
       <section class="panel history-panel">
         <h3>{{ t('pailie.historyTitle') }}</h3>
+        <p v-if="activeGame === 'ssq'" class="prize-levels-hint">{{ t('pailie.prizeLevelsHint') }}</p>
         <el-alert
           v-if="historyMessage"
           type="info"
@@ -446,7 +447,40 @@
           :title="historyMessage"
           class="history-alert"
         />
-        <el-table :data="historyTableRows" stripe size="small" empty-text="—">
+        <el-table :data="historyTableRows" stripe size="small" empty-text="—" row-key="issue">
+          <el-table-column
+            v-if="activeGame === 'ssq'"
+            type="expand"
+            width="42"
+          >
+            <template #default="{ row }">
+              <div v-if="row.prize_levels?.length" class="prize-levels">
+                <div class="prize-levels-head">
+                  <span>{{ t('pailie.colPrizeLevel') }}</span>
+                  <span>{{ t('pailie.colPrizeRule') }}</span>
+                  <span>{{ t('pailie.colPrizeNumbers') }}</span>
+                  <span>{{ t('pailie.colPrizeAmount') }}</span>
+                  <span>{{ t('pailie.colPrizeCount') }}</span>
+                </div>
+                <div
+                  v-for="(p, pi) in row.prize_levels"
+                  :key="'prize-' + row.issue + '-' + pi"
+                  class="prize-level-row"
+                >
+                  <span class="prize-level-name">{{ p.level }}</span>
+                  <span class="prize-level-rule">{{ p.rule || '—' }}</span>
+                  <span class="prize-level-nums">{{ p.winning_numbers || '—' }}</span>
+                  <span class="prize-level-amount">
+                    {{ p.stake_amount_text ? `${p.stake_amount_text} ${t('pailie.prizePerBet')}` : '—' }}
+                  </span>
+                  <span class="prize-level-count">
+                    {{ p.stake_count != null ? t('pailie.betCount', { n: p.stake_count }) : '—' }}
+                  </span>
+                </div>
+              </div>
+              <span v-else class="prize-levels-empty">{{ t('pailie.prizeLevelsEmpty') }}</span>
+            </template>
+          </el-table-column>
           <el-table-column prop="issue" :label="t('pailie.colIssue')" min-width="90" />
           <el-table-column prop="result" :label="t('pailie.colResult')" min-width="180" />
           <el-table-column :label="t('pailie.colPredict')" min-width="280">
@@ -1727,6 +1761,62 @@ onUnmounted(() => {
 }
 .history-alert {
   margin-bottom: 12px;
+}
+.prize-levels-hint {
+  margin: -4px 0 10px;
+  font-size: 12px;
+  color: #909399;
+}
+.prize-levels {
+  padding: 8px 12px 12px 48px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.prize-levels-head,
+.prize-level-row {
+  display: grid;
+  grid-template-columns: 72px 140px minmax(180px, 1.6fr) 120px 88px;
+  gap: 8px 12px;
+  align-items: start;
+  font-size: 12px;
+}
+.prize-levels-head {
+  color: #909399;
+  font-weight: 600;
+  padding-bottom: 4px;
+  border-bottom: 1px solid #ebeef5;
+}
+.prize-level-name {
+  font-weight: 600;
+  color: #c62828;
+}
+.prize-level-nums {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  color: #303133;
+  line-height: 1.45;
+  word-break: break-word;
+}
+.prize-level-amount {
+  color: #e6a23c;
+  font-weight: 600;
+}
+.prize-level-count,
+.prize-level-rule {
+  color: #606266;
+}
+.prize-levels-empty {
+  padding: 8px 48px;
+  color: #909399;
+  font-size: 12px;
+}
+@media (max-width: 900px) {
+  .prize-levels-head,
+  .prize-level-row {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+  .prize-levels-head { display: none; }
 }
 .hist-pred-list {
   display: flex;
