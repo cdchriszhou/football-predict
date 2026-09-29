@@ -483,7 +483,7 @@
           </el-table-column>
           <el-table-column prop="issue" :label="t('pailie.colIssue')" min-width="90" />
           <el-table-column prop="result" :label="t('pailie.colResult')" min-width="180" />
-          <el-table-column :label="t('pailie.colPredict')" min-width="280">
+          <el-table-column :label="t('pailie.colPredict')" min-width="320">
             <template #default="{ row }">
               <div v-if="historyPredictions(row).length" class="hist-pred-list">
                 <div
@@ -580,6 +580,12 @@
                       :class="{ 'hist-pred-ball--hit': pred.hits?.[di] }"
                     >{{ formatBall(d) }}</span>
                   </template>
+                  <span
+                    v-if="activeGame === 'ssq'"
+                    class="hist-pred-prize"
+                    :class="Number(pred.prize_amount) > 0 ? 'hist-pred-prize--win' : 'hist-pred-prize--miss'"
+                    :title="pred.prize_level || undefined"
+                  >{{ formatPredPrize(pred) }}</span>
                 </div>
               </div>
               <span v-else class="hist-pred-empty">—</span>
@@ -724,6 +730,14 @@ function historyPredLabel(pred, index) {
   if (pred?.mode === 'fushi') return t('pailie.modeFushi')
   if (pred?.mode === 'dantuo') return t('pailie.modeDantuo')
   return String(index + 1)
+}
+
+function formatPredPrize(pred) {
+  const amount = Number(pred?.prize_amount)
+  if (!Number.isFinite(amount) || amount <= 0) return '0'
+  const text = pred?.prize_amount_text || String(amount)
+  const level = pred?.prize_level
+  return level ? `${text}·${level}` : text
 }
 
 function poolAmountDisplay(gameId) {
@@ -1853,6 +1867,25 @@ onUnmounted(() => {
   font-weight: 700;
   color: #909399;
   margin: 0 1px;
+}
+.hist-pred-prize {
+  margin-left: 6px;
+  padding: 0 6px;
+  min-height: 20px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 20px;
+  flex-shrink: 0;
+}
+.hist-pred-prize--miss {
+  color: #67c23a;
+  background: #f0f9eb;
+}
+.hist-pred-prize--win {
+  color: #e6a23c;
+  background: #fdf6ec;
 }
 .hist-pred-empty {
   color: #c0c4cc;

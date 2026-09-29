@@ -160,6 +160,166 @@ _SSQ_PRIZE_META: dict[int, dict[str, str]] = {
     6: {"level": "六等奖", "rule": "2红+蓝 / 1红+蓝 / 仅蓝"},
 }
 
+# 固定奖回退（官方接口偶发缺档时）
+_SSQ_FIXED_PRIZE_FALLBACK: dict[int, float] = {
+    3: 3000.0,
+    4: 200.0,
+    5: 10.0,
+    6: 5.0,
+}
+
+
+def ssq_prize_tier(red_hits: int, blue_hit: bool) -> int | None:
+    """按红球命中数 + 蓝球是否命中返回奖等 type(1–6)，未中返回 None。"""
+    rh = int(red_hits)
+    bh = bool(blue_hit)
+    if rh == 6 and bh:
+        return 1
+    if rh == 6:
+        return 2
+    if rh == 5 and bh:
+        return 3
+    if rh == 5 or (rh == 4 and bh):
+        return 4
+    if rh == 4 or (rh == 3 and bh):
+        return 5
+    if bh and rh <= 2:
+        return 6
+    return None
+
+
+def _ssq_tier_stake_amount(prize_levels: list[dict] | None, tier: int) -> float:
+    meta = _SSQ_PRIZE_META.get(tier) or {}
+    level_name = meta.get("level")
+    for p in prize_levels or []:
+        if not isinstance(p, dict):
+            continue
+        try:
+            ptype = int(p.get("type") or 0)
+        except (TypeError, ValueError):
+            ptype = 0
+        if ptype == tier or (level_name and p.get("level") == level_name):
+            money = p.get("stake_amount")
+            if money is not None:
+                try:
+                    return float(money)
+                except (TypeError, ValueError):
+                    pass
+    return float(_SSQ_FIXED_PRIZE_FALLBACK.get(tier) or 0.0)
+
+
+def _ssq_single_ticket_prize(
+    pred_reds: list[int],
+    pred_blue: int,
+    actual_reds: set[int],
+    actual_blue: int,
+    prize_levels: list[dict] | None,
+) -> tuple[float, int | None, str | None]:
+    reds = sorted({int(x) for x in pred_reds if 1 <= int(x) <= 33})
+    if len(reds) != 6 or not (1 <= int(pred_blue) <= 16):
+        return 0.0, None, None
+    rh = len(set(reds) & actual_reds)
+    bh = int(pred_blue) == int(actual_blue)
+    tier = ssq_prize_tier(rh, bh)
+    if tier is None:
+        return 0.0, None, None
+    amount = _ssq_tier_stake_amount(prize_levels, tier)
+    level = (_SSQ_PRIZE_META.get(tier) or {}).get("level")
+    return amount, tier, level
+
+
+def evaluate_ssq_pick_prize(
+    pick: dict[str, Any],
+    actual_digits: list[int],
+    prize_levels: list[dict] | None = None,
+) -> dict[str, Any]:
+    """对照开奖号核算一注参考号（单式/复式/胆拖）的中奖金额。
+
+    复式/胆拖按拆出的全部单式累加奖金（与官方拆注计奖一致）。
+    """
+    from itertools import combinations
+
+    if not isinstance(actual_digits, list) or len(actual_digits) < 7:
+        return {
+            "prize_amount": 0.0,
+            "prize_amount_text": "0",
+            "prize_tier": None,
+            "prize_level": None,
+            "winning_bets": 0,
+        }
+    try:
+        actual_reds = {int(x) for x in actual_digits[:6]}
+        actual_blue = int(actual_digits[6])
+    except (TypeError, ValueError):
+        return {
+            "prize_amount": 0.0,
+            "prize_amount_text": "0",
+            "prize_tier": None,
+            "prize_level": None,
+            "winning_bets": 0,
+        }
+
+    mode = str(pick.get("mode") or "ssq")
+    total = 0.0
+    winning_bets = 0
+    best_tier: int | None = None
+    best_level: str | None = None
+
+    def accumulate(reds: list[int], blue: int) -> None:
+        nonlocal total, winning_bets, best_tier, best_level
+        amount, tier, level = _ssq_single_ticket_prize(
+            reds, blue, actual_reds, actual_blue, prize_levels,
+        )
+        if tier is None or amount <= 0:
+            return
+        total += amount
+        winning_bets += 1
+        if best_tier is None or tier < best_tier:
+            best_tier = tier
+            best_level = level
+
+    if mode == "fushi":
+        reds7 = pick.get("red") or (pick.get("digits") or [])[:7]
+        try:
+            reds7_i = sorted({int(x) for x in reds7 if 1 <= int(x) <= 33})
+            blue = int(pick.get("blue") if pick.get("blue") is not None else (pick.get("digits") or [0])[-1])
+        except (TypeError, ValueError, IndexError):
+            reds7_i, blue = [], 0
+        if len(reds7_i) >= 6 and 1 <= blue <= 16:
+            for combo in combinations(reds7_i, 6):
+                accumulate(list(combo), blue)
+    elif mode == "dantuo":
+        try:
+            dan = sorted({int(x) for x in (pick.get("dan") or []) if 1 <= int(x) <= 33})
+            tuo = sorted({int(x) for x in (pick.get("tuo") or []) if 1 <= int(x) <= 33 and int(x) not in dan})
+            blue = int(pick.get("blue") if pick.get("blue") is not None else (pick.get("digits") or [0])[-1])
+        except (TypeError, ValueError, IndexError):
+            dan, tuo, blue = [], [], 0
+        need = 6 - len(dan)
+        if 0 < need <= len(tuo) and 1 <= blue <= 16:
+            for combo in combinations(tuo, need):
+                accumulate(sorted(dan + list(combo)), blue)
+    else:
+        try:
+            reds = pick.get("red") or (pick.get("digits") or [])[:6]
+            reds_i = [int(x) for x in reds][:6]
+            blue = int(
+                pick.get("blue")
+                if pick.get("blue") is not None
+                else (pick.get("digits") or [0])[6]
+            )
+        except (TypeError, ValueError, IndexError):
+            reds_i, blue = [], 0
+        accumulate(reds_i, blue)
+
+    return {
+        "prize_amount": float(total),
+        "prize_amount_text": _format_money(total) if total > 0 else "0",
+        "prize_tier": best_tier,
+        "prize_level": best_level,
+        "winning_bets": winning_bets,
+    }
+
 
 def _ssq_winning_numbers(prize_type: int, reds: list[int], blue: int) -> str:
     """按奖等给出对照本期开奖号的中奖号码说明（低奖等为组合条件）。

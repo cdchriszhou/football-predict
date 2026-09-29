@@ -557,7 +557,13 @@ def _prediction_hits(
     ]
 
 
-def _prediction_payload(pick: dict[str, Any], actual_i: list[int], game_id: str) -> dict[str, Any] | None:
+def _prediction_payload(
+    pick: dict[str, Any],
+    actual_i: list[int],
+    game_id: str,
+    *,
+    prize_levels: list[dict] | None = None,
+) -> dict[str, Any] | None:
     """把一注预测整理成前端对照结构（含 mode / 复式红 / 胆拖）。"""
     digits = pick.get("digits") or []
     if not digits:
@@ -599,6 +605,11 @@ def _prediction_payload(pick: dict[str, Any], actual_i: list[int], game_id: str)
             payload["amount"] = int(pick["amount"])
         except (TypeError, ValueError):
             pass
+    if game_id == "ssq":
+        from service.ssq_service import evaluate_ssq_pick_prize
+
+        prize_info = evaluate_ssq_pick_prize(pick, actual_i, prize_levels)
+        payload.update(prize_info)
     return payload
 
 
@@ -675,8 +686,11 @@ def enrich_draws_with_predictions(game_id: str, rows: list[dict]) -> list[dict]:
 
         predictions: list[dict[str, Any]] = []
         if picks and actual_i:
+            prize_levels = row.get("prize_levels") if isinstance(row.get("prize_levels"), list) else []
             for p in picks:
-                payload = _prediction_payload(p, actual_i, game_id)
+                payload = _prediction_payload(
+                    p, actual_i, game_id, prize_levels=prize_levels,
+                )
                 if payload:
                     predictions.append(payload)
 

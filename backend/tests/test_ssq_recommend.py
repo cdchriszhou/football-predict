@@ -230,6 +230,48 @@ def test_validate_ssq_ai():
     assert _validate_ssq_ai({"red": [1, 2, 3, 4, 5, 6], "blue": 99}) is None
 
 
+def test_evaluate_ssq_pick_prize_amounts():
+    from service.ssq_service import evaluate_ssq_pick_prize, ssq_prize_tier
+
+    assert ssq_prize_tier(6, True) == 1
+    assert ssq_prize_tier(6, False) == 2
+    assert ssq_prize_tier(5, True) == 3
+    assert ssq_prize_tier(4, True) == 4
+    assert ssq_prize_tier(3, True) == 5
+    assert ssq_prize_tier(0, True) == 6
+    assert ssq_prize_tier(3, False) is None
+
+    actual = [1, 5, 12, 18, 23, 30, 8]
+    levels = [
+        {"type": 1, "level": "一等奖", "stake_amount": 5_000_000},
+        {"type": 4, "level": "四等奖", "stake_amount": 200},
+        {"type": 6, "level": "六等奖", "stake_amount": 5},
+    ]
+    miss = evaluate_ssq_pick_prize(
+        {"mode": "ssq", "red": [2, 3, 4, 6, 7, 9], "blue": 1, "digits": [2, 3, 4, 6, 7, 9, 1]},
+        actual,
+        levels,
+    )
+    assert miss["prize_amount"] == 0
+    assert miss["prize_amount_text"] == "0"
+
+    sixth = evaluate_ssq_pick_prize(
+        {"mode": "ssq", "red": [2, 3, 4, 6, 7, 9], "blue": 8, "digits": [2, 3, 4, 6, 7, 9, 8]},
+        actual,
+        levels,
+    )
+    assert sixth["prize_amount"] == 5
+    assert sixth["prize_level"] == "六等奖"
+
+    fourth = evaluate_ssq_pick_prize(
+        {"mode": "ssq", "red": [1, 5, 12, 18, 2, 3], "blue": 8, "digits": [1, 5, 12, 18, 2, 3, 8]},
+        actual,
+        levels,
+    )
+    assert fourth["prize_amount"] == 200
+    assert fourth["prize_tier"] == 4
+
+
 def test_ssq_reference_score_not_win_prob():
     """参考度与频率脱钩并压低，避免被读成中奖概率。"""
     from service.ssq_service import _REF_SCORE_SINGLE, _REF_SCORE_FUSHI, _REF_SCORE_DANTUO
