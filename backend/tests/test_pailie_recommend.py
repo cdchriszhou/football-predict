@@ -106,6 +106,32 @@ def test_parse_money_and_pool_fields():
     assert item["has_floating_pool"] is True
 
 
+def test_normalize_qxc_prize_levels():
+    from service.pailie_service import _normalize_draw_row
+
+    raw = {
+        "lotteryDrawNum": "26112",
+        "lotteryDrawResult": "4 2 6 4 1 4 8",
+        "lotteryDrawTime": "2026-09-28",
+        "poolBalanceAfterdraw": "10,000,000",
+        "totalSaleAmount": "20,000,000",
+        "prizeLevelList": [
+            {"prizeLevel": "一等奖", "stakeAmount": "5,000,000", "stakeCount": "1", "totalPrizeamount": "5,000,000", "sort": 10},
+            {"prizeLevel": "二等奖", "stakeAmount": "80,000", "stakeCount": "2", "totalPrizeamount": "160,000", "sort": 20},
+            {"prizeLevel": "六等奖", "stakeAmount": "5", "stakeCount": "1000", "totalPrizeamount": "5,000", "sort": 80},
+        ],
+    }
+    item = _normalize_draw_row(raw, "qxc")
+    assert item is not None
+    assert item["digits"] == [4, 2, 6, 4, 1, 4, 8]
+    assert len(item["prize_levels"]) == 3
+    assert item["prize_levels"][0]["winning_numbers"] == "4 2 6 4 1 4 + 8"
+    assert item["prize_levels"][0]["rule"] == "7位全部相同"
+    assert "4 2 6 4 1 4" in item["prize_levels"][1]["winning_numbers"]
+    assert item["prize_levels"][1]["rule"] == "连续6位相同"
+    assert item["prize_levels"][2]["rule"] == "连续2位相同"
+
+
 def test_validate_ai_digits_qxc():
     alphabets = GAME_SPECS["qxc"]["alphabets"]
     assert _validate_ai_digits([1, 2, 3, 4, 5, 6, 14], alphabets) == [1, 2, 3, 4, 5, 6, 14]

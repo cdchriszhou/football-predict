@@ -438,7 +438,7 @@
 
       <section class="panel history-panel">
         <h3>{{ t('pailie.historyTitle') }}</h3>
-        <p v-if="activeGame === 'ssq'" class="prize-levels-hint">{{ t('pailie.prizeLevelsHint') }}</p>
+        <p v-if="showPrizeLevels" class="prize-levels-hint">{{ t('pailie.prizeLevelsHint') }}</p>
         <el-alert
           v-if="historyMessage"
           type="info"
@@ -449,7 +449,7 @@
         />
         <el-table :data="historyTableRows" stripe size="small" empty-text="—" row-key="issue">
           <el-table-column
-            v-if="activeGame === 'ssq'"
+            v-if="showPrizeLevels"
             type="expand"
             width="42"
           >
@@ -586,12 +586,12 @@
             </template>
           </el-table-column>
           <el-table-column prop="draw_time" :label="t('pailie.colTime')" min-width="110" />
-          <el-table-column v-if="activeGame !== 'ssq'" :label="t('pailie.colPool')" min-width="140">
+          <el-table-column v-if="!showPrizeLevels" :label="t('pailie.colPool')" min-width="140">
             <template #default="{ row }">
               {{ isThreeDigitGame ? t('pailie.noFloatingPool') : formatPool(row.pool_balance_text) }}
             </template>
           </el-table-column>
-          <el-table-column v-if="activeGame !== 'ssq'" :label="t('pailie.colSale')" min-width="120">
+          <el-table-column v-if="!showPrizeLevels" :label="t('pailie.colSale')" min-width="120">
             <template #default="{ row }">{{ formatPool(row.sale_amount_text) }}</template>
           </el-table-column>
         </el-table>
@@ -636,6 +636,7 @@ const recommendCache = new Map()
 const knownIssues = ref({})
 
 const isThreeDigitGame = computed(() => activeGame.value === 'pl3' || activeGame.value === 'fc3d')
+const showPrizeLevels = computed(() => ['ssq', 'dlt', 'qxc'].includes(activeGame.value))
 
 function recommendCacheKey(game, win, ai, issue, rotate) {
   return `${game}:${win}:${ai ? 1 : 0}:${issue || '-'}:${rotate || 0}`

@@ -210,19 +210,84 @@ def _parse_prize_levels(raw_list: Any) -> list[dict]:
         level = item.get("prizeLevel") or item.get("prize_level") or item.get("level")
         stake_amount = _parse_money(item.get("stakeAmount") or item.get("stake_amount"))
         stake_count = item.get("stakeCount") or item.get("stake_count")
-        total_prize = _parse_money(item.get("totalPrizeAmount") or item.get("total_prize_amount"))
+        total_prize = _parse_money(
+            item.get("totalPrizeAmount")
+            or item.get("totalPrizeamount")
+            or item.get("total_prize_amount")
+        )
         try:
             stake_count_n = int(str(stake_count).replace(",", "")) if stake_count not in (None, "") else None
         except ValueError:
             stake_count_n = None
+        if total_prize is None and stake_amount is not None and stake_count_n is not None:
+            total_prize = stake_amount * stake_count_n
         out.append({
             "level": level,
+            "rule": None,
+            "winning_numbers": None,
             "stake_amount": stake_amount,
             "stake_amount_text": _format_money(stake_amount),
             "stake_count": stake_count_n,
             "total_prize": total_prize,
             "total_prize_text": _format_money(total_prize),
+            "sort": item.get("sort"),
         })
+    return out
+
+
+_QXC_PRIZE_RULES: dict[str, str] = {
+    "一等奖": "7位全部相同",
+    "二等奖": "连续6位相同",
+    "三等奖": "连续5位相同",
+    "四等奖": "连续4位相同",
+    "五等奖": "连续3位相同",
+    "六等奖": "连续2位相同",
+}
+
+
+def _qxc_winning_numbers(level: str, digits: list[int]) -> str:
+    """七星彩按连续位中奖：列出本期开奖号上对应长度的连续窗口。"""
+    if len(digits) < 7:
+        return " ".join(str(d) for d in digits)
+    full = " ".join(str(d) for d in digits[:6]) + " + " + str(digits[6])
+    name = str(level or "").strip()
+    width_map = {
+        "一等奖": 7,
+        "二等奖": 6,
+        "三等奖": 5,
+        "四等奖": 4,
+        "五等奖": 3,
+        "六等奖": 2,
+    }
+    width = width_map.get(name)
+    if width is None:
+        return full
+    if width >= 7:
+        return full
+    seq = list(digits[:7])
+    windows: list[str] = []
+    for i in range(0, 7 - width + 1):
+        chunk = seq[i : i + width]
+        # 最后一位为特别号时用 + 分隔更清晰
+        if i + width == 7 and width > 1:
+            windows.append(" ".join(str(x) for x in chunk[:-1]) + " + " + str(chunk[-1]))
+        else:
+            windows.append(" ".join(str(x) for x in chunk))
+    return "；".join(windows)
+
+
+def _enrich_qxc_prize_levels(levels: list[dict], digits: list[int]) -> list[dict]:
+    out: list[dict] = []
+    for item in levels:
+        level = str(item.get("level") or "").strip()
+        if not level:
+            continue
+        enriched = dict(item)
+        enriched["level"] = level
+        enriched["rule"] = _QXC_PRIZE_RULES.get(level) or level
+        enriched["winning_numbers"] = _qxc_winning_numbers(level, digits)
+        out.append(enriched)
+    out.sort(key=lambda x: (int(x["sort"]) if isinstance(x.get("sort"), int) else 9999, str(x.get("level"))))
     return out
 
 
@@ -295,6 +360,8 @@ def _normalize_draw_row(raw: dict, game_id: str) -> dict[str, Any] | None:
     prize_levels = _parse_prize_levels(
         raw.get("prizeLevelList") or raw.get("prize_level_list") or raw.get("prizeLevels")
     )
+    if game_id == "qxc":
+        prize_levels = _enrich_qxc_prize_levels(prize_levels, parsed)
 
     return {
         "issue": str(issue),

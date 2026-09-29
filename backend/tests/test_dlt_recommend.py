@@ -15,6 +15,11 @@ def test_normalize_dlt_row():
         "lotteryDrawTime": "2026-07-18",
         "poolBalanceAfterdraw": "765,513,154.43",
         "totalSaleAmount": "350,000,000",
+        "prizeLevelList": [
+            {"prizeLevel": "一等奖", "stakeAmount": "8,000,000", "stakeCount": "3", "totalPrizeamount": "24,000,000", "sort": 101},
+            {"prizeLevel": "二等奖", "stakeAmount": "100,000", "stakeCount": "20", "totalPrizeamount": "2,000,000", "sort": 301},
+            {"prizeLevel": "三等奖", "stakeAmount": "10,000", "stakeCount": "100", "totalPrizeamount": "1,000,000", "sort": 501},
+        ],
     }
     item = _normalize_dlt_row(raw)
     assert item is not None
@@ -23,6 +28,12 @@ def test_normalize_dlt_row():
     assert item["digits"] == [5, 10, 15, 21, 23, 7, 8]
     assert "+" in item["result"]
     assert item["pool_balance"] == 765513154.43
+    assert len(item["prize_levels"]) == 3
+    assert item["prize_levels"][0]["level"] == "一等奖"
+    assert item["prize_levels"][0]["winning_numbers"] == "05 10 15 21 23 + 07 08"
+    assert item["prize_levels"][0]["stake_amount"] == 8000000.0
+    assert "05 10 15 21 23 + 07" in item["prize_levels"][1]["winning_numbers"]
+    assert item["prize_levels"][2]["winning_numbers"] == "05 10 15 21 23"
 
 
 def test_normalize_dlt_rejects_bad():

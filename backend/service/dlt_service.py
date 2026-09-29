@@ -97,6 +97,100 @@ def _fmt_ball(n: int) -> str:
     return f"{int(n):02d}"
 
 
+# 现行大乐透奖级（含追加）；低奖等为固定奖，号码以条件说明对照本期开奖
+_DLT_PRIZE_RULES: dict[str, str] = {
+    "一等奖": "5前+2后",
+    "一等奖(追加)": "5前+2后（追加）",
+    "二等奖": "5前+1后",
+    "二等奖(追加)": "5前+1后（追加）",
+    "三等奖": "5前",
+    "四等奖": "4前+2后",
+    "五等奖": "4前+1后",
+    "六等奖": "3前+2后 / 4前 / 3前+1后 / 2前+2后",
+    "七等奖": "3前 / 2前+1后 / 1前+2后 / 2后 / 1前+1后 / 1后",
+}
+
+
+def _dlt_base_level(level: str) -> str:
+    text = str(level or "").strip()
+    return text.replace("（追加）", "").replace("(追加)", "")
+
+
+def _dlt_winning_numbers(level: str, front: list[int], back: list[int]) -> str:
+    from itertools import combinations
+
+    front_txt = " ".join(_fmt_ball(x) for x in front)
+    back_txt = " ".join(_fmt_ball(x) for x in back)
+    full = f"{front_txt} + {back_txt}"
+    base = _dlt_base_level(level)
+    suffix = "（追加）" if ("追加" in str(level)) else ""
+
+    if base == "一等奖":
+        return full + suffix
+    if base == "二等奖":
+        combos = [f"{front_txt} + {_fmt_ball(b)}" for b in back]
+        return "；".join(combos) + suffix
+    if base == "三等奖":
+        return front_txt
+    if base == "四等奖":
+        combos = [
+            " ".join(_fmt_ball(x) for x in c) + f" + {back_txt}"
+            for c in combinations(front, 4)
+        ]
+        return "；".join(combos)
+    if base == "五等奖":
+        combos = []
+        for c in combinations(front, 4):
+            for b in back:
+                combos.append(" ".join(_fmt_ball(x) for x in c) + f" + {_fmt_ball(b)}")
+        return "；".join(combos)
+    rule = _DLT_PRIZE_RULES.get(str(level).strip()) or _DLT_PRIZE_RULES.get(base) or base
+    return f"{rule}（对照本期 {full}）"
+
+
+def _parse_dlt_prize_levels(raw_list: Any, front: list[int], back: list[int]) -> list[dict[str, Any]]:
+    if not isinstance(raw_list, list):
+        return []
+    out: list[dict[str, Any]] = []
+    for item in raw_list:
+        if not isinstance(item, dict):
+            continue
+        level = item.get("prizeLevel") or item.get("prize_level") or item.get("level")
+        if not level:
+            continue
+        level_s = str(level).strip()
+        money = _parse_money(item.get("stakeAmount") or item.get("stake_amount"))
+        count_raw = item.get("stakeCount") or item.get("stake_count")
+        try:
+            stake_count = int(str(count_raw).replace(",", "").strip()) if count_raw not in (None, "") else None
+        except ValueError:
+            stake_count = None
+        total = _parse_money(
+            item.get("totalPrizeamount")
+            or item.get("totalPrizeAmount")
+            or item.get("total_prize_amount")
+        )
+        if total is None and money is not None and stake_count is not None:
+            total = money * stake_count
+        if money is None and stake_count is None:
+            continue
+        base = _dlt_base_level(level_s)
+        rule = _DLT_PRIZE_RULES.get(level_s) or _DLT_PRIZE_RULES.get(base) or base
+        out.append({
+            "level": level_s,
+            "rule": rule,
+            "winning_numbers": _dlt_winning_numbers(level_s, front, back),
+            "stake_amount": money,
+            "stake_amount_text": _format_money(money),
+            "stake_count": stake_count,
+            "total_prize": total,
+            "total_prize_text": _format_money(total),
+            "sort": item.get("sort"),
+        })
+    out.sort(key=lambda x: (int(x["sort"]) if isinstance(x.get("sort"), int) else 9999, str(x.get("level"))))
+    return out
+
+
 def _normalize_dlt_row(raw: dict) -> dict[str, Any] | None:
     issue = raw.get("lotteryDrawNum") or raw.get("issue") or raw.get("code")
     result = (
@@ -131,6 +225,11 @@ def _normalize_dlt_row(raw: dict) -> dict[str, Any] | None:
         or raw.get("poolmoney")
     )
     sale = _parse_money(raw.get("totalSaleAmount") or raw.get("sales") or raw.get("saleAmount"))
+    prize_levels = _parse_dlt_prize_levels(
+        raw.get("prizeLevelList") or raw.get("prize_level_list") or raw.get("prizeLevels") or [],
+        front,
+        back,
+    )
 
     return {
         "issue": str(issue),
@@ -143,7 +242,7 @@ def _normalize_dlt_row(raw: dict) -> dict[str, Any] | None:
         "sale_amount_text": _format_money(sale),
         "pool_balance": pool,
         "pool_balance_text": _format_money(pool),
-        "prize_levels": [],
+        "prize_levels": prize_levels,
         "has_floating_pool": True,
         "kind": "dlt",
     }
