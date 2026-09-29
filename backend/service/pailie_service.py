@@ -977,6 +977,89 @@ def _pick_direct_numbers(
     return picks[:count]
 
 
+def _pick_direct_light(
+    position_scores: list[list[float]],
+    alphabets: list[int],
+    count: int = 5,
+    *,
+    seed: int = 0,
+    exclude: set[tuple[int, ...]] | None = None,
+) -> list[list[int]]:
+    """全位轻权抽样 + 最大化跨注覆盖（用于福彩3D，避免热号 Top-K 锁死）。"""
+    import random as _random
+
+    exclude = exclude or set()
+    n_pos = len(alphabets)
+    rng = _random.Random((int(seed) ^ 0xFC3D) & 0xFFFFFFFF)
+    picks: list[list[int]] = []
+    used: set[tuple[int, ...]] = set()
+
+    def sample_one() -> list[int]:
+        out: list[int] = []
+        for p in range(n_pos):
+            pool = list(range(alphabets[p]))
+            weights = [0.85 + 0.15 * float(position_scores[p][d]) for d in pool]
+            total = sum(weights) or 1.0
+            r = rng.random() * total
+            acc = 0.0
+            chosen = pool[-1]
+            for d, w in zip(pool, weights):
+                acc += w
+                if acc >= r:
+                    chosen = d
+                    break
+            out.append(chosen)
+        return out
+
+    def accept(nums: list[int]) -> bool:
+        key = tuple(nums)
+        if key in used or key in exclude:
+            return False
+        used.add(key)
+        picks.append(list(nums))
+        return True
+
+    def covered() -> set[tuple[int, int]]:
+        """(pos, digit) pairs already used."""
+        out: set[tuple[int, int]] = set()
+        for nums in picks:
+            for p, d in enumerate(nums):
+                out.add((p, d))
+        return out
+
+    # 近均匀若干注
+    for _ in range(60):
+        if len(picks) >= min(2, count):
+            break
+        accept(sample_one())
+
+    # 优先覆盖尚未出现的 (位, 号)
+    guard = 0
+    while len(picks) < count and guard < 100:
+        guard += 1
+        cov = covered()
+        best = None
+        best_score = -1
+        for _ in range(24):
+            cand = sample_one()
+            if tuple(cand) in used or tuple(cand) in exclude:
+                continue
+            score = sum(1 for p, d in enumerate(cand) if (p, d) not in cov)
+            if score > best_score:
+                best_score = score
+                best = cand
+        if best is None:
+            best = sample_one()
+        if not accept(best):
+            # 强制换一个位上的号
+            nums = list(best)
+            p = guard % n_pos
+            nums[p] = (nums[p] + 1 + (guard % 3)) % alphabets[p]
+            accept(nums)
+
+    return picks[:count]
+
+
 def _cold_pick(analysis: dict[str, Any], *, seed: int = 0) -> list[int]:
     from service.digital_pick import pick_from_pool
 
@@ -1003,9 +1086,13 @@ def _build_recommendations(
     if draws and isinstance(draws[0].get("digits"), list) and len(draws[0]["digits"]) >= n_pos:
         exclude.add(tuple(int(x) for x in draws[0]["digits"][:n_pos]))
 
-    directs = _pick_direct_numbers(scores, alphabets, count=5, seed=seed, exclude=exclude)
+    # 福彩3D：全位轻权分散，避免热号 Top-K 系统性弱于随机
+    if game_id == "fc3d":
+        directs = _pick_direct_light(scores, alphabets, count=5, seed=seed, exclude=exclude)
+    else:
+        directs = _pick_direct_numbers(scores, alphabets, count=5, seed=seed, exclude=exclude)
 
-    # 第 5 注尽量用冷号回补，增加多样性
+    # 第 5 注尽量用冷号回补，增加多样性（轻权路径下仍保留一注冷号）
     cold_pick = _cold_pick(analysis, seed=seed)
     used = {tuple(x) for x in directs}
     if tuple(cold_pick) not in used and tuple(cold_pick) not in exclude:
@@ -1018,6 +1105,18 @@ def _build_recommendations(
     for i, nums in enumerate(directs[:5]):
         conf = sum(scores[p][nums[p]] for p in range(n_pos)) / n_pos
         is_cold = nums == cold_pick
+        if game_id == "fc3d":
+            reason = (
+                "冷号回补：各位遗漏偏大，作均衡参考"
+                if is_cold
+                else "各位全号池轻加权抽样 + 跨注覆盖；仅供参考，不保证命中"
+            )
+        else:
+            reason = (
+                "冷号回补：各位遗漏偏大，作均衡参考"
+                if is_cold
+                else "各位历史出现率 + 遗漏 + 近窗趋势；并按最新期号在热号池内轮换"
+            )
         recs.append({
             "id": f"pick-{i + 1}",
             "mode": "direct",
@@ -1025,12 +1124,8 @@ def _build_recommendations(
             "label": f"推荐 {i + 1}",
             "digits": nums,
             "display": " ".join(str(x) for x in nums),
-            "confidence": round(conf, 4),
-            "reason": (
-                "冷号回补：各位遗漏偏大，作均衡参考"
-                if is_cold
-                else "各位历史出现率 + 遗漏 + 近窗趋势；并按最新期号在热号池内轮换"
-            ),
+            "confidence": round(min(0.72, conf) if game_id == "fc3d" else conf, 4),
+            "reason": reason,
             "bets": 1,
         })
     return recs

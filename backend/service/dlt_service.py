@@ -49,9 +49,9 @@ _BROWSER_HEADERS = {
 _CACHE: dict[str, tuple[float, list[dict]]] = {}
 _CACHE_TTL_SEC = 600
 
-_HOT_WEIGHT = 0.65
-_COLD_WEIGHT = 0.25
-_TREND_WEIGHT = 0.10
+_HOT_WEIGHT = 0.45
+_COLD_WEIGHT = 0.35
+_TREND_WEIGHT = 0.20
 
 
 def clear_dlt_history_cache() -> None:
@@ -418,6 +418,25 @@ def analyze_dlt(draws: list[dict]) -> dict[str, Any]:
     }
 
 
+def _weighted_sample_dlt(nums: list[int], k: int, weight_fn, rng) -> list[int]:
+    pool = list(nums)
+    out: list[int] = []
+    for _ in range(min(k, len(pool))):
+        weights = [max(1e-6, float(weight_fn(n))) for n in pool]
+        total = sum(weights)
+        r = rng.random() * total
+        acc = 0.0
+        chosen = pool[-1]
+        for n, w in zip(pool, weights):
+            acc += w
+            if acc >= r:
+                chosen = n
+                break
+        out.append(chosen)
+        pool.remove(chosen)
+    return out
+
+
 def _pick_dlt_sets(
     analysis: dict[str, Any],
     count: int = 5,
@@ -425,59 +444,109 @@ def _pick_dlt_sets(
     seed: int = 0,
     exclude: set[tuple[int, ...]] | None = None,
 ) -> list[tuple[list[int], list[int]]]:
-    from service.digital_pick import rotate_ranked
+    """全池轻权 + 低重叠覆盖：避免热号 Top-K 切片系统性弱于随机。"""
+    import random as _random
 
     exclude = exclude or set()
-    front_ranked = rotate_ranked(
-        [r["digit"] for r in analysis["front_stats"]], seed, top_k=8, salt=5,
-    )
-    back_ranked = rotate_ranked(
-        [b["digit"] for b in analysis["back_stats"]], seed, top_k=4, salt=13,
-    )
-    cold_front = rotate_ranked(list(analysis["cold_digits"]), seed, top_k=6, salt=21)
-    cold_back = rotate_ranked(list(analysis["cold_back"]), seed, top_k=4, salt=29)
+    front_map = analysis.get("front_score_map") or {}
+    back_map = analysis.get("back_score_map") or {}
+    cold_front = list(analysis.get("cold_digits") or [])
+    rng = _random.Random((int(seed) ^ 0xD17A) & 0xFFFFFFFF)
+
+    all_front = list(range(1, 36))
+    all_back = list(range(1, 13))
+
+    def fw(n: int) -> float:
+        return 0.85 + 0.15 * float(front_map.get(n, 0.5))
+
+    def bw(n: int) -> float:
+        return 0.85 + 0.15 * float(back_map.get(n, 0.5))
 
     picks: list[tuple[list[int], list[int]]] = []
     used: set[tuple[int, ...]] = set()
+    used_backs: set[tuple[int, ...]] = set()
 
-    def add(fronts: list[int], backs: list[int]) -> None:
-        fronts = sorted(set(fronts))
-        backs = sorted(set(backs))
+    def too_similar(fronts: list[int], *, max_share: int = 2) -> bool:
+        s = set(fronts)
+        return any(len(s & set(prev)) >= max_share for prev, _ in picks)
+
+    def accept(fronts: list[int], backs: list[int], *, max_share: int = 2) -> bool:
+        fronts = sorted(set(int(x) for x in fronts if 1 <= int(x) <= 35))
+        backs = sorted(set(int(x) for x in backs if 1 <= int(x) <= 12))
         if len(fronts) != 5 or len(backs) != 2:
-            return
-        if any(n < 1 or n > 35 for n in fronts):
-            return
-        if any(n < 1 or n > 12 for n in backs):
-            return
+            return False
+        if too_similar(fronts, max_share=max_share):
+            return False
         key = tuple(fronts + backs)
         if key in used or key in exclude:
-            return
+            return False
+        bkey = tuple(backs)
+        if bkey in used_backs and len(used_backs) < 4:
+            return False
         used.add(key)
+        used_backs.add(bkey)
         picks.append((fronts, backs))
+        return True
 
-    add(front_ranked[:5], back_ranked[:2])
-    add(front_ranked[1:6], back_ranked[1:3] if len(back_ranked) >= 3 else back_ranked[:2])
-    mix = sorted(set(front_ranked[:3] + cold_front[:2]))[:5]
-    if len(mix) < 5:
-        for n in front_ranked:
-            if n not in mix:
-                mix.append(n)
-            if len(mix) >= 5:
-                break
-    add(sorted(mix[:5]), back_ranked[:2])
-    add(sorted(cold_front[:5]), cold_back[:2] if len(cold_back) >= 2 else back_ranked[-2:])
-    odd = [n for n in front_ranked if n % 2 == 1]
-    even = [n for n in front_ranked if n % 2 == 0]
-    bal = sorted((odd[:3] + even[:2])[:5])
-    add(bal, [back_ranked[0], back_ranked[min(2, len(back_ranked) - 1)]])
+    def covered_front() -> set[int]:
+        out: set[int] = set()
+        for f, _ in picks:
+            out.update(f)
+        return out
 
-    offset = 2
-    while len(picks) < count and offset < 25:
-        add(front_ranked[offset:offset + 5], [
-            back_ranked[offset % len(back_ranked)],
-            back_ranked[(offset + 1) % len(back_ranked)],
-        ])
-        offset += 1
+    def maximize_front_coverage(cands: list[list[int]]) -> list[int] | None:
+        best = None
+        best_score = -1e9
+        cov = covered_front()
+        for cand in cands:
+            if too_similar(cand, max_share=2):
+                continue
+            score = len(set(cand) - cov) * 10
+            if score > best_score:
+                best_score = score
+                best = cand
+        return best
+
+    for _ in range(40):
+        fronts = sorted(_weighted_sample_dlt(all_front, 5, fw, rng))
+        backs = sorted(_weighted_sample_dlt(all_back, 2, bw, rng))
+        if accept(fronts, backs):
+            break
+
+    avoid = set(picks[0][0]) if picks else set()
+    pool2 = [n for n in (cold_front + all_front) if n not in avoid] or all_front
+    cands = [sorted(_weighted_sample_dlt(pool2, 5, fw, rng)) for _ in range(36)]
+    chosen = maximize_front_coverage(cands)
+    if chosen:
+        accept(chosen, sorted(_weighted_sample_dlt(all_back, 2, bw, rng)))
+
+    for _ in range(30):
+        odd = [n for n in all_front if n % 2 == 1]
+        even = [n for n in all_front if n % 2 == 0]
+        fronts = sorted(
+            _weighted_sample_dlt(odd, 3, fw, rng) + _weighted_sample_dlt(even, 2, fw, rng)
+        )
+        if accept(fronts, sorted(_weighted_sample_dlt(all_back, 2, bw, rng))):
+            break
+
+    guard = 0
+    while len(picks) < count and guard < 80:
+        guard += 1
+        cov = covered_front()
+        prefer = [n for n in all_front if n not in cov] or all_front
+        cands = [
+            sorted(_weighted_sample_dlt(prefer + all_front, 5, fw, rng))
+            for _ in range(18)
+        ]
+        chosen = maximize_front_coverage(cands)
+        backs = sorted(_weighted_sample_dlt(all_back, 2, bw, rng))
+        if chosen and accept(chosen, backs):
+            continue
+        accept(
+            sorted(_weighted_sample_dlt(all_front, 5, fw, rng)),
+            backs,
+            max_share=3,
+        )
 
     return picks[:count]
 
@@ -497,9 +566,9 @@ def build_dlt_recommendations(
             sum(front_map[n] for n in fronts) / 5
             + sum(back_map[n] for n in backs) / 2
         ) / 2
-        reason = "前区/后区历史频率 + 遗漏 + 近窗趋势；按最新期号在热号池内轮换"
-        if i == 3:
-            reason = "冷号回补：遗漏偏大的前后区号码作均衡参考"
+        reason = "前区/后区全号池轻加权 + 低重叠覆盖；仅供参考，不保证命中"
+        if i >= 3:
+            reason = "冷号/未覆盖分散策略；" + reason
         recs.append({
             "id": f"pick-{i + 1}",
             "mode": "dlt",
@@ -513,11 +582,12 @@ def build_dlt_recommendations(
                 + " + "
                 + " ".join(_fmt_ball(x) for x in backs)
             ),
-            "confidence": round(conf, 4),
+            "confidence": round(min(0.72, conf), 4),
             "reason": reason,
             "bets": 1,
         })
     return recs
+
 
 
 def _validate_dlt_ai(item: dict) -> tuple[list[int], list[int]] | None:
@@ -712,7 +782,7 @@ async def get_dlt_recommendations(
             "period_seed": True,
             "desc": (
                 f"基于第 {latest_issue} 期后统计；前/后区全量评分（含未出现冷号），"
-                "按期号在热号池内轮换生成 5 注"
+                "全号池轻加权 + 低重叠覆盖，生成 5 注"
                 + (f"（换号批次 {rotate}）" if rotate else "")
                 + (
                     f"，并由 {'+'.join(model_names)} 多模型精选前几注。"

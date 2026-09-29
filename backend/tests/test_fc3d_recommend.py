@@ -56,3 +56,7 @@ def test_fc3d_analyze_includes_unseen_digits():
     for r in recs:
         assert len(r["digits"]) == 3
         assert all(0 <= d <= 9 for d in r["digits"])
+    # 轻权分散：5 注不应全部锁死同一组号
+    uniq = {tuple(r["digits"]) for r in recs}
+    assert len(uniq) >= 4
+    assert "轻加权" in (recs[0].get("reason") or "") or "冷号" in (recs[0].get("reason") or "")

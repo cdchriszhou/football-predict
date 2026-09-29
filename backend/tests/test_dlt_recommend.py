@@ -73,6 +73,7 @@ def test_analyze_and_build_dlt_recs():
 
     recs = build_dlt_recommendations(analysis)
     assert len(recs) == 5
+    fronts_sets = []
     for r in recs:
         assert r["mode"] == "dlt"
         assert len(r["digits"]) == 7
@@ -80,6 +81,15 @@ def test_analyze_and_build_dlt_recs():
         assert len(set(r["digits"][5:])) == 2
         assert all(1 <= n <= 35 for n in r["digits"][:5])
         assert all(1 <= n <= 12 for n in r["digits"][5:])
+        fronts_sets.append(set(r["digits"][:5]))
+    # 轻权覆盖：包内前区最大重叠不宜过高
+    max_ov = max(
+        len(fronts_sets[i] & fronts_sets[j])
+        for i in range(len(fronts_sets))
+        for j in range(i + 1, len(fronts_sets))
+    )
+    assert max_ov <= 3
+    assert len(set().union(*fronts_sets)) >= 12
 
 
 def test_validate_dlt_ai():
