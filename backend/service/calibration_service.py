@@ -110,12 +110,34 @@ class CalibratedRuleEngine(RuleEngine):
 
         if context_analysis:
             ca = context_analysis
+            # League blind (no book): context draw bumps were tuned for tournament
+            # football and re-inflated Big-Five draws past the no-book cap.
+            is_league = bool(group_context and group_context.get("is_league"))
+            has_book = bool(group_context and group_context.get("has_book_odds"))
+            if is_league and not has_book:
+                ca.draw_adjustment = min(float(ca.draw_adjustment or 0), 2.0)
+                ca.favourite_lose_shift = min(float(ca.favourite_lose_shift or 0), 0.05)
             ca.draw_adjustment *= self._collusion_weight
             ca.upset_risk = min(0.38, ca.upset_risk * self._upset_weight)
             w, d, l = apply_context_to_rates(
                 result.win_rate, result.draw_rate, result.lose_rate, ca
             )
-            result.win_rate, result.draw_rate, result.lose_rate = w, d, l
+            if is_league and not has_book:
+                from service.score_pick_config import get_config as _score_cfg
+                draw_cap = float(_score_cfg().get("LEAGUE_NO_BOOK_DRAW_CAP", 34.0))
+                if d > draw_cap:
+                    excess = d - draw_cap
+                    d = draw_cap
+                    wl = w + l
+                    if wl > 0:
+                        w += excess * w / wl
+                        l += excess * l / wl
+                    else:
+                        w += excess / 2
+                        l += excess / 2
+            result.win_rate, result.draw_rate, result.lose_rate = (
+                round(w, 1), round(d, 1), round(100 - round(w, 1) - round(d, 1), 1)
+            )
 
             if ca.manipulation_risk > 0.2:
                 dampen = self._manipulation_dampen * ca.manipulation_risk

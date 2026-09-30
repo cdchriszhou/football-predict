@@ -32,6 +32,10 @@ from service.confidence_service import compute_wdl_confidence
 
 async def _try_refresh_match_odds(db: AsyncSession, match: Match) -> Odds | None:
     """Best-effort: pull sporttery / Odds API for one upcoming fixture missing markets."""
+    import os
+    if os.getenv("SKIP_MATCH_ODDS_REFRESH", "").strip().lower() in {"1", "true", "yes"}:
+        return None
+
     from data.status_constants import normalize_match_status
 
     status = normalize_match_status(match.status)

@@ -3127,6 +3127,23 @@ def refine_wdl_after_score_pick(
     if not best_scores:
         return win_rate, draw_rate, lose_rate
     if _score_outcome(best_scores[0]) == "draw":
+        # League rounds: never crown draw as WDL favourite just because primary is 1:1.
+        # That feedback loop pushed stored Big-Five draws to ~38–41%.
+        if not is_knockout_stage(stage):
+            from service.score_pick_config import get_config
+            draw_cap = float(get_config().get("LEAGUE_NO_BOOK_DRAW_CAP", 34.0))
+            bumped = min(draw_cap, draw_rate + 2.0)
+            top_wl = max(win_rate, lose_rate)
+            if bumped >= top_wl:
+                bumped = max(draw_rate, top_wl - 1.0)
+            if bumped <= draw_rate + 1e-6:
+                return win_rate, draw_rate, lose_rate
+            scale = (100.0 - bumped) / max(100.0 - draw_rate, 1.0)
+            return (
+                round(win_rate * scale, 1),
+                round(bumped, 1),
+                round(lose_rate * scale, 1),
+            )
         rank_gap = league_rank_gap(rank_a, rank_b)
         fav_clear = win_rate >= lose_rate + 8.0 or lose_rate >= win_rate + 8.0
         if is_late_knockout_stage(stage):
