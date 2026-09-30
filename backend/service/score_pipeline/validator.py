@@ -24,6 +24,8 @@ class ScoreValidator:
         win_rate: float = 50.0,
         draw_rate: float = 25.0,
         lose_rate: float = 50.0,
+        sp_win: Optional[float] = None,
+        sp_lose: Optional[float] = None,
     ) -> tuple[list[str], Optional[str], list[str]]:
         """
         Returns (fixed_picks[:2], fixed_upset, warnings).
@@ -49,6 +51,8 @@ class ScoreValidator:
         # 3. Ensure direction coverage
         top_scores, upset = ensure_triple_direction_coverage(
             top_scores, upset, crs, model_scores,
+            win_rate=win_rate, lose_rate=lose_rate,
+            sp_win=sp_win, sp_lose=sp_lose,
         )
 
         # 4. Full validation
@@ -57,6 +61,7 @@ class ScoreValidator:
             model_scores=model_scores,
             apply_ensure_triple=True,
             win_rate=win_rate, draw_rate=draw_rate, lose_rate=lose_rate,
+            sp_win=sp_win, sp_lose=sp_lose,
         )
 
         return top_scores, upset, warnings

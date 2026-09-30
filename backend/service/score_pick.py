@@ -326,6 +326,18 @@ def poisson_to_synthetic_crs(
         # Lower implied odd for higher probability; cap range for stability
         odd = max(4.0, min(35.0, 1.0 / max(prob / max_p, 0.02) * 3.5))
         out[score] = round(odd, 2)
+
+    # Diversify blind league ladders: keep narrow 1-0 / 0-1 competitive with 2-1 / 1-2
+    # so the ensemble does not collapse every home edge into 2:1|2:0|1:1.
+    total = float(expected_a) + float(expected_b)
+    if "1:0" in out and "2:1" in out and expected_a <= 1.9:
+        out["1:0"] = round(min(out["1:0"], out["2:1"] * 0.96), 2)
+    if "0:1" in out and "1:2" in out and expected_b <= 1.9:
+        out["0:1"] = round(min(out["0:1"], out["1:2"] * 0.96), 2)
+    if total <= 2.55 and "0:0" in out and "1:1" in out:
+        out["0:0"] = round(min(out["0:0"], out["1:1"] * 1.05), 2)
+    if total >= 3.2 and "3:1" in out and "2:0" in out:
+        out["3:1"] = round(min(out["3:1"], max(out["2:0"] * 1.15, out.get("3:0", 99))), 2)
     return out
 
 
@@ -646,6 +658,25 @@ def _draw_close_to_primary(
     if not pri_odd or not draw_odd:
         return False
     return (draw_odd / pri_odd) <= ratio and (draw_odd - pri_odd) <= gap
+
+
+def _crs_draw_is_near_top(
+    ranked: list[tuple[str, float]],
+    *,
+    gap: float | None = None,
+) -> bool:
+    """True when a draw is the cheapest CRS line or within a small odd of it."""
+    if not ranked:
+        return False
+    cfg = _get_config()
+    near = float(gap if gap is not None else cfg.get("CRS_DRAW_NEAR_TOP_GAP", 0.45))
+    cheapest = ranked[0][1]
+    if _score_outcome(ranked[0][0]) == "draw":
+        return True
+    for score, odd in ranked:
+        if _score_outcome(score) == "draw" and (odd - cheapest) <= near:
+            return True
+    return False
 
 
 def _best_home_win(
@@ -1589,6 +1620,8 @@ def align_score_picks_to_wdl(
     min_margin: float | None = None,
     resilience: dict | None = None,
     group_context: dict | None = None,
+    sp_win: float | None = None,
+    sp_lose: float | None = None,
 ) -> list[str]:
     """Ensure likely scorelines match the fused W/D/L favourite (AI + market)."""
     from service.score_context import resilience_preserves_draw
@@ -1597,7 +1630,6 @@ def align_score_picks_to_wdl(
     margin_threshold = float(min_margin or cfg.get("ALIGN_MIN_MARGIN", 6.0))
     margin_strong = float(cfg.get("ALIGN_MARGIN_STRONG", 8.0))
     draw_preserve_rate = float(cfg.get("ALIGN_DRAW_PRESERVE_RATE", 20.0))
-    same_dir_gap = float(cfg.get("ALIGN_SAME_DIR_GAP_CAP", 8.0))
 
     picks = [s for s in (best_scores or []) if s and s != "?"][:2]
     if not picks or not crs:
@@ -1652,16 +1684,34 @@ def align_score_picks_to_wdl(
     if margin < margin_threshold and not force_align:
         return picks
     ranked = _rank_crs(crs, set())
-    if ranked and not force_align and margin < 8.0:
+    # Real book CRS may keep a near-top draw against a mild WDL favourite.
+    # Synthetic / blind-league CRS must not — that froze mass 1:1 primaries.
+    real_book = bool(ctx.get("has_book_odds")) or (
+        sp_win is not None and sp_lose is not None
+        and float(sp_win) > 1.01 and float(sp_lose) > 1.01
+    )
+    if ctx.get("synthetic_crs"):
+        real_book = False
+    if real_book and ranked and not force_align and margin < 8.0:
         crs_dom = _score_outcome(ranked[0][0])
         pri_dom = _score_outcome(picks[0]) if picks else None
         if crs_dom != dom and pri_dom == crs_dom:
             return picks
 
+    draw_near = _crs_draw_is_near_top(ranked)
+    heavy = (
+        (dom == "win" and _is_heavy_fav_home(win_rate, sp_win))
+        or (dom == "lose" and _is_heavy_fav_away(lose_rate, sp_lose))
+    )
+    keep_crs_draw = real_book and draw_near and not heavy and not force_align
+
     if _score_outcome(picks[0]) != dom:
-        primary = _best_crs_for_outcome(ranked, crs, dom, set(), model_scores)
-        if primary:
-            picks[0] = primary
+        if keep_crs_draw and _score_outcome(picks[0]) == "draw":
+            pass
+        else:
+            primary = _best_crs_for_outcome(ranked, crs, dom, set(), model_scores)
+            if primary:
+                picks[0] = primary
 
     if len(picks) < 2:
         sec = _best_crs_for_outcome(ranked, crs, dom, {picks[0]}, model_scores)
@@ -1670,6 +1720,8 @@ def align_score_picks_to_wdl(
     elif margin >= margin_strong and _score_outcome(picks[1]) != dom:
         # Keep draw secondary when R1 form / high draw_rate warns against forcing win-win pair
         if preserve_draw and _score_outcome(picks[1]) == "draw" and draw_rate >= draw_preserve_rate:
+            pass
+        elif keep_crs_draw and _score_outcome(picks[1]) == "draw":
             pass
         else:
             sec = _best_crs_for_outcome(ranked, crs, dom, {picks[0]}, model_scores)
@@ -1685,6 +1737,19 @@ def align_score_picks_to_wdl(
                 sec = _best_side_outcome_moderate(ranked, alt_out, {picks[0]})
             if sec:
                 picks[1] = sec
+
+    # Moderate favourite + market draw near top: keep a draw in the likely pair.
+    if (
+        keep_crs_draw
+        and len(picks) >= 2
+        and _score_outcome(picks[0]) == dom
+        and _score_outcome(picks[1]) == dom
+        and dom in ("win", "lose")
+        and draw_rate >= draw_preserve_rate
+    ):
+        draw_pick = _best_draw(ranked, {picks[0]})
+        if draw_pick:
+            picks[1] = draw_pick
 
     return picks[:2]
 
@@ -1787,6 +1852,8 @@ def repair_stored_score_picks(
         win_rate=win_rate,
         draw_rate=draw_rate or max(0.0, 100.0 - win_rate - lose_rate),
         lose_rate=lose_rate,
+        sp_win=sp_win,
+        sp_lose=sp_lose,
     )
     pick_outs = {_score_outcome(p) for p in fixed_picks if p}
     if fixed_upset and pick_outs and _score_outcome(fixed_upset) in pick_outs:
@@ -1807,6 +1874,7 @@ def repair_stored_score_picks(
         fixed_picks, fixed_upset, crs, apply_ensure_triple=True,
         win_rate=win_rate, draw_rate=draw_rate or max(0.0, 100.0 - win_rate - lose_rate),
         lose_rate=lose_rate,
+        sp_win=sp_win, sp_lose=sp_lose,
     )
     return fixed_picks, fixed_upset
 
@@ -1822,6 +1890,8 @@ def validate_score_picks(
     win_rate: float = 50.0,
     draw_rate: float = 28.0,
     lose_rate: float = 50.0,
+    sp_win: float | None = None,
+    sp_lose: float | None = None,
 ) -> tuple[list[str], str | None, list[str]]:
     """
     Post-pick validation (luoji.md §8). Returns fixed picks and warning messages.
@@ -1846,6 +1916,8 @@ def validate_score_picks(
     if apply_ensure_triple:
         picks, upset_val = ensure_triple_direction_coverage(
             picks, upset_val, crs, model_scores,
+            win_rate=win_rate, lose_rate=lose_rate,
+            sp_win=sp_win, sp_lose=sp_lose,
         )
 
     picks, upset_val = reconcile_likely_upset_cluster(picks, upset_val, crs)
@@ -2164,7 +2236,10 @@ def run_full_score_pipeline(
             **({"handicap": handicap} if handicap else {}),
             **({"rank_a": rank_a, "rank_b": rank_b, "rank_gap": league_rank_gap(rank_a, rank_b)}
                if rank_a is not None and rank_b is not None else {}),
+            "synthetic_crs": synthetic_crs,
         },
+        sp_win=sp_win,
+        sp_lose=sp_lose,
     )
     best = ensure_rout_score_in_likely_pair(
         best, crs, sp_win=sp_win, sp_lose=sp_lose, win_rate=win_rate, lose_rate=lose_rate,
@@ -2182,10 +2257,15 @@ def run_full_score_pipeline(
         group_context=group_context, team_a=team_a, team_b=team_b,
         odds_dict=_res_odds,
     )
-    best, upset = ensure_triple_direction_coverage(best, upset, crs, hints or None)
+    best, upset = ensure_triple_direction_coverage(
+        best, upset, crs, hints or None,
+        win_rate=win_rate, lose_rate=lose_rate,
+        sp_win=sp_win, sp_lose=sp_lose,
+    )
     best, upset, warnings = validate_score_picks(
         best, upset, crs, model_scores=hints or None, apply_ensure_triple=False,
         win_rate=win_rate, draw_rate=draw_rate, lose_rate=lose_rate,
+        sp_win=sp_win, sp_lose=sp_lose,
     )
     best, upset = finalize_late_knockout_triple(
         best, upset, crs,
@@ -3136,6 +3216,117 @@ def ensure_extreme_mismatch_triple_coverage(
     return picks[:2], upset_val
 
 
+def spread_favorite_score_ladder(
+    best_scores: list[str],
+    upset: str | None,
+    crs: dict[str, float],
+    *,
+    win_rate: float,
+    lose_rate: float,
+    draw_rate: float,
+    sp_win: float | None = None,
+    sp_lose: float | None = None,
+    expected_a: float = 1.2,
+    expected_b: float = 1.0,
+    stage: str | None = None,
+) -> tuple[list[str], str | None]:
+    """Spread favourite-win totals across the triple; keep 3:0 off primary."""
+    picks = [s for s in (best_scores or []) if s and s != "?"][:2]
+    upset_val = upset if upset and upset != "?" else None
+    if not crs or not picks or is_knockout_stage(stage):
+        return picks, upset_val
+
+    ranked = _rank_crs(crs, set())
+    home_fav = win_rate >= lose_rate + 6 and win_rate >= 48.0
+    away_fav = lose_rate >= win_rate + 6 and lose_rate >= 48.0
+
+    def _parts(score: str) -> tuple[int, int, int] | None:
+        try:
+            ga, gb = map(int, score.split(":"))
+        except (ValueError, AttributeError):
+            return None
+        return ga, gb, ga + gb
+
+    # Home favourite: 3:0/4:0 must not sit as primary when 1:0/2:0 exist.
+    if home_fav and _score_outcome(picks[0]) == "win":
+        parts = _parts(picks[0])
+        if parts and parts[1] == 0 and parts[2] >= 3:
+            for pref in ("1:0", "2:0", "2:1"):
+                if pref in crs and pref != picks[0]:
+                    rout = picks[0]
+                    picks[0] = pref
+                    if len(picks) < 2:
+                        picks.append("2:0" if "2:0" in crs and pref != "2:0" else rout)
+                    elif picks[1] in ("3:0", "4:0", "5:0") or _score_outcome(picks[1]) != "win":
+                        if "2:0" in crs and "2:0" not in {picks[0], picks[1]}:
+                            if _score_outcome(picks[1]) == "win":
+                                picks[1] = "2:0"
+                            else:
+                                picks[1] = "2:0" if _score_outcome(picks[1]) != "draw" else picks[1]
+                    elif picks[1] not in ("2:0", "2:1", "1:0"):
+                        if "2:0" in crs and picks[0] != "2:0":
+                            picks[1] = "2:0"
+                    if (
+                        rout not in picks
+                        and (upset_val is None or _score_outcome(upset_val) == "win")
+                    ):
+                        upset_val = rout
+                    break
+        if len(picks) >= 2 and picks[0] == "1:0" and picks[1] in ("3:0", "4:0") and "2:0" in crs:
+            rout = picks[1]
+            picks[1] = "2:0"
+            if upset_val is None or _score_outcome(upset_val) == "win":
+                upset_val = rout
+        if len(picks) >= 2 and picks[0] == picks[1]:
+            for pref in ("2:0", "2:1", "1:0", "3:1", "3:0"):
+                if pref in crs and pref != picks[0]:
+                    picks[1] = pref
+                    break
+
+    # Away favourite, open game: swap stacked 0:2 for 1:3/2:3 when priced.
+    if away_fav and len(picks) >= 2 and expected_a + expected_b >= 2.6:
+        if _score_outcome(picks[0]) == "lose" and _score_outcome(picks[1]) == "lose":
+            if picks[1] in ("0:2", "0:1"):
+                for pref in ("1:3", "2:3", "1:2"):
+                    if pref in crs and pref not in picks:
+                        picks[1] = pref
+                        break
+
+    # Even / competitive league games: prefer 0:1 / 1:0 over 1:2 / 2:1.
+    low_total = expected_a + expected_b <= 3.15
+    evenish = abs(win_rate - lose_rate) < 12.0
+    if (
+        low_total
+        and evenish
+        and not _is_heavy_fav_home(win_rate, sp_win)
+        and not _is_heavy_fav_away(lose_rate, sp_lose)
+    ) or (
+        _is_competitive(win_rate, lose_rate, draw_rate)
+        and low_total
+        and not _is_heavy_fav_home(win_rate, sp_win)
+        and not _is_heavy_fav_away(lose_rate, sp_lose)
+    ):
+        repl = {"1:2": "0:1", "2:1": "1:0"}
+        used = set(picks) | ({upset_val} if upset_val else set())
+        for i, p in enumerate(picks):
+            alt = repl.get(p)
+            if alt and alt in crs and alt not in used:
+                picks[i] = alt
+                used.discard(p)
+                used.add(alt)
+        if upset_val in repl:
+            alt = repl[upset_val]
+            if alt in crs and alt not in used:
+                upset_val = alt
+
+    skip = set(picks) | ({upset_val} if upset_val else set())
+    if len(picks) == 1:
+        alt = _best_crs_for_outcome(ranked, crs, _score_outcome(picks[0]), skip)
+        if alt:
+            picks.append(alt)
+    return picks[:2], upset_val
+
+
 def ensure_market_direction_in_trio(
     best_scores: list[str],
     upset: str | None,
@@ -3147,6 +3338,9 @@ def ensure_market_direction_in_trio(
     sp_win: float | None = None,
     sp_draw: float | None = None,
     sp_lose: float | None = None,
+    expected_a: float = 1.2,
+    expected_b: float = 1.0,
+    stage: str | None = None,
 ) -> tuple[list[str], str | None]:
     """
     Safety net after ensemble pick:
@@ -3168,12 +3362,12 @@ def ensure_market_direction_in_trio(
     market_away = (
         _market_fav_a(sp_win, sp_lose) is False
         or (sp_lose is not None and sp_lose <= 1.90 and lose_rate >= win_rate)
-        or lose_rate >= 45.0
+        or (lose_rate >= win_rate + 6 and lose_rate >= 45.0)
     )
     market_home = (
         _market_fav_a(sp_win, sp_lose) is True
         or (sp_win is not None and sp_win <= 1.70)
-        or win_rate >= 55.0
+        or (win_rate >= lose_rate + 6 and win_rate >= 48.0)
     )
     competitive = _is_competitive(win_rate, lose_rate, draw_rate)
 
@@ -3225,7 +3419,55 @@ def ensure_market_direction_in_trio(
         and {picks[0], picks[1]} == {"2:1", "2:0"}
         and "1:0" in crs
     ):
-        picks[1] = "1:0"
+        # Low/medium xG home edges: prefer 2:1 + 1:0 over stacking 2:x only.
+        if expected_a <= 1.85 or expected_a + expected_b <= 3.0:
+            picks[1] = "1:0"
+        elif "3:1" in crs and expected_a >= 2.05:
+            picks[1] = "1:0"  # keep narrow secondary; put rout on upset below
+            if upset_val is None or _score_outcome(upset_val) == "draw":
+                if "3:0" in crs and "3:0" not in picks:
+                    # keep draw upset when competitive; else allow 3:0 cold
+                    pass
+
+    # 4b) Away fav stacked 1:2+0:2 → prefer 0:1 secondary on lower totals.
+    if (
+        market_away
+        and len(picks) >= 2
+        and _score_outcome(picks[0]) == "lose"
+        and _score_outcome(picks[1]) == "lose"
+        and {picks[0], picks[1]} == {"1:2", "0:2"}
+        and "0:1" in crs
+        and expected_b <= 1.85
+    ):
+        picks[1] = "0:1"
+
+    # 4c) Draw-primary league templates: avoid always pairing 1:1 with 1:2 —
+    # include a narrow home or away win when rates lean that way.
+    if (
+        _score_outcome(picks[0]) == "draw"
+        and len(picks) >= 2
+        and not _is_heavy_fav_home(win_rate, sp_win)
+        and not _is_heavy_fav_away(lose_rate, sp_lose)
+    ):
+        if win_rate >= lose_rate + 3 and picks[1] in ("1:2", "0:2", "0:1"):
+            for pref in ("1:0", "2:1", "2:0"):
+                if pref in crs and pref not in picks:
+                    picks[1] = pref
+                    break
+        elif lose_rate >= win_rate + 3 and picks[1] in ("2:1", "2:0", "1:0"):
+            for pref in ("0:1", "1:2", "0:2"):
+                if pref in crs and pref not in picks:
+                    picks[1] = pref
+                    break
+        # Prefer 0:0 as upset over repeating mid-score away/home when totals low.
+        if (
+            expected_a + expected_b <= 2.6
+            and upset_val
+            and _score_outcome(upset_val) != "draw"
+            and "0:0" in crs
+            and "0:0" not in picks
+        ):
+            upset_val = "0:0"
 
     # 5) Pad missing secondary for home/away favourites so UI/triple always has two likelies.
     if len(picks) == 1:
@@ -3237,6 +3479,24 @@ def ensure_market_direction_in_trio(
         if alt:
             picks.append(alt)
 
+    picks, upset_val = spread_favorite_score_ladder(
+        picks, upset_val, crs,
+        win_rate=win_rate, lose_rate=lose_rate, draw_rate=draw_rate,
+        sp_win=sp_win, sp_lose=sp_lose,
+        expected_a=expected_a, expected_b=expected_b, stage=stage,
+    )
+    picks, upset_val = ensure_triple_direction_coverage(
+        picks, upset_val, crs,
+        win_rate=win_rate, lose_rate=lose_rate,
+        sp_win=sp_win, sp_lose=sp_lose,
+    )
+    # 3-dir may re-inject 1:2 as the cheapest away; narrow even games back to 0:1.
+    picks, upset_val = spread_favorite_score_ladder(
+        picks, upset_val, crs,
+        win_rate=win_rate, lose_rate=lose_rate, draw_rate=draw_rate,
+        sp_win=sp_win, sp_lose=sp_lose,
+        expected_a=expected_a, expected_b=expected_b, stage=stage,
+    )
     return picks[:2], upset_val
 
 
@@ -3245,41 +3505,85 @@ def ensure_triple_direction_coverage(
     upset: str | None,
     score_odds: dict[str, float],
     model_scores: list[str] | None = None,
+    *,
+    win_rate: float | None = None,
+    lose_rate: float | None = None,
+    sp_win: float | None = None,
+    sp_lose: float | None = None,
 ) -> tuple[list[str], str | None]:
-    """Ensure likely+upset span >=2 W/D/L outcomes when CRS pool allows."""
+    """Ensure likely+upset span W/D/L outcomes when the CRS pool allows."""
     picks = [s for s in (best_scores or []) if s and s != "?"][:2]
     upset_val = upset if upset and upset != "?" else None
     if upset_val in ("胜其它", "平其它", "负其它"):
         return picks, upset_val
     if len(_pick_outcomes(picks, upset_val)) >= 2:
-        return picks, upset_val
+        pass
+    else:
+        primary = picks[0] if picks else None
+        pri_out = _score_outcome(primary) if primary else None
+        ranked = _rank_crs(score_odds, set())
 
-    primary = picks[0] if picks else None
-    pri_out = _score_outcome(primary) if primary else None
-    ranked = _rank_crs(score_odds, set())
+        if (
+            pri_out
+            and len(picks) >= 2
+            and _score_outcome(picks[1]) == pri_out
+            and upset_val
+            and _score_outcome(upset_val) == pri_out
+        ):
+            # Cluster pair + same-direction upset — fix upset only, never mutate picks[1]
+            upset_val = _upset_from_different_outcome(ranked, set(picks), primary_outcome=pri_out)
 
+        if len(_pick_outcomes(picks, upset_val)) < 2 and not upset_val:
+            exclude = set(picks)
+            for score, _ in ranked:
+                if score in exclude or not pri_out or _score_outcome(score) == pri_out:
+                    continue
+                upset_val = score
+                break
+            if not upset_val:
+                for ms in model_scores or []:
+                    if ms and ms not in exclude and pri_out and _score_outcome(ms) != pri_out:
+                        upset_val = ms
+                        break
+
+    crs_outs = {
+        _score_outcome(s) for s in (score_odds or {}) if s and ":" in str(s)
+    }
+    covered = _pick_outcomes(picks, upset_val)
     if (
-        pri_out
-        and len(picks) >= 2
-        and _score_outcome(picks[1]) == pri_out
-        and upset_val
-        and _score_outcome(upset_val) == pri_out
+        win_rate is not None
+        and lose_rate is not None
+        and len(covered) < 3
+        and {"win", "draw", "lose"} <= crs_outs
+        and not _is_heavy_fav_home(win_rate, sp_win)
+        and not _is_heavy_fav_away(lose_rate, sp_lose)
     ):
-        # Cluster pair + same-direction upset — fix upset only, never mutate picks[1]
-        upset_val = _upset_from_different_outcome(ranked, set(picks), primary_outcome=pri_out)
-
-    if len(_pick_outcomes(picks, upset_val)) >= 2:
-        return picks, upset_val
-
-    if upset_val:
-        return picks, upset_val
-
-    exclude = set(picks)
-    for score, _ in ranked:
-        if score in exclude or not pri_out or _score_outcome(score) == pri_out:
-            continue
-        return picks, score
-    for ms in model_scores or []:
-        if ms and ms not in exclude and pri_out and _score_outcome(ms) != pri_out:
-            return picks, ms
+        missing = next(iter({"win", "draw", "lose"} - covered), None)
+        if missing:
+            ranked = _rank_crs(score_odds, set())
+            skip = set(picks) | ({upset_val} if upset_val else set())
+            alt = _best_crs_for_outcome(ranked, score_odds, missing, skip, model_scores)
+            if not alt:
+                alt = _best_crs_for_outcome(
+                    ranked, score_odds, missing, set(picks), model_scores,
+                )
+            if alt:
+                pri_out = _score_outcome(picks[0]) if picks else None
+                same_dir_pair = (
+                    len(picks) >= 2
+                    and _score_outcome(picks[0]) == _score_outcome(picks[1])
+                )
+                if (
+                    same_dir_pair
+                    and missing in ("win", "lose")
+                    and missing != pri_out
+                ):
+                    draw_pick = _best_draw(ranked, {picks[0]})
+                    if draw_pick:
+                        picks[1] = draw_pick
+                    upset_val = alt
+                elif same_dir_pair:
+                    picks[1] = alt
+                else:
+                    upset_val = alt
     return picks, upset_val

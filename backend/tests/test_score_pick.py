@@ -210,6 +210,51 @@ def test_align_respects_crs_when_wdl_margin_small():
     )
     assert out[0] == "0:2"
 
+
+def test_align_keeps_crs_draw_for_moderate_home_fav():
+    from service.score_pick import align_score_picks_to_wdl, _score_outcome
+
+    crs = {
+        "1:1": 6.4, "1:0": 6.5, "2:1": 7.0, "2:0": 7.75,
+        "0:0": 10.5, "0:1": 12.5,
+    }
+    out = align_score_picks_to_wdl(
+        ["1:1", "1:0"], crs,
+        win_rate=54.7, draw_rate=26.3, lose_rate=19.0,
+        sp_win=1.62, sp_lose=4.66,
+    )
+    assert any(_score_outcome(s) == "draw" for s in out[:2]), out
+
+
+def test_spread_favorite_demotes_three_nil_primary():
+    from service.score_pick import spread_favorite_score_ladder, _score_outcome
+
+    crs = {
+        "3:0": 11.0, "1:0": 6.7, "2:0": 7.5, "1:1": 7.0, "0:0": 12.0, "0:1": 14.0,
+    }
+    best, upset = spread_favorite_score_ladder(
+        ["3:0", "1:0"], "0:0", crs,
+        win_rate=57.5, lose_rate=17.5, draw_rate=24.9,
+        sp_win=1.54, expected_a=1.7, expected_b=1.2, stage="第1轮",
+    )
+    assert best[0] != "3:0"
+    assert _score_outcome(best[0]) == "win"
+    assert len(best) < 2 or best[0] != best[1]
+
+
+def test_ensure_triple_covers_three_directions_for_moderate_fav():
+    from service.score_pick import ensure_triple_direction_coverage, _score_outcome
+
+    crs = {
+        "2:0": 5.0, "1:0": 5.5, "1:1": 6.0, "0:1": 8.0, "0:0": 9.0,
+    }
+    best, upset = ensure_triple_direction_coverage(
+        ["2:0", "1:0"], "1:1", crs,
+        win_rate=54.0, lose_rate=20.0, sp_win=1.70,
+    )
+    trio = [s for s in best + [upset] if s]
+    assert {_score_outcome(s) for s in trio} == {"win", "draw", "lose"}
+
 def test_cap_knockout_wdl_pulls_inflated_draw():
     from service.score_pick import cap_knockout_wdl_to_market
 

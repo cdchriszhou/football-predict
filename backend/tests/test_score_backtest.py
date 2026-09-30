@@ -157,11 +157,17 @@ def test_league_backtest_does_not_seed_worldcup_matches():
 
 
 def test_league_expected_goals_do_not_use_fifa_team_data():
-    from service.score_backtest import _expected_goals, _pipeline_ranks, LEAGUE_HOME_XG, LEAGUE_AWAY_XG
+    from service.score_backtest import (
+        _expected_goals, _pipeline_ranks, LEAGUE_HOME_XG, LEAGUE_AWAY_XG,
+    )
 
-    assert _expected_goals("巴萨", "马竞", "la-liga") == (LEAGUE_HOME_XG, LEAGUE_AWAY_XG)
-    assert _pipeline_ranks("巴萨", "马竞", "la-liga") == (10, 10)
-    assert _expected_goals("巴萨", "马竞", "premier-league") == (LEAGUE_HOME_XG, LEAGUE_AWAY_XG)
+    assert _pipeline_ranks("巴萨", "马竞", "la-liga") == (1, 3)
+    ea, eb = _expected_goals("巴萨", "马竞", "la-liga")
+    assert ea > eb
+    assert ea > LEAGUE_HOME_XG
+    assert _pipeline_ranks("未知甲", "未知乙", "la-liga") == (10, 10)
+    assert _expected_goals("未知甲", "未知乙", "la-liga") == (LEAGUE_HOME_XG, LEAGUE_AWAY_XG)
+    assert _pipeline_ranks("阿森纳", "切尔西", "premier-league") == (1, 4)
 
 
 def test_all_big_five_backtests_ignore_worldcup_history():

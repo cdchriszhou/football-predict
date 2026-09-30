@@ -284,10 +284,13 @@ class RuleEngine:
 
         # League early-season / no book: keep a healthier draw prior (MD1 draws are common).
         is_league = bool(group_context and group_context.get("is_league"))
+        league_blind = bool(is_league and (early_season or not has_book))
         draw_floor = 10.0
-        if is_league and (early_season or not has_book):
-            draw_floor = 18.0
-            target_draw = max(target_draw, 18.0)
+        if league_blind:
+            from service.score_pick_config import get_config as _score_cfg
+            league_draw_floor = float(_score_cfg().get("LEAGUE_EARLY_DRAW_FLOOR", 24.0))
+            draw_floor = league_draw_floor
+            target_draw = max(target_draw, league_draw_floor)
 
         scores["draw"] = scores["draw"] * 0.40 + target_draw * 0.60
         scores["draw"] = max(draw_floor, min(38.0, scores["draw"]))
@@ -297,8 +300,21 @@ class RuleEngine:
         # makes symmetric outcomes (1:1, 0:0) mathematically less likely than they
         # are in reality. This nudge gives draws a fair chance when the match is
         # relatively balanced (max win/loss < 55%).
+        #
+        # League without book odds: do NOT promote draw to tied/top favourite —
+        # that path collapsed 2026/27 Big-Five stored picks into mass 1:1 primaries
+        # while actual draws stayed ~25%. Keep a soft bump only.
         max_wl = max(scores["a"], scores["b"])
-        if scores["draw"] >= max_wl - 8.0 and max_wl < 55.0:
+        if league_blind:
+            if scores["draw"] >= max_wl - 5.0 and max_wl < 52.0:
+                soft = min(scores["draw"] + 2.0, max_wl - 1.5)
+                scores["draw"] = max(scores["draw"], soft)
+            # Any residual rank/ability gap should keep a decisive W/L favourite.
+            if strength_gap >= 4.0:
+                scores["draw"] = min(scores["draw"], max_wl - 2.0)
+            elif strength_gap >= 2.0:
+                scores["draw"] = min(scores["draw"], max_wl - 0.8)
+        elif scores["draw"] >= max_wl - 8.0 and max_wl < 55.0:
             scores["draw"] = max(scores["draw"], max_wl)
         # Also: when draw is close to being the top pick, give it a slight edge
         # in knockout (tournament) football only — not Big Five league rounds.
@@ -317,6 +333,31 @@ class RuleEngine:
         else:
             scores["a"] = remaining / 2
             scores["b"] = remaining / 2
+
+        # League blind: hard-cap draw so 1:1 does not dominate the published WDL.
+        if league_blind:
+            from service.score_pick_config import get_config as _score_cfg2
+            draw_cap = float(_score_cfg2().get("LEAGUE_NO_BOOK_DRAW_CAP", 34.0))
+            if scores["draw"] > draw_cap:
+                excess = scores["draw"] - draw_cap
+                scores["draw"] = draw_cap
+                wl_sum = scores["a"] + scores["b"]
+                if wl_sum > 0:
+                    scores["a"] += excess * scores["a"] / wl_sum
+                    scores["b"] += excess * scores["b"] / wl_sum
+                else:
+                    scores["a"] += excess / 2
+                    scores["b"] += excess / 2
+            # Re-assert W/L favourite when sides are not truly even.
+            max_wl2 = max(scores["a"], scores["b"])
+            if strength_gap >= 3.0 and scores["draw"] >= max_wl2:
+                bump = min(3.0, scores["draw"] - (max_wl2 - 1.0))
+                if bump > 0:
+                    scores["draw"] -= bump
+                    if scores["a"] >= scores["b"]:
+                        scores["a"] += bump
+                    else:
+                        scores["b"] += bump
 
         # ── Score prediction ──
         expected_a, expected_b = self._expected_goals(

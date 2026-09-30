@@ -225,6 +225,21 @@ async def run_odds_crawler(
                             handicap_draw = macau.get("handicap_draw")
                             handicap_lose = macau.get("handicap_lose")
 
+                    # When 1X2 exists but CRS is thin/empty, derive a book-aligned CRS map
+                    # so score picks are not forced onto Poisson-only templates.
+                    if (
+                        win_win and draw and win_lose
+                        and not _has_crs_data(score_odds_raw)
+                    ):
+                        from crawler.odds_scraper import derive_score_odds
+                        derived = derive_score_odds(
+                            float(win_win), float(draw), float(win_lose)
+                        )
+                        derived.update(
+                            {k: v for k, v in score_odds_raw.items() if k.startswith("_")}
+                        )
+                        score_odds_raw = derived
+
                     meta = _build_meta(european, macau, sporttery_meta)
                     score_odds_raw["_meta"] = meta
                     source = _compose_source(european, has_sporttery)

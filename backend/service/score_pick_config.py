@@ -84,6 +84,9 @@ class ScorePickConfig(TypedDict, total=False):
     ALIGN_MARGIN_STRONG: float       # Margin threshold for forcing direction change
     ALIGN_DRAW_PRESERVE_RATE: float  # Draw_rate threshold for preserving draw secondary
     ALIGN_SAME_DIR_GAP_CAP: float     # Gap cap for same-direction upset fallback
+    CRS_DRAW_NEAR_TOP_GAP: float     # Draw CRS within this odd of cheapest counts as market-favoured
+    LEAGUE_EARLY_DRAW_FLOOR: float   # Early-season / no-book league draw prior floor
+    LEAGUE_NO_BOOK_DRAW_CAP: float   # Soft cap on draw% when league has no book odds
 
     # ── Upset thresholds ───────────────────────────────────────────────────────
     UPSET_DRAW_DEEP_FAV_LIMIT: float  # Max draw CRS odd for deep-fav stalemate upset
@@ -216,6 +219,9 @@ DEFAULT_CONFIG: ScorePickConfig = {
     "ALIGN_MARGIN_STRONG": 8.0,
     "ALIGN_DRAW_PRESERVE_RATE": 20.0,
     "ALIGN_SAME_DIR_GAP_CAP": 8.0,
+    "CRS_DRAW_NEAR_TOP_GAP": 0.45,
+    "LEAGUE_EARLY_DRAW_FLOOR": 24.0,
+    "LEAGUE_NO_BOOK_DRAW_CAP": 34.0,
 
     # Upset thresholds
     "UPSET_DRAW_DEEP_FAV_LIMIT": 55.0,

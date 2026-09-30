@@ -10,7 +10,7 @@ from .odds_fusion import fuse_multi_market_odds, fused_odds_to_dict
 from .data_sources import meta_has_real_markets, is_real_sporttery
 from .match_context import build_group_context, analyze_match_context
 from db.models import Match, Team, Player, Odds, Prediction
-from data.status_constants import MATCH_UPCOMING
+from data.status_constants import MATCH_UPCOMING, MATCH_LIVE
 from db.redis_client import cache_get, cache_set
 from db.sqlite_write import IS_SQLITE, run_db_write
 from utils.logger import logger
@@ -28,6 +28,135 @@ from service.score_pick import (
     _score_outcome,
 )
 from service.confidence_service import compute_wdl_confidence
+
+
+async def _try_refresh_match_odds(db: AsyncSession, match: Match) -> Odds | None:
+    """Best-effort: pull sporttery / Odds API for one upcoming fixture missing markets."""
+    from data.status_constants import normalize_match_status
+
+    status = normalize_match_status(match.status)
+    if status not in (MATCH_UPCOMING, MATCH_LIVE):
+        return None
+
+    existing = (
+        await db.execute(select(Odds).where(Odds.match_id == match.id))
+    ).scalar_one_or_none()
+    if existing and existing.win_win and existing.draw and existing.win_lose:
+        return existing
+
+    try:
+        from crawler.sporttery_client import (
+            fetch_sporttery_on_sale,
+            find_sporttery_match,
+            sporttery_row_has_sale_data,
+            to_db_odds,
+        )
+        from data.competitions import get_competition, league_hints_for
+        from crawler.odds_crawler import _build_meta, _compose_source, _has_crs_data
+        from crawler.odds_scraper import derive_score_odds
+        from crawler.the_odds_api_client import find_odds_api_match, fetch_sport_odds
+    except Exception as exc:
+        logger.warning("odds refresh imports failed: %s", exc)
+        return existing
+
+    sporttery_pool = await fetch_sporttery_on_sale()
+    hints = league_hints_for(match.competition_slug)
+    st_raw = find_sporttery_match(
+        match.team_a, match.team_b, match.match_time, sporttery_pool, league_hints=hints,
+    )
+    st_odds = to_db_odds(st_raw, match.team_a, match.team_b) if st_raw else None
+
+    european = macau = None
+    comp = get_competition(match.competition_slug) or {}
+    sport_key = comp.get("odds_api_sport_key")
+    if sport_key:
+        try:
+            pool = await fetch_sport_odds(sport_key, comp.get("short_name") or match.competition_slug)
+            api_odds = find_odds_api_match(match.team_a, match.team_b, match.match_time, pool)
+            if api_odds:
+                european = api_odds.get("european")
+                macau = api_odds.get("macau")
+        except Exception as exc:
+            logger.info("Odds API refresh skipped for match %s: %s", match.id, exc)
+
+    has_sporttery = sporttery_row_has_sale_data(st_odds)
+    has_market = bool(european and european.get("win_win"))
+    if not has_sporttery and not has_market:
+        return existing
+
+    if has_sporttery:
+        win_win = st_odds["win_win"]
+        draw = st_odds["draw"]
+        win_lose = st_odds["win_lose"]
+        handicap = st_odds.get("handicap")
+        handicap_win = st_odds.get("handicap_win")
+        handicap_draw = st_odds.get("handicap_draw")
+        handicap_lose = st_odds.get("handicap_lose")
+        over_under = st_odds.get("over_under")
+        over_odds = st_odds.get("over_odds")
+        under_odds = st_odds.get("under_odds")
+        score_odds_raw = dict(st_odds.get("score_odds") or {})
+        half_full_raw = dict(st_odds.get("half_full_odds") or {})
+        sporttery_meta = {
+            "match_id": st_odds.get("sporttery_match_id"),
+            "match_num": st_odds.get("sporttery_match_num"),
+            "league": st_raw.get("league") if st_raw else None,
+        }
+    else:
+        win_win = european["win_win"]
+        draw = european["draw"]
+        win_lose = european["win_lose"]
+        handicap = (macau or {}).get("handicap")
+        handicap_win = (macau or {}).get("handicap_win")
+        handicap_draw = (macau or {}).get("handicap_draw")
+        handicap_lose = (macau or {}).get("handicap_lose")
+        over_under = european.get("over_under")
+        over_odds = european.get("over_odds")
+        under_odds = european.get("under_odds")
+        score_odds_raw = {}
+        half_full_raw = {}
+        sporttery_meta = None
+
+    if win_win and draw and win_lose and not _has_crs_data(score_odds_raw):
+        score_odds_raw = derive_score_odds(float(win_win), float(draw), float(win_lose))
+
+    meta = _build_meta(european, macau, sporttery_meta)
+    score_odds_raw["_meta"] = meta
+    source = _compose_source(european, has_sporttery)
+    payload = dict(
+        win_win=win_win,
+        draw=draw,
+        win_lose=win_lose,
+        handicap=handicap,
+        handicap_win=handicap_win,
+        handicap_draw=handicap_draw,
+        handicap_lose=handicap_lose,
+        over_under=over_under,
+        over_odds=over_odds,
+        under_odds=under_odds,
+        score_odds=json.dumps(score_odds_raw, ensure_ascii=False),
+        half_full_odds=json.dumps(half_full_raw, ensure_ascii=False),
+        source=source,
+    )
+
+    async def _persist():
+        row = (
+            await db.execute(select(Odds).where(Odds.match_id == match.id))
+        ).scalar_one_or_none()
+        if row:
+            for k, v in payload.items():
+                setattr(row, k, v)
+        else:
+            row = Odds(match_id=match.id, **payload)
+            db.add(row)
+        await db.flush()
+        return row
+
+    if IS_SQLITE:
+        from db.sqlite_write import write_lock
+        async with write_lock:
+            return await _persist()
+    return await _persist()
 
 
 def get_configured_models() -> list[str]:
@@ -567,6 +696,13 @@ def prepare_fused_odds(odds: Odds = None, team_a: str = "", team_b: str = "") ->
     if not raw_score and odds.win_win and odds.draw and odds.win_lose:
         from crawler.odds_scraper import derive_score_odds
         raw_score = derive_score_odds(odds.win_win, odds.draw, odds.win_lose)
+    elif (
+        isinstance(raw_score, dict)
+        and odds.win_win and odds.draw and odds.win_lose
+        and not any((":" in str(k)) for k in raw_score.keys())
+    ):
+        from crawler.odds_scraper import derive_score_odds
+        raw_score = derive_score_odds(odds.win_win, odds.draw, odds.win_lose)
 
     if not meta_has_real_markets(meta):
         result = empty.copy()
@@ -650,6 +786,13 @@ class PredictionService:
         team_b_dict = team_to_dict(team_b) if team_b else {"name": match.team_b}
 
         odds = (await db.execute(select(Odds).where(Odds.match_id == match_id))).scalar_one_or_none()
+        if not odds or not (odds.win_win and odds.draw and odds.win_lose):
+            try:
+                refreshed = await _try_refresh_match_odds(db, match)
+                if refreshed is not None:
+                    odds = refreshed
+            except Exception as exc:
+                logger.info("Pre-predict odds refresh failed for match %s: %s", match_id, exc)
         odds_dict = prepare_fused_odds(odds, match.team_a, match.team_b)
         odds_dict = maybe_correct_odds_orientation(
             odds_dict,

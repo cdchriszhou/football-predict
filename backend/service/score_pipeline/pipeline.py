@@ -179,7 +179,10 @@ class ScorePredictionPipeline:
                 **({"handicap": handicap} if handicap else {}),
                 **({"rank_a": rank_a, "rank_b": rank_b,
                     "rank_gap": gap} if rank_a is not None and rank_b is not None else {}),
+                "synthetic_crs": synthetic_crs,
             },
+            sp_win=sp_win,
+            sp_lose=sp_lose,
         )
 
         # Contextual modifications (MD3, host opener, etc.)
@@ -253,6 +256,9 @@ class ScorePredictionPipeline:
             sp_win=sp_win,
             sp_draw=sp_draw,
             sp_lose=sp_lose,
+            expected_a=expected_a,
+            expected_b=expected_b,
+            stage=stage,
         )
 
         # ── Validate ──
@@ -262,6 +268,8 @@ class ScorePredictionPipeline:
             win_rate=adjusted_wr,
             draw_rate=adjusted_dr,
             lose_rate=adjusted_lr,
+            sp_win=sp_win,
+            sp_lose=sp_lose,
         )
 
         all_picks = best + ([upset] if upset else [])
