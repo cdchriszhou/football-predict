@@ -1,0 +1,2961 @@
+{
+  "meta": {
+    "draw_count": 100,
+    "source": "network",
+    "newest_issue": "2026105",
+    "oldest_issue": "2026006",
+    "n_eval_requested": 50,
+    "window": 40,
+    "periods_evaluated": 50,
+    "ordering": "newest_first"
+  },
+  "model": {
+    "label": "model",
+    "periods": 50,
+    "avg_best_red_hits": 2.24,
+    "avg_any_blue_hit_rate": 0.26,
+    "avg_primary_blue_hit_rate": 0.06,
+    "max_red_hits_distribution": {
+      "0": 0,
+      "1": 4,
+      "2": 32,
+      "3": 12,
+      "4": 2,
+      "5": 0,
+      "6": 0
+    },
+    "prize_like_counts": {
+      "red3_and_blue": 1,
+      "red_ge_4": 2,
+      "red_ge_5": 0,
+      "red_eq_6": 0,
+      "blue_alone": 12
+    },
+    "prize_like_rates": {
+      "red3_and_blue": 0.02,
+      "red_ge_4": 0.04,
+      "red_ge_5": 0.0,
+      "red_eq_6": 0.0,
+      "blue_alone": 0.24
+    },
+    "blue_gt10_pick_share": 0.32,
+    "blue_gt10_pick_count": 80,
+    "total_picks_scored": 250,
+    "blue_hit_when_actual_le_10": {
+      "n": 38,
+      "hits": 9,
+      "rate": 0.2368
+    },
+    "blue_hit_when_actual_gt_10": {
+      "n": 12,
+      "hits": 4,
+      "rate": 0.3333
+    }
+  },
+  "random_baseline": {
+    "label": "random",
+    "periods": 50,
+    "avg_best_red_hits": 2.22,
+    "avg_any_blue_hit_rate": 0.2,
+    "avg_primary_blue_hit_rate": 0.04,
+    "max_red_hits_distribution": {
+      "0": 1,
+      "1": 3,
+      "2": 32,
+      "3": 12,
+      "4": 2,
+      "5": 0,
+      "6": 0
+    },
+    "prize_like_counts": {
+      "red3_and_blue": 1,
+      "red_ge_4": 2,
+      "red_ge_5": 0,
+      "red_eq_6": 0,
+      "blue_alone": 9
+    },
+    "prize_like_rates": {
+      "red3_and_blue": 0.02,
+      "red_ge_4": 0.04,
+      "red_ge_5": 0.0,
+      "red_eq_6": 0.0,
+      "blue_alone": 0.18
+    },
+    "blue_gt10_pick_share": 0.392,
+    "blue_gt10_pick_count": 98,
+    "total_picks_scored": 250,
+    "blue_hit_when_actual_le_10": {
+      "n": 38,
+      "hits": 9,
+      "rate": 0.2368
+    },
+    "blue_hit_when_actual_gt_10": {
+      "n": 12,
+      "hits": 1,
+      "rate": 0.0833
+    }
+  },
+  "extras": {
+    "dantuo_dan_hit_rate": 0.04,
+    "dantuo_n": 50,
+    "fushi_full6_rate": 0.0,
+    "fushi_n": 50
+  },
+  "delta_model_minus_random": {
+    "avg_best_red_hits": 0.02,
+    "avg_any_blue_hit_rate": 0.06,
+    "avg_primary_blue_hit_rate": 0.02
+  },
+  "periods": [
+    {
+      "issue": "2026105",
+      "based_on_issue": "2026104",
+      "actual": "02 04 13 14 15 30 + 08",
+      "actual_blue": 8,
+      "model_best_red": 3,
+      "model_any_blue": true,
+      "random_best_red": 3,
+      "random_any_blue": true,
+      "pick_scores": [
+        {
+          "mode": "ssq",
+          "red_hits": 0,
+          "sample_red_hits": 0,
+          "blue_hit": false,
+          "blue": 7,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "ssq",
+          "red_hits": 2,
+          "sample_red_hits": 2,
+          "blue_hit": false,
+          "blue": 11,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "ssq",
+          "red_hits": 3,
+          "sample_red_hits": 3,
+          "blue_hit": true,
+          "blue": 8,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "fushi",
+          "red_hits": 2,
+          "sample_red_hits": 2,
+          "blue_hit": false,
+          "blue": 9,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "dantuo",
+          "red_hits": 0,
+          "sample_red_hits": 0,
+          "blue_hit": false,
+          "blue": 6,
+          "fushi_full6": false,
+          "dan_hit": false
+        }
+      ]
+    },
+    {
+      "issue": "2026104",
+      "based_on_issue": "2026103",
+      "actual": "11 12 13 19 20 31 + 03",
+      "actual_blue": 3,
+      "model_best_red": 3,
+      "model_any_blue": false,
+      "random_best_red": 2,
+      "random_any_blue": true,
+      "pick_scores": [
+        {
+          "mode": "ssq",
+          "red_hits": 2,
+          "sample_red_hits": 2,
+          "blue_hit": false,
+          "blue": 4,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "ssq",
+          "red_hits": 0,
+          "sample_red_hits": 0,
+          "blue_hit": false,
+          "blue": 1,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "ssq",
+          "red_hits": 1,
+          "sample_red_hits": 1,
+          "blue_hit": false,
+          "blue": 16,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "fushi",
+          "red_hits": 3,
+          "sample_red_hits": 3,
+          "blue_hit": false,
+          "blue": 14,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "dantuo",
+          "red_hits": 2,
+          "sample_red_hits": 2,
+          "blue_hit": false,
+          "blue": 10,
+          "fushi_full6": false,
+          "dan_hit": false
+        }
+      ]
+    },
+    {
+      "issue": "2026103",
+      "based_on_issue": "2026102",
+      "actual": "04 11 20 27 28 30 + 15",
+      "actual_blue": 15,
+      "model_best_red": 1,
+      "model_any_blue": true,
+      "random_best_red": 3,
+      "random_any_blue": false,
+      "pick_scores": [
+        {
+          "mode": "ssq",
+          "red_hits": 0,
+          "sample_red_hits": 0,
+          "blue_hit": true,
+          "blue": 15,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "ssq",
+          "red_hits": 1,
+          "sample_red_hits": 1,
+          "blue_hit": false,
+          "blue": 10,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "ssq",
+          "red_hits": 1,
+          "sample_red_hits": 1,
+          "blue_hit": false,
+          "blue": 7,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "fushi",
+          "red_hits": 1,
+          "sample_red_hits": 1,
+          "blue_hit": false,
+          "blue": 5,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "dantuo",
+          "red_hits": 0,
+          "sample_red_hits": 0,
+          "blue_hit": false,
+          "blue": 9,
+          "fushi_full6": false,
+          "dan_hit": false
+        }
+      ]
+    },
+    {
+      "issue": "2026102",
+      "based_on_issue": "2026101",
+      "actual": "03 04 10 13 16 25 + 09",
+      "actual_blue": 9,
+      "model_best_red": 4,
+      "model_any_blue": false,
+      "random_best_red": 2,
+      "random_any_blue": true,
+      "pick_scores": [
+        {
+          "mode": "ssq",
+          "red_hits": 1,
+          "sample_red_hits": 1,
+          "blue_hit": false,
+          "blue": 4,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "ssq",
+          "red_hits": 1,
+          "sample_red_hits": 1,
+          "blue_hit": false,
+          "blue": 7,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "ssq",
+          "red_hits": 1,
+          "sample_red_hits": 1,
+          "blue_hit": false,
+          "blue": 11,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "fushi",
+          "red_hits": 2,
+          "sample_red_hits": 2,
+          "blue_hit": false,
+          "blue": 3,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "dantuo",
+          "red_hits": 4,
+          "sample_red_hits": 3,
+          "blue_hit": false,
+          "blue": 16,
+          "fushi_full6": false,
+          "dan_hit": false
+        }
+      ]
+    },
+    {
+      "issue": "2026101",
+      "based_on_issue": "2026100",
+      "actual": "05 06 08 09 24 25 + 12",
+      "actual_blue": 12,
+      "model_best_red": 2,
+      "model_any_blue": false,
+      "random_best_red": 2,
+      "random_any_blue": false,
+      "pick_scores": [
+        {
+          "mode": "ssq",
+          "red_hits": 2,
+          "sample_red_hits": 2,
+          "blue_hit": false,
+          "blue": 2,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "ssq",
+          "red_hits": 1,
+          "sample_red_hits": 1,
+          "blue_hit": false,
+          "blue": 1,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "ssq",
+          "red_hits": 0,
+          "sample_red_hits": 0,
+          "blue_hit": false,
+          "blue": 16,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "fushi",
+          "red_hits": 2,
+          "sample_red_hits": 2,
+          "blue_hit": false,
+          "blue": 1,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "dantuo",
+          "red_hits": 0,
+          "sample_red_hits": 0,
+          "blue_hit": false,
+          "blue": 11,
+          "fushi_full6": false,
+          "dan_hit": false
+        }
+      ]
+    },
+    {
+      "issue": "2026100",
+      "based_on_issue": "2026099",
+      "actual": "03 04 09 13 22 31 + 04",
+      "actual_blue": 4,
+      "model_best_red": 1,
+      "model_any_blue": false,
+      "random_best_red": 3,
+      "random_any_blue": false,
+      "pick_scores": [
+        {
+          "mode": "ssq",
+          "red_hits": 1,
+          "sample_red_hits": 1,
+          "blue_hit": false,
+          "blue": 5,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "ssq",
+          "red_hits": 1,
+          "sample_red_hits": 1,
+          "blue_hit": false,
+          "blue": 3,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "ssq",
+          "red_hits": 1,
+          "sample_red_hits": 1,
+          "blue_hit": false,
+          "blue": 15,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "fushi",
+          "red_hits": 0,
+          "sample_red_hits": 0,
+          "blue_hit": false,
+          "blue": 6,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "dantuo",
+          "red_hits": 1,
+          "sample_red_hits": 1,
+          "blue_hit": false,
+          "blue": 3,
+          "fushi_full6": false,
+          "dan_hit": false
+        }
+      ]
+    },
+    {
+      "issue": "2026099",
+      "based_on_issue": "2026098",
+      "actual": "01 12 14 18 30 31 + 02",
+      "actual_blue": 2,
+      "model_best_red": 2,
+      "model_any_blue": false,
+      "random_best_red": 0,
+      "random_any_blue": false,
+      "pick_scores": [
+        {
+          "mode": "ssq",
+          "red_hits": 2,
+          "sample_red_hits": 2,
+          "blue_hit": false,
+          "blue": 4,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "ssq",
+          "red_hits": 1,
+          "sample_red_hits": 1,
+          "blue_hit": false,
+          "blue": 5,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "ssq",
+          "red_hits": 2,
+          "sample_red_hits": 2,
+          "blue_hit": false,
+          "blue": 12,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "fushi",
+          "red_hits": 2,
+          "sample_red_hits": 2,
+          "blue_hit": false,
+          "blue": 5,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "dantuo",
+          "red_hits": 2,
+          "sample_red_hits": 2,
+          "blue_hit": false,
+          "blue": 6,
+          "fushi_full6": false,
+          "dan_hit": false
+        }
+      ]
+    },
+    {
+      "issue": "2026098",
+      "based_on_issue": "2026097",
+      "actual": "08 16 18 22 25 26 + 07",
+      "actual_blue": 7,
+      "model_best_red": 2,
+      "model_any_blue": false,
+      "random_best_red": 2,
+      "random_any_blue": false,
+      "pick_scores": [
+        {
+          "mode": "ssq",
+          "red_hits": 0,
+          "sample_red_hits": 0,
+          "blue_hit": false,
+          "blue": 3,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "ssq",
+          "red_hits": 2,
+          "sample_red_hits": 2,
+          "blue_hit": false,
+          "blue": 6,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "ssq",
+          "red_hits": 1,
+          "sample_red_hits": 1,
+          "blue_hit": false,
+          "blue": 14,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "fushi",
+          "red_hits": 1,
+          "sample_red_hits": 1,
+          "blue_hit": false,
+          "blue": 4,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "dantuo",
+          "red_hits": 2,
+          "sample_red_hits": 1,
+          "blue_hit": false,
+          "blue": 11,
+          "fushi_full6": false,
+          "dan_hit": false
+        }
+      ]
+    },
+    {
+      "issue": "2026097",
+      "based_on_issue": "2026096",
+      "actual": "05 16 24 26 29 30 + 02",
+      "actual_blue": 2,
+      "model_best_red": 3,
+      "model_any_blue": false,
+      "random_best_red": 1,
+      "random_any_blue": false,
+      "pick_scores": [
+        {
+          "mode": "ssq",
+          "red_hits": 1,
+          "sample_red_hits": 1,
+          "blue_hit": false,
+          "blue": 5,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "ssq",
+          "red_hits": 0,
+          "sample_red_hits": 0,
+          "blue_hit": false,
+          "blue": 8,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "ssq",
+          "red_hits": 3,
+          "sample_red_hits": 3,
+          "blue_hit": false,
+          "blue": 16,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "fushi",
+          "red_hits": 1,
+          "sample_red_hits": 1,
+          "blue_hit": false,
+          "blue": 14,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "dantuo",
+          "red_hits": 2,
+          "sample_red_hits": 1,
+          "blue_hit": false,
+          "blue": 8,
+          "fushi_full6": false,
+          "dan_hit": false
+        }
+      ]
+    },
+    {
+      "issue": "2026096",
+      "based_on_issue": "2026095",
+      "actual": "01 04 16 22 26 31 + 04",
+      "actual_blue": 4,
+      "model_best_red": 2,
+      "model_any_blue": false,
+      "random_best_red": 2,
+      "random_any_blue": false,
+      "pick_scores": [
+        {
+          "mode": "ssq",
+          "red_hits": 2,
+          "sample_red_hits": 2,
+          "blue_hit": false,
+          "blue": 12,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "ssq",
+          "red_hits": 2,
+          "sample_red_hits": 2,
+          "blue_hit": false,
+          "blue": 7,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "ssq",
+          "red_hits": 0,
+          "sample_red_hits": 0,
+          "blue_hit": false,
+          "blue": 10,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "fushi",
+          "red_hits": 0,
+          "sample_red_hits": 0,
+          "blue_hit": false,
+          "blue": 10,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "dantuo",
+          "red_hits": 0,
+          "sample_red_hits": 0,
+          "blue_hit": false,
+          "blue": 10,
+          "fushi_full6": false,
+          "dan_hit": false
+        }
+      ]
+    },
+    {
+      "issue": "2026095",
+      "based_on_issue": "2026094",
+      "actual": "04 06 14 21 22 33 + 16",
+      "actual_blue": 16,
+      "model_best_red": 3,
+      "model_any_blue": false,
+      "random_best_red": 3,
+      "random_any_blue": false,
+      "pick_scores": [
+        {
+          "mode": "ssq",
+          "red_hits": 1,
+          "sample_red_hits": 1,
+          "blue_hit": false,
+          "blue": 12,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "ssq",
+          "red_hits": 1,
+          "sample_red_hits": 1,
+          "blue_hit": false,
+          "blue": 9,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "ssq",
+          "red_hits": 1,
+          "sample_red_hits": 1,
+          "blue_hit": false,
+          "blue": 2,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "fushi",
+          "red_hits": 2,
+          "sample_red_hits": 1,
+          "blue_hit": false,
+          "blue": 4,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "dantuo",
+          "red_hits": 3,
+          "sample_red_hits": 2,
+          "blue_hit": false,
+          "blue": 1,
+          "fushi_full6": false,
+          "dan_hit": false
+        }
+      ]
+    },
+    {
+      "issue": "2026094",
+      "based_on_issue": "2026093",
+      "actual": "06 13 15 17 24 25 + 01",
+      "actual_blue": 1,
+      "model_best_red": 3,
+      "model_any_blue": true,
+      "random_best_red": 2,
+      "random_any_blue": true,
+      "pick_scores": [
+        {
+          "mode": "ssq",
+          "red_hits": 0,
+          "sample_red_hits": 0,
+          "blue_hit": true,
+          "blue": 1,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "ssq",
+          "red_hits": 2,
+          "sample_red_hits": 2,
+          "blue_hit": false,
+          "blue": 11,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "ssq",
+          "red_hits": 2,
+          "sample_red_hits": 2,
+          "blue_hit": false,
+          "blue": 6,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "fushi",
+          "red_hits": 3,
+          "sample_red_hits": 3,
+          "blue_hit": false,
+          "blue": 16,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "dantuo",
+          "red_hits": 1,
+          "sample_red_hits": 1,
+          "blue_hit": false,
+          "blue": 4,
+          "fushi_full6": false,
+          "dan_hit": false
+        }
+      ]
+    },
+    {
+      "issue": "2026093",
+      "based_on_issue": "2026092",
+      "actual": "05 08 15 20 21 24 + 09",
+      "actual_blue": 9,
+      "model_best_red": 2,
+      "model_any_blue": false,
+      "random_best_red": 2,
+      "random_any_blue": true,
+      "pick_scores": [
+        {
+          "mode": "ssq",
+          "red_hits": 0,
+          "sample_red_hits": 0,
+          "blue_hit": false,
+          "blue": 1,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "ssq",
+          "red_hits": 2,
+          "sample_red_hits": 2,
+          "blue_hit": false,
+          "blue": 6,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "ssq",
+          "red_hits": 0,
+          "sample_red_hits": 0,
+          "blue_hit": false,
+          "blue": 11,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "fushi",
+          "red_hits": 1,
+          "sample_red_hits": 1,
+          "blue_hit": false,
+          "blue": 4,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "dantuo",
+          "red_hits": 1,
+          "sample_red_hits": 1,
+          "blue_hit": false,
+          "blue": 8,
+          "fushi_full6": false,
+          "dan_hit": false
+        }
+      ]
+    },
+    {
+      "issue": "2026092",
+      "based_on_issue": "2026091",
+      "actual": "09 11 12 25 30 33 + 11",
+      "actual_blue": 11,
+      "model_best_red": 2,
+      "model_any_blue": false,
+      "random_best_red": 3,
+      "random_any_blue": false,
+      "pick_scores": [
+        {
+          "mode": "ssq",
+          "red_hits": 1,
+          "sample_red_hits": 1,
+          "blue_hit": false,
+          "blue": 1,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "ssq",
+          "red_hits": 2,
+          "sample_red_hits": 2,
+          "blue_hit": false,
+          "blue": 6,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "ssq",
+          "red_hits": 1,
+          "sample_red_hits": 1,
+          "blue_hit": false,
+          "blue": 15,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "fushi",
+          "red_hits": 0,
+          "sample_red_hits": 0,
+          "blue_hit": false,
+          "blue": 2,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "dantuo",
+          "red_hits": 0,
+          "sample_red_hits": 0,
+          "blue_hit": false,
+          "blue": 16,
+          "fushi_full6": false,
+          "dan_hit": false
+        }
+      ]
+    },
+    {
+      "issue": "2026091",
+      "based_on_issue": "2026090",
+      "actual": "02 13 14 16 20 24 + 05",
+      "actual_blue": 5,
+      "model_best_red": 2,
+      "model_any_blue": false,
+      "random_best_red": 2,
+      "random_any_blue": true,
+      "pick_scores": [
+        {
+          "mode": "ssq",
+          "red_hits": 0,
+          "sample_red_hits": 0,
+          "blue_hit": false,
+          "blue": 7,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "ssq",
+          "red_hits": 0,
+          "sample_red_hits": 0,
+          "blue_hit": false,
+          "blue": 10,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "ssq",
+          "red_hits": 1,
+          "sample_red_hits": 1,
+          "blue_hit": false,
+          "blue": 12,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "fushi",
+          "red_hits": 2,
+          "sample_red_hits": 2,
+          "blue_hit": false,
+          "blue": 9,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "dantuo",
+          "red_hits": 2,
+          "sample_red_hits": 1,
+          "blue_hit": false,
+          "blue": 16,
+          "fushi_full6": false,
+          "dan_hit": false
+        }
+      ]
+    },
+    {
+      "issue": "2026090",
+      "based_on_issue": "2026089",
+      "actual": "02 04 15 23 25 27 + 03",
+      "actual_blue": 3,
+      "model_best_red": 2,
+      "model_any_blue": false,
+      "random_best_red": 2,
+      "random_any_blue": false,
+      "pick_scores": [
+        {
+          "mode": "ssq",
+          "red_hits": 0,
+          "sample_red_hits": 0,
+          "blue_hit": false,
+          "blue": 4,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "ssq",
+          "red_hits": 0,
+          "sample_red_hits": 0,
+          "blue_hit": false,
+          "blue": 10,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "ssq",
+          "red_hits": 2,
+          "sample_red_hits": 2,
+          "blue_hit": false,
+          "blue": 16,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "fushi",
+          "red_hits": 2,
+          "sample_red_hits": 2,
+          "blue_hit": false,
+          "blue": 14,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "dantuo",
+          "red_hits": 2,
+          "sample_red_hits": 1,
+          "blue_hit": false,
+          "blue": 5,
+          "fushi_full6": false,
+          "dan_hit": false
+        }
+      ]
+    },
+    {
+      "issue": "2026089",
+      "based_on_issue": "2026088",
+      "actual": "05 18 23 24 27 33 + 03",
+      "actual_blue": 3,
+      "model_best_red": 2,
+      "model_any_blue": true,
+      "random_best_red": 2,
+      "random_any_blue": false,
+      "pick_scores": [
+        {
+          "mode": "ssq",
+          "red_hits": 2,
+          "sample_red_hits": 2,
+          "blue_hit": false,
+          "blue": 1,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "ssq",
+          "red_hits": 1,
+          "sample_red_hits": 1,
+          "blue_hit": false,
+          "blue": 8,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "ssq",
+          "red_hits": 2,
+          "sample_red_hits": 2,
+          "blue_hit": false,
+          "blue": 15,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "fushi",
+          "red_hits": 1,
+          "sample_red_hits": 1,
+          "blue_hit": false,
+          "blue": 9,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "dantuo",
+          "red_hits": 1,
+          "sample_red_hits": 0,
+          "blue_hit": true,
+          "blue": 3,
+          "fushi_full6": false,
+          "dan_hit": false
+        }
+      ]
+    },
+    {
+      "issue": "2026088",
+      "based_on_issue": "2026087",
+      "actual": "06 07 11 18 22 33 + 05",
+      "actual_blue": 5,
+      "model_best_red": 2,
+      "model_any_blue": false,
+      "random_best_red": 2,
+      "random_any_blue": false,
+      "pick_scores": [
+        {
+          "mode": "ssq",
+          "red_hits": 1,
+          "sample_red_hits": 1,
+          "blue_hit": false,
+          "blue": 6,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "ssq",
+          "red_hits": 2,
+          "sample_red_hits": 2,
+          "blue_hit": false,
+          "blue": 10,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "ssq",
+          "red_hits": 1,
+          "sample_red_hits": 1,
+          "blue_hit": false,
+          "blue": 12,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "fushi",
+          "red_hits": 1,
+          "sample_red_hits": 1,
+          "blue_hit": false,
+          "blue": 13,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "dantuo",
+          "red_hits": 1,
+          "sample_red_hits": 1,
+          "blue_hit": false,
+          "blue": 7,
+          "fushi_full6": false,
+          "dan_hit": false
+        }
+      ]
+    },
+    {
+      "issue": "2026087",
+      "based_on_issue": "2026086",
+      "actual": "04 06 10 18 23 31 + 11",
+      "actual_blue": 11,
+      "model_best_red": 2,
+      "model_any_blue": true,
+      "random_best_red": 3,
+      "random_any_blue": false,
+      "pick_scores": [
+        {
+          "mode": "ssq",
+          "red_hits": 1,
+          "sample_red_hits": 1,
+          "blue_hit": false,
+          "blue": 4,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "ssq",
+          "red_hits": 1,
+          "sample_red_hits": 1,
+          "blue_hit": false,
+          "blue": 3,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "ssq",
+          "red_hits": 1,
+          "sample_red_hits": 1,
+          "blue_hit": true,
+          "blue": 11,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "fushi",
+          "red_hits": 2,
+          "sample_red_hits": 2,
+          "blue_hit": false,
+          "blue": 12,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "dantuo",
+          "red_hits": 0,
+          "sample_red_hits": 0,
+          "blue_hit": false,
+          "blue": 8,
+          "fushi_full6": false,
+          "dan_hit": false
+        }
+      ]
+    },
+    {
+      "issue": "2026086",
+      "based_on_issue": "2026085",
+      "actual": "02 05 14 25 30 32 + 05",
+      "actual_blue": 5,
+      "model_best_red": 1,
+      "model_any_blue": false,
+      "random_best_red": 3,
+      "random_any_blue": false,
+      "pick_scores": [
+        {
+          "mode": "ssq",
+          "red_hits": 1,
+          "sample_red_hits": 1,
+          "blue_hit": false,
+          "blue": 15,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "ssq",
+          "red_hits": 1,
+          "sample_red_hits": 1,
+          "blue_hit": false,
+          "blue": 3,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "ssq",
+          "red_hits": 1,
+          "sample_red_hits": 1,
+          "blue_hit": false,
+          "blue": 2,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "fushi",
+          "red_hits": 1,
+          "sample_red_hits": 1,
+          "blue_hit": false,
+          "blue": 3,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "dantuo",
+          "red_hits": 0,
+          "sample_red_hits": 0,
+          "blue_hit": false,
+          "blue": 2,
+          "fushi_full6": false,
+          "dan_hit": false
+        }
+      ]
+    },
+    {
+      "issue": "2026085",
+      "based_on_issue": "2026084",
+      "actual": "06 09 13 17 24 28 + 15",
+      "actual_blue": 15,
+      "model_best_red": 3,
+      "model_any_blue": false,
+      "random_best_red": 2,
+      "random_any_blue": false,
+      "pick_scores": [
+        {
+          "mode": "ssq",
+          "red_hits": 3,
+          "sample_red_hits": 3,
+          "blue_hit": false,
+          "blue": 3,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "ssq",
+          "red_hits": 1,
+          "sample_red_hits": 1,
+          "blue_hit": false,
+          "blue": 5,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "ssq",
+          "red_hits": 2,
+          "sample_red_hits": 2,
+          "blue_hit": false,
+          "blue": 12,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "fushi",
+          "red_hits": 2,
+          "sample_red_hits": 1,
+          "blue_hit": false,
+          "blue": 13,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "dantuo",
+          "red_hits": 1,
+          "sample_red_hits": 1,
+          "blue_hit": false,
+          "blue": 2,
+          "fushi_full6": false,
+          "dan_hit": false
+        }
+      ]
+    },
+    {
+      "issue": "2026084",
+      "based_on_issue": "2026083",
+      "actual": "01 05 06 10 12 16 + 05",
+      "actual_blue": 5,
+      "model_best_red": 2,
+      "model_any_blue": false,
+      "random_best_red": 2,
+      "random_any_blue": true,
+      "pick_scores": [
+        {
+          "mode": "ssq",
+          "red_hits": 2,
+          "sample_red_hits": 2,
+          "blue_hit": false,
+          "blue": 8,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "ssq",
+          "red_hits": 1,
+          "sample_red_hits": 1,
+          "blue_hit": false,
+          "blue": 1,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "ssq",
+          "red_hits": 1,
+          "sample_red_hits": 1,
+          "blue_hit": false,
+          "blue": 11,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "fushi",
+          "red_hits": 1,
+          "sample_red_hits": 1,
+          "blue_hit": false,
+          "blue": 11,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "dantuo",
+          "red_hits": 2,
+          "sample_red_hits": 2,
+          "blue_hit": false,
+          "blue": 4,
+          "fushi_full6": false,
+          "dan_hit": false
+        }
+      ]
+    },
+    {
+      "issue": "2026083",
+      "based_on_issue": "2026082",
+      "actual": "07 14 15 23 28 33 + 03",
+      "actual_blue": 3,
+      "model_best_red": 2,
+      "model_any_blue": false,
+      "random_best_red": 1,
+      "random_any_blue": false,
+      "pick_scores": [
+        {
+          "mode": "ssq",
+          "red_hits": 1,
+          "sample_red_hits": 1,
+          "blue_hit": false,
+          "blue": 6,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "ssq",
+          "red_hits": 2,
+          "sample_red_hits": 2,
+          "blue_hit": false,
+          "blue": 9,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "ssq",
+          "red_hits": 1,
+          "sample_red_hits": 1,
+          "blue_hit": false,
+          "blue": 12,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "fushi",
+          "red_hits": 1,
+          "sample_red_hits": 1,
+          "blue_hit": false,
+          "blue": 13,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "dantuo",
+          "red_hits": 1,
+          "sample_red_hits": 1,
+          "blue_hit": false,
+          "blue": 10,
+          "fushi_full6": false,
+          "dan_hit": false
+        }
+      ]
+    },
+    {
+      "issue": "2026082",
+      "based_on_issue": "2026081",
+      "actual": "05 07 10 14 21 28 + 04",
+      "actual_blue": 4,
+      "model_best_red": 3,
+      "model_any_blue": false,
+      "random_best_red": 3,
+      "random_any_blue": false,
+      "pick_scores": [
+        {
+          "mode": "ssq",
+          "red_hits": 2,
+          "sample_red_hits": 2,
+          "blue_hit": false,
+          "blue": 8,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "ssq",
+          "red_hits": 0,
+          "sample_red_hits": 0,
+          "blue_hit": false,
+          "blue": 10,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "ssq",
+          "red_hits": 2,
+          "sample_red_hits": 2,
+          "blue_hit": false,
+          "blue": 16,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "fushi",
+          "red_hits": 3,
+          "sample_red_hits": 2,
+          "blue_hit": false,
+          "blue": 2,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "dantuo",
+          "red_hits": 0,
+          "sample_red_hits": 0,
+          "blue_hit": false,
+          "blue": 13,
+          "fushi_full6": false,
+          "dan_hit": false
+        }
+      ]
+    },
+    {
+      "issue": "2026081",
+      "based_on_issue": "2026080",
+      "actual": "06 10 12 15 24 27 + 12",
+      "actual_blue": 12,
+      "model_best_red": 3,
+      "model_any_blue": true,
+      "random_best_red": 3,
+      "random_any_blue": true,
+      "pick_scores": [
+        {
+          "mode": "ssq",
+          "red_hits": 1,
+          "sample_red_hits": 1,
+          "blue_hit": false,
+          "blue": 2,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "ssq",
+          "red_hits": 2,
+          "sample_red_hits": 2,
+          "blue_hit": false,
+          "blue": 6,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "ssq",
+          "red_hits": 0,
+          "sample_red_hits": 0,
+          "blue_hit": true,
+          "blue": 12,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "fushi",
+          "red_hits": 1,
+          "sample_red_hits": 1,
+          "blue_hit": false,
+          "blue": 7,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "dantuo",
+          "red_hits": 3,
+          "sample_red_hits": 3,
+          "blue_hit": false,
+          "blue": 9,
+          "fushi_full6": false,
+          "dan_hit": false
+        }
+      ]
+    },
+    {
+      "issue": "2026080",
+      "based_on_issue": "2026079",
+      "actual": "04 05 11 19 27 32 + 01",
+      "actual_blue": 1,
+      "model_best_red": 2,
+      "model_any_blue": false,
+      "random_best_red": 3,
+      "random_any_blue": false,
+      "pick_scores": [
+        {
+          "mode": "ssq",
+          "red_hits": 1,
+          "sample_red_hits": 1,
+          "blue_hit": false,
+          "blue": 10,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "ssq",
+          "red_hits": 1,
+          "sample_red_hits": 1,
+          "blue_hit": false,
+          "blue": 6,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "ssq",
+          "red_hits": 1,
+          "sample_red_hits": 1,
+          "blue_hit": false,
+          "blue": 12,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "fushi",
+          "red_hits": 2,
+          "sample_red_hits": 2,
+          "blue_hit": false,
+          "blue": 3,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "dantuo",
+          "red_hits": 2,
+          "sample_red_hits": 2,
+          "blue_hit": false,
+          "blue": 7,
+          "fushi_full6": false,
+          "dan_hit": false
+        }
+      ]
+    },
+    {
+      "issue": "2026079",
+      "based_on_issue": "2026078",
+      "actual": "01 11 17 22 24 29 + 04",
+      "actual_blue": 4,
+      "model_best_red": 2,
+      "model_any_blue": true,
+      "random_best_red": 2,
+      "random_any_blue": true,
+      "pick_scores": [
+        {
+          "mode": "ssq",
+          "red_hits": 2,
+          "sample_red_hits": 2,
+          "blue_hit": false,
+          "blue": 5,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "ssq",
+          "red_hits": 1,
+          "sample_red_hits": 1,
+          "blue_hit": true,
+          "blue": 4,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "ssq",
+          "red_hits": 1,
+          "sample_red_hits": 1,
+          "blue_hit": false,
+          "blue": 16,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "fushi",
+          "red_hits": 2,
+          "sample_red_hits": 2,
+          "blue_hit": false,
+          "blue": 2,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "dantuo",
+          "red_hits": 2,
+          "sample_red_hits": 1,
+          "blue_hit": true,
+          "blue": 4,
+          "fushi_full6": false,
+          "dan_hit": false
+        }
+      ]
+    },
+    {
+      "issue": "2026078",
+      "based_on_issue": "2026077",
+      "actual": "07 11 14 16 27 28 + 06",
+      "actual_blue": 6,
+      "model_best_red": 2,
+      "model_any_blue": false,
+      "random_best_red": 2,
+      "random_any_blue": true,
+      "pick_scores": [
+        {
+          "mode": "ssq",
+          "red_hits": 0,
+          "sample_red_hits": 0,
+          "blue_hit": false,
+          "blue": 9,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "ssq",
+          "red_hits": 1,
+          "sample_red_hits": 1,
+          "blue_hit": false,
+          "blue": 4,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "ssq",
+          "red_hits": 2,
+          "sample_red_hits": 2,
+          "blue_hit": false,
+          "blue": 15,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "fushi",
+          "red_hits": 1,
+          "sample_red_hits": 0,
+          "blue_hit": false,
+          "blue": 5,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "dantuo",
+          "red_hits": 2,
+          "sample_red_hits": 2,
+          "blue_hit": false,
+          "blue": 15,
+          "fushi_full6": false,
+          "dan_hit": false
+        }
+      ]
+    },
+    {
+      "issue": "2026077",
+      "based_on_issue": "2026076",
+      "actual": "01 04 05 14 18 25 + 04",
+      "actual_blue": 4,
+      "model_best_red": 2,
+      "model_any_blue": false,
+      "random_best_red": 2,
+      "random_any_blue": false,
+      "pick_scores": [
+        {
+          "mode": "ssq",
+          "red_hits": 1,
+          "sample_red_hits": 1,
+          "blue_hit": false,
+          "blue": 5,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "ssq",
+          "red_hits": 0,
+          "sample_red_hits": 0,
+          "blue_hit": false,
+          "blue": 2,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "ssq",
+          "red_hits": 2,
+          "sample_red_hits": 2,
+          "blue_hit": false,
+          "blue": 13,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "fushi",
+          "red_hits": 1,
+          "sample_red_hits": 1,
+          "blue_hit": false,
+          "blue": 15,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "dantuo",
+          "red_hits": 1,
+          "sample_red_hits": 1,
+          "blue_hit": false,
+          "blue": 14,
+          "fushi_full6": false,
+          "dan_hit": false
+        }
+      ]
+    },
+    {
+      "issue": "2026076",
+      "based_on_issue": "2026075",
+      "actual": "01 03 19 20 24 25 + 07",
+      "actual_blue": 7,
+      "model_best_red": 2,
+      "model_any_blue": false,
+      "random_best_red": 2,
+      "random_any_blue": false,
+      "pick_scores": [
+        {
+          "mode": "ssq",
+          "red_hits": 1,
+          "sample_red_hits": 1,
+          "blue_hit": false,
+          "blue": 2,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "ssq",
+          "red_hits": 2,
+          "sample_red_hits": 2,
+          "blue_hit": false,
+          "blue": 8,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "ssq",
+          "red_hits": 0,
+          "sample_red_hits": 0,
+          "blue_hit": false,
+          "blue": 16,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "fushi",
+          "red_hits": 0,
+          "sample_red_hits": 0,
+          "blue_hit": false,
+          "blue": 11,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "dantuo",
+          "red_hits": 1,
+          "sample_red_hits": 1,
+          "blue_hit": false,
+          "blue": 6,
+          "fushi_full6": false,
+          "dan_hit": false
+        }
+      ]
+    },
+    {
+      "issue": "2026075",
+      "based_on_issue": "2026074",
+      "actual": "08 12 18 21 24 30 + 01",
+      "actual_blue": 1,
+      "model_best_red": 3,
+      "model_any_blue": true,
+      "random_best_red": 2,
+      "random_any_blue": false,
+      "pick_scores": [
+        {
+          "mode": "ssq",
+          "red_hits": 2,
+          "sample_red_hits": 2,
+          "blue_hit": false,
+          "blue": 7,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "ssq",
+          "red_hits": 2,
+          "sample_red_hits": 2,
+          "blue_hit": true,
+          "blue": 1,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "ssq",
+          "red_hits": 1,
+          "sample_red_hits": 1,
+          "blue_hit": false,
+          "blue": 12,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "fushi",
+          "red_hits": 3,
+          "sample_red_hits": 2,
+          "blue_hit": false,
+          "blue": 11,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "dantuo",
+          "red_hits": 3,
+          "sample_red_hits": 3,
+          "blue_hit": false,
+          "blue": 5,
+          "fushi_full6": false,
+          "dan_hit": true
+        }
+      ]
+    },
+    {
+      "issue": "2026074",
+      "based_on_issue": "2026073",
+      "actual": "02 23 24 26 28 32 + 04",
+      "actual_blue": 4,
+      "model_best_red": 3,
+      "model_any_blue": false,
+      "random_best_red": 4,
+      "random_any_blue": false,
+      "pick_scores": [
+        {
+          "mode": "ssq",
+          "red_hits": 0,
+          "sample_red_hits": 0,
+          "blue_hit": false,
+          "blue": 10,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "ssq",
+          "red_hits": 1,
+          "sample_red_hits": 1,
+          "blue_hit": false,
+          "blue": 8,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "ssq",
+          "red_hits": 1,
+          "sample_red_hits": 1,
+          "blue_hit": false,
+          "blue": 16,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "fushi",
+          "red_hits": 3,
+          "sample_red_hits": 3,
+          "blue_hit": false,
+          "blue": 7,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "dantuo",
+          "red_hits": 0,
+          "sample_red_hits": 0,
+          "blue_hit": false,
+          "blue": 6,
+          "fushi_full6": false,
+          "dan_hit": false
+        }
+      ]
+    },
+    {
+      "issue": "2026073",
+      "based_on_issue": "2026072",
+      "actual": "09 10 13 16 19 21 + 08",
+      "actual_blue": 8,
+      "model_best_red": 2,
+      "model_any_blue": false,
+      "random_best_red": 2,
+      "random_any_blue": false,
+      "pick_scores": [
+        {
+          "mode": "ssq",
+          "red_hits": 2,
+          "sample_red_hits": 2,
+          "blue_hit": false,
+          "blue": 9,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "ssq",
+          "red_hits": 1,
+          "sample_red_hits": 1,
+          "blue_hit": false,
+          "blue": 3,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "ssq",
+          "red_hits": 0,
+          "sample_red_hits": 0,
+          "blue_hit": false,
+          "blue": 14,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "fushi",
+          "red_hits": 0,
+          "sample_red_hits": 0,
+          "blue_hit": false,
+          "blue": 6,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "dantuo",
+          "red_hits": 1,
+          "sample_red_hits": 1,
+          "blue_hit": false,
+          "blue": 7,
+          "fushi_full6": false,
+          "dan_hit": false
+        }
+      ]
+    },
+    {
+      "issue": "2026072",
+      "based_on_issue": "2026071",
+      "actual": "07 08 12 15 17 21 + 01",
+      "actual_blue": 1,
+      "model_best_red": 2,
+      "model_any_blue": false,
+      "random_best_red": 2,
+      "random_any_blue": false,
+      "pick_scores": [
+        {
+          "mode": "ssq",
+          "red_hits": 2,
+          "sample_red_hits": 2,
+          "blue_hit": false,
+          "blue": 2,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "ssq",
+          "red_hits": 1,
+          "sample_red_hits": 1,
+          "blue_hit": false,
+          "blue": 7,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "ssq",
+          "red_hits": 2,
+          "sample_red_hits": 2,
+          "blue_hit": false,
+          "blue": 13,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "fushi",
+          "red_hits": 0,
+          "sample_red_hits": 0,
+          "blue_hit": false,
+          "blue": 6,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "dantuo",
+          "red_hits": 2,
+          "sample_red_hits": 2,
+          "blue_hit": false,
+          "blue": 6,
+          "fushi_full6": false,
+          "dan_hit": false
+        }
+      ]
+    },
+    {
+      "issue": "2026071",
+      "based_on_issue": "2026070",
+      "actual": "03 08 19 25 31 33 + 05",
+      "actual_blue": 5,
+      "model_best_red": 2,
+      "model_any_blue": false,
+      "random_best_red": 2,
+      "random_any_blue": false,
+      "pick_scores": [
+        {
+          "mode": "ssq",
+          "red_hits": 0,
+          "sample_red_hits": 0,
+          "blue_hit": false,
+          "blue": 7,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "ssq",
+          "red_hits": 2,
+          "sample_red_hits": 2,
+          "blue_hit": false,
+          "blue": 1,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "ssq",
+          "red_hits": 1,
+          "sample_red_hits": 1,
+          "blue_hit": false,
+          "blue": 14,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "fushi",
+          "red_hits": 1,
+          "sample_red_hits": 1,
+          "blue_hit": false,
+          "blue": 2,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "dantuo",
+          "red_hits": 0,
+          "sample_red_hits": 0,
+          "blue_hit": false,
+          "blue": 15,
+          "fushi_full6": false,
+          "dan_hit": false
+        }
+      ]
+    },
+    {
+      "issue": "2026070",
+      "based_on_issue": "2026069",
+      "actual": "03 06 08 14 26 27 + 08",
+      "actual_blue": 8,
+      "model_best_red": 3,
+      "model_any_blue": false,
+      "random_best_red": 2,
+      "random_any_blue": false,
+      "pick_scores": [
+        {
+          "mode": "ssq",
+          "red_hits": 0,
+          "sample_red_hits": 0,
+          "blue_hit": false,
+          "blue": 10,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "ssq",
+          "red_hits": 3,
+          "sample_red_hits": 3,
+          "blue_hit": false,
+          "blue": 6,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "ssq",
+          "red_hits": 2,
+          "sample_red_hits": 2,
+          "blue_hit": false,
+          "blue": 12,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "fushi",
+          "red_hits": 2,
+          "sample_red_hits": 2,
+          "blue_hit": false,
+          "blue": 10,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "dantuo",
+          "red_hits": 2,
+          "sample_red_hits": 2,
+          "blue_hit": false,
+          "blue": 16,
+          "fushi_full6": false,
+          "dan_hit": false
+        }
+      ]
+    },
+    {
+      "issue": "2026069",
+      "based_on_issue": "2026068",
+      "actual": "12 14 16 17 18 32 + 08",
+      "actual_blue": 8,
+      "model_best_red": 2,
+      "model_any_blue": false,
+      "random_best_red": 2,
+      "random_any_blue": false,
+      "pick_scores": [
+        {
+          "mode": "ssq",
+          "red_hits": 1,
+          "sample_red_hits": 1,
+          "blue_hit": false,
+          "blue": 3,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "ssq",
+          "red_hits": 0,
+          "sample_red_hits": 0,
+          "blue_hit": false,
+          "blue": 16,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "ssq",
+          "red_hits": 1,
+          "sample_red_hits": 1,
+          "blue_hit": false,
+          "blue": 2,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "fushi",
+          "red_hits": 1,
+          "sample_red_hits": 1,
+          "blue_hit": false,
+          "blue": 2,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "dantuo",
+          "red_hits": 2,
+          "sample_red_hits": 1,
+          "blue_hit": false,
+          "blue": 7,
+          "fushi_full6": false,
+          "dan_hit": false
+        }
+      ]
+    },
+    {
+      "issue": "2026068",
+      "based_on_issue": "2026067",
+      "actual": "03 05 16 18 29 32 + 04",
+      "actual_blue": 4,
+      "model_best_red": 4,
+      "model_any_blue": true,
+      "random_best_red": 2,
+      "random_any_blue": false,
+      "pick_scores": [
+        {
+          "mode": "ssq",
+          "red_hits": 0,
+          "sample_red_hits": 0,
+          "blue_hit": true,
+          "blue": 4,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "ssq",
+          "red_hits": 4,
+          "sample_red_hits": 4,
+          "blue_hit": false,
+          "blue": 10,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "ssq",
+          "red_hits": 0,
+          "sample_red_hits": 0,
+          "blue_hit": false,
+          "blue": 16,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "fushi",
+          "red_hits": 0,
+          "sample_red_hits": 0,
+          "blue_hit": false,
+          "blue": 10,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "dantuo",
+          "red_hits": 3,
+          "sample_red_hits": 3,
+          "blue_hit": false,
+          "blue": 9,
+          "fushi_full6": false,
+          "dan_hit": true
+        }
+      ]
+    },
+    {
+      "issue": "2026067",
+      "based_on_issue": "2026066",
+      "actual": "04 19 27 29 30 32 + 13",
+      "actual_blue": 13,
+      "model_best_red": 2,
+      "model_any_blue": false,
+      "random_best_red": 2,
+      "random_any_blue": false,
+      "pick_scores": [
+        {
+          "mode": "ssq",
+          "red_hits": 2,
+          "sample_red_hits": 2,
+          "blue_hit": false,
+          "blue": 10,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "ssq",
+          "red_hits": 0,
+          "sample_red_hits": 0,
+          "blue_hit": false,
+          "blue": 4,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "ssq",
+          "red_hits": 1,
+          "sample_red_hits": 1,
+          "blue_hit": false,
+          "blue": 11,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "fushi",
+          "red_hits": 1,
+          "sample_red_hits": 0,
+          "blue_hit": false,
+          "blue": 4,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "dantuo",
+          "red_hits": 1,
+          "sample_red_hits": 0,
+          "blue_hit": false,
+          "blue": 16,
+          "fushi_full6": false,
+          "dan_hit": false
+        }
+      ]
+    },
+    {
+      "issue": "2026066",
+      "based_on_issue": "2026065",
+      "actual": "05 11 21 23 24 29 + 16",
+      "actual_blue": 16,
+      "model_best_red": 2,
+      "model_any_blue": false,
+      "random_best_red": 2,
+      "random_any_blue": false,
+      "pick_scores": [
+        {
+          "mode": "ssq",
+          "red_hits": 2,
+          "sample_red_hits": 2,
+          "blue_hit": false,
+          "blue": 3,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "ssq",
+          "red_hits": 2,
+          "sample_red_hits": 2,
+          "blue_hit": false,
+          "blue": 10,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "ssq",
+          "red_hits": 0,
+          "sample_red_hits": 0,
+          "blue_hit": false,
+          "blue": 15,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "fushi",
+          "red_hits": 1,
+          "sample_red_hits": 1,
+          "blue_hit": false,
+          "blue": 1,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "dantuo",
+          "red_hits": 0,
+          "sample_red_hits": 0,
+          "blue_hit": false,
+          "blue": 5,
+          "fushi_full6": false,
+          "dan_hit": false
+        }
+      ]
+    },
+    {
+      "issue": "2026065",
+      "based_on_issue": "2026064",
+      "actual": "07 08 16 24 30 32 + 02",
+      "actual_blue": 2,
+      "model_best_red": 3,
+      "model_any_blue": false,
+      "random_best_red": 2,
+      "random_any_blue": false,
+      "pick_scores": [
+        {
+          "mode": "ssq",
+          "red_hits": 2,
+          "sample_red_hits": 2,
+          "blue_hit": false,
+          "blue": 10,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "ssq",
+          "red_hits": 1,
+          "sample_red_hits": 1,
+          "blue_hit": false,
+          "blue": 9,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "ssq",
+          "red_hits": 0,
+          "sample_red_hits": 0,
+          "blue_hit": false,
+          "blue": 12,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "fushi",
+          "red_hits": 3,
+          "sample_red_hits": 3,
+          "blue_hit": false,
+          "blue": 5,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "dantuo",
+          "red_hits": 2,
+          "sample_red_hits": 1,
+          "blue_hit": false,
+          "blue": 11,
+          "fushi_full6": false,
+          "dan_hit": false
+        }
+      ]
+    },
+    {
+      "issue": "2026064",
+      "based_on_issue": "2026063",
+      "actual": "01 09 15 18 29 33 + 15",
+      "actual_blue": 15,
+      "model_best_red": 2,
+      "model_any_blue": true,
+      "random_best_red": 1,
+      "random_any_blue": false,
+      "pick_scores": [
+        {
+          "mode": "ssq",
+          "red_hits": 1,
+          "sample_red_hits": 1,
+          "blue_hit": false,
+          "blue": 5,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "ssq",
+          "red_hits": 0,
+          "sample_red_hits": 0,
+          "blue_hit": false,
+          "blue": 6,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "ssq",
+          "red_hits": 2,
+          "sample_red_hits": 2,
+          "blue_hit": false,
+          "blue": 16,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "fushi",
+          "red_hits": 1,
+          "sample_red_hits": 1,
+          "blue_hit": true,
+          "blue": 15,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "dantuo",
+          "red_hits": 1,
+          "sample_red_hits": 1,
+          "blue_hit": false,
+          "blue": 1,
+          "fushi_full6": false,
+          "dan_hit": false
+        }
+      ]
+    },
+    {
+      "issue": "2026063",
+      "based_on_issue": "2026062",
+      "actual": "02 08 25 28 30 31 + 02",
+      "actual_blue": 2,
+      "model_best_red": 2,
+      "model_any_blue": false,
+      "random_best_red": 2,
+      "random_any_blue": false,
+      "pick_scores": [
+        {
+          "mode": "ssq",
+          "red_hits": 0,
+          "sample_red_hits": 0,
+          "blue_hit": false,
+          "blue": 5,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "ssq",
+          "red_hits": 1,
+          "sample_red_hits": 1,
+          "blue_hit": false,
+          "blue": 10,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "ssq",
+          "red_hits": 1,
+          "sample_red_hits": 1,
+          "blue_hit": false,
+          "blue": 15,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "fushi",
+          "red_hits": 0,
+          "sample_red_hits": 0,
+          "blue_hit": false,
+          "blue": 6,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "dantuo",
+          "red_hits": 2,
+          "sample_red_hits": 1,
+          "blue_hit": false,
+          "blue": 12,
+          "fushi_full6": false,
+          "dan_hit": false
+        }
+      ]
+    },
+    {
+      "issue": "2026062",
+      "based_on_issue": "2026061",
+      "actual": "02 04 07 14 28 29 + 09",
+      "actual_blue": 9,
+      "model_best_red": 2,
+      "model_any_blue": false,
+      "random_best_red": 4,
+      "random_any_blue": false,
+      "pick_scores": [
+        {
+          "mode": "ssq",
+          "red_hits": 1,
+          "sample_red_hits": 1,
+          "blue_hit": false,
+          "blue": 4,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "ssq",
+          "red_hits": 1,
+          "sample_red_hits": 1,
+          "blue_hit": false,
+          "blue": 11,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "ssq",
+          "red_hits": 0,
+          "sample_red_hits": 0,
+          "blue_hit": false,
+          "blue": 2,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "fushi",
+          "red_hits": 2,
+          "sample_red_hits": 2,
+          "blue_hit": false,
+          "blue": 10,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "dantuo",
+          "red_hits": 1,
+          "sample_red_hits": 1,
+          "blue_hit": false,
+          "blue": 11,
+          "fushi_full6": false,
+          "dan_hit": false
+        }
+      ]
+    },
+    {
+      "issue": "2026061",
+      "based_on_issue": "2026060",
+      "actual": "01 04 05 15 23 28 + 07",
+      "actual_blue": 7,
+      "model_best_red": 2,
+      "model_any_blue": true,
+      "random_best_red": 2,
+      "random_any_blue": false,
+      "pick_scores": [
+        {
+          "mode": "ssq",
+          "red_hits": 0,
+          "sample_red_hits": 0,
+          "blue_hit": false,
+          "blue": 10,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "ssq",
+          "red_hits": 2,
+          "sample_red_hits": 2,
+          "blue_hit": false,
+          "blue": 8,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "ssq",
+          "red_hits": 1,
+          "sample_red_hits": 1,
+          "blue_hit": false,
+          "blue": 15,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "fushi",
+          "red_hits": 1,
+          "sample_red_hits": 1,
+          "blue_hit": false,
+          "blue": 2,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "dantuo",
+          "red_hits": 1,
+          "sample_red_hits": 1,
+          "blue_hit": true,
+          "blue": 7,
+          "fushi_full6": false,
+          "dan_hit": false
+        }
+      ]
+    },
+    {
+      "issue": "2026060",
+      "based_on_issue": "2026059",
+      "actual": "07 09 10 16 22 27 + 11",
+      "actual_blue": 11,
+      "model_best_red": 2,
+      "model_any_blue": false,
+      "random_best_red": 2,
+      "random_any_blue": false,
+      "pick_scores": [
+        {
+          "mode": "ssq",
+          "red_hits": 1,
+          "sample_red_hits": 1,
+          "blue_hit": false,
+          "blue": 16,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "ssq",
+          "red_hits": 1,
+          "sample_red_hits": 1,
+          "blue_hit": false,
+          "blue": 2,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "ssq",
+          "red_hits": 1,
+          "sample_red_hits": 1,
+          "blue_hit": false,
+          "blue": 9,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "fushi",
+          "red_hits": 2,
+          "sample_red_hits": 2,
+          "blue_hit": false,
+          "blue": 14,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "dantuo",
+          "red_hits": 0,
+          "sample_red_hits": 0,
+          "blue_hit": false,
+          "blue": 10,
+          "fushi_full6": false,
+          "dan_hit": false
+        }
+      ]
+    },
+    {
+      "issue": "2026059",
+      "based_on_issue": "2026058",
+      "actual": "08 16 26 28 29 30 + 15",
+      "actual_blue": 15,
+      "model_best_red": 2,
+      "model_any_blue": false,
+      "random_best_red": 2,
+      "random_any_blue": false,
+      "pick_scores": [
+        {
+          "mode": "ssq",
+          "red_hits": 2,
+          "sample_red_hits": 2,
+          "blue_hit": false,
+          "blue": 4,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "ssq",
+          "red_hits": 1,
+          "sample_red_hits": 1,
+          "blue_hit": false,
+          "blue": 5,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "ssq",
+          "red_hits": 0,
+          "sample_red_hits": 0,
+          "blue_hit": false,
+          "blue": 16,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "fushi",
+          "red_hits": 1,
+          "sample_red_hits": 1,
+          "blue_hit": false,
+          "blue": 12,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "dantuo",
+          "red_hits": 1,
+          "sample_red_hits": 1,
+          "blue_hit": false,
+          "blue": 10,
+          "fushi_full6": false,
+          "dan_hit": false
+        }
+      ]
+    },
+    {
+      "issue": "2026058",
+      "based_on_issue": "2026057",
+      "actual": "01 04 07 21 29 30 + 01",
+      "actual_blue": 1,
+      "model_best_red": 1,
+      "model_any_blue": false,
+      "random_best_red": 2,
+      "random_any_blue": false,
+      "pick_scores": [
+        {
+          "mode": "ssq",
+          "red_hits": 1,
+          "sample_red_hits": 1,
+          "blue_hit": false,
+          "blue": 10,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "ssq",
+          "red_hits": 0,
+          "sample_red_hits": 0,
+          "blue_hit": false,
+          "blue": 5,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "ssq",
+          "red_hits": 1,
+          "sample_red_hits": 1,
+          "blue_hit": false,
+          "blue": 13,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "fushi",
+          "red_hits": 0,
+          "sample_red_hits": 0,
+          "blue_hit": false,
+          "blue": 6,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "dantuo",
+          "red_hits": 1,
+          "sample_red_hits": 1,
+          "blue_hit": false,
+          "blue": 9,
+          "fushi_full6": false,
+          "dan_hit": false
+        }
+      ]
+    },
+    {
+      "issue": "2026057",
+      "based_on_issue": "2026056",
+      "actual": "01 10 22 24 28 30 + 07",
+      "actual_blue": 7,
+      "model_best_red": 2,
+      "model_any_blue": true,
+      "random_best_red": 3,
+      "random_any_blue": false,
+      "pick_scores": [
+        {
+          "mode": "ssq",
+          "red_hits": 2,
+          "sample_red_hits": 2,
+          "blue_hit": false,
+          "blue": 3,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "ssq",
+          "red_hits": 2,
+          "sample_red_hits": 2,
+          "blue_hit": true,
+          "blue": 7,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "ssq",
+          "red_hits": 1,
+          "sample_red_hits": 1,
+          "blue_hit": false,
+          "blue": 13,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "fushi",
+          "red_hits": 0,
+          "sample_red_hits": 0,
+          "blue_hit": false,
+          "blue": 6,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "dantuo",
+          "red_hits": 1,
+          "sample_red_hits": 1,
+          "blue_hit": false,
+          "blue": 2,
+          "fushi_full6": false,
+          "dan_hit": false
+        }
+      ]
+    },
+    {
+      "issue": "2026056",
+      "based_on_issue": "2026055",
+      "actual": "10 19 21 22 31 33 + 05",
+      "actual_blue": 5,
+      "model_best_red": 2,
+      "model_any_blue": true,
+      "random_best_red": 3,
+      "random_any_blue": false,
+      "pick_scores": [
+        {
+          "mode": "ssq",
+          "red_hits": 1,
+          "sample_red_hits": 1,
+          "blue_hit": false,
+          "blue": 4,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "ssq",
+          "red_hits": 1,
+          "sample_red_hits": 1,
+          "blue_hit": true,
+          "blue": 5,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "ssq",
+          "red_hits": 1,
+          "sample_red_hits": 1,
+          "blue_hit": false,
+          "blue": 14,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "fushi",
+          "red_hits": 1,
+          "sample_red_hits": 1,
+          "blue_hit": false,
+          "blue": 14,
+          "fushi_full6": false,
+          "dan_hit": null
+        },
+        {
+          "mode": "dantuo",
+          "red_hits": 2,
+          "sample_red_hits": 2,
+          "blue_hit": false,
+          "blue": 3,
+          "fushi_full6": false,
+          "dan_hit": false
+        }
+      ]
+    }
+  ]
+}

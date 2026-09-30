@@ -1,0 +1,481 @@
+{
+  "meta": {
+    "n_eval": 40,
+    "window": 40,
+    "note": "walk-forward frequency/position picks vs fair random baseline; entertainment reference only",
+    "community_refs": [
+      "zxz0119/lottery-ai-simulator (hot/cold/miss + backtest, not guarantee)",
+      "zhaoyangpp/LottoProphet (LSTM-CRF; research UI)",
+      "Markovmodcn/Lotterymcp (cold/hot/sum/span/zone analysis tools)",
+      "sinyu1012/Double-Color-Ball-AI (hot/cold/balance/cycle strategies)"
+    ]
+  },
+  "games": [
+    {
+      "game": "pl3",
+      "name": "排列3",
+      "periods": 40,
+      "newest": "26261",
+      "oldest_eval": "26222",
+      "model_avg_best": 0.875,
+      "rand_avg_best": 0.95,
+      "delta_best": -0.075,
+      "model_exact_rate": 0.025,
+      "rand_exact_rate": 0.0,
+      "delta_exact": 0.025,
+      "n_pos": 3,
+      "tolerance": 0.15,
+      "verdict": "benign",
+      "recent10": [
+        {
+          "issue": "26261",
+          "result": "5 3 8",
+          "model": 1,
+          "rand": 1
+        },
+        {
+          "issue": "26260",
+          "result": "4 4 9",
+          "model": 0,
+          "rand": 1
+        },
+        {
+          "issue": "26259",
+          "result": "3 7 9",
+          "model": 0,
+          "rand": 1
+        },
+        {
+          "issue": "26258",
+          "result": "1 3 7",
+          "model": 1,
+          "rand": 2
+        },
+        {
+          "issue": "26257",
+          "result": "4 9 3",
+          "model": 1,
+          "rand": 0
+        },
+        {
+          "issue": "26256",
+          "result": "6 9 0",
+          "model": 1,
+          "rand": 0
+        },
+        {
+          "issue": "26255",
+          "result": "7 6 4",
+          "model": 1,
+          "rand": 1
+        },
+        {
+          "issue": "26254",
+          "result": "0 6 9",
+          "model": 3,
+          "rand": 1
+        },
+        {
+          "issue": "26253",
+          "result": "8 9 3",
+          "model": 1,
+          "rand": 1
+        },
+        {
+          "issue": "26252",
+          "result": "1 9 0",
+          "model": 2,
+          "rand": 1
+        }
+      ]
+    },
+    {
+      "game": "pl5",
+      "name": "排列5",
+      "periods": 40,
+      "newest": "26261",
+      "oldest_eval": "26222",
+      "model_avg_best": 1.3,
+      "rand_avg_best": 1.3,
+      "delta_best": 0.0,
+      "model_exact_rate": 0.0,
+      "rand_exact_rate": 0.0,
+      "delta_exact": 0.0,
+      "n_pos": 5,
+      "tolerance": 0.35,
+      "verdict": "benign",
+      "recent10": [
+        {
+          "issue": "26261",
+          "result": "5 3 8 5 9",
+          "model": 1,
+          "rand": 1
+        },
+        {
+          "issue": "26260",
+          "result": "4 4 9 1 0",
+          "model": 0,
+          "rand": 1
+        },
+        {
+          "issue": "26259",
+          "result": "3 7 9 0 2",
+          "model": 1,
+          "rand": 1
+        },
+        {
+          "issue": "26258",
+          "result": "1 3 7 4 1",
+          "model": 1,
+          "rand": 2
+        },
+        {
+          "issue": "26257",
+          "result": "4 9 3 3 0",
+          "model": 2,
+          "rand": 2
+        },
+        {
+          "issue": "26256",
+          "result": "6 9 0 4 3",
+          "model": 1,
+          "rand": 2
+        },
+        {
+          "issue": "26255",
+          "result": "7 6 4 2 5",
+          "model": 1,
+          "rand": 0
+        },
+        {
+          "issue": "26254",
+          "result": "0 6 9 4 0",
+          "model": 4,
+          "rand": 2
+        },
+        {
+          "issue": "26253",
+          "result": "8 9 3 5 1",
+          "model": 1,
+          "rand": 1
+        },
+        {
+          "issue": "26252",
+          "result": "1 9 0 9 0",
+          "model": 2,
+          "rand": 1
+        }
+      ]
+    },
+    {
+      "game": "qxc",
+      "name": "七星彩",
+      "periods": 40,
+      "newest": "26112",
+      "oldest_eval": "26073",
+      "model_avg_best": 1.375,
+      "rand_avg_best": 1.625,
+      "delta_best": -0.25,
+      "model_exact_rate": 0.0,
+      "rand_exact_rate": 0.0,
+      "delta_exact": 0.0,
+      "n_pos": 7,
+      "tolerance": 0.35,
+      "verdict": "benign",
+      "recent10": [
+        {
+          "issue": "26112",
+          "result": "4 2 6 4 1 4 8",
+          "model": 1,
+          "rand": 2
+        },
+        {
+          "issue": "26111",
+          "result": "7 8 9 1 0 1 1",
+          "model": 1,
+          "rand": 1
+        },
+        {
+          "issue": "26110",
+          "result": "6 2 5 9 6 9 13",
+          "model": 3,
+          "rand": 2
+        },
+        {
+          "issue": "26109",
+          "result": "2 9 0 5 0 3 9",
+          "model": 1,
+          "rand": 1
+        },
+        {
+          "issue": "26108",
+          "result": "9 5 2 0 8 6 9",
+          "model": 3,
+          "rand": 3
+        },
+        {
+          "issue": "26107",
+          "result": "2 8 3 4 5 6 4",
+          "model": 2,
+          "rand": 3
+        },
+        {
+          "issue": "26106",
+          "result": "5 1 9 5 8 5 11",
+          "model": 1,
+          "rand": 1
+        },
+        {
+          "issue": "26105",
+          "result": "5 9 9 5 3 3 0",
+          "model": 2,
+          "rand": 2
+        },
+        {
+          "issue": "26104",
+          "result": "7 4 0 7 2 8 14",
+          "model": 2,
+          "rand": 1
+        },
+        {
+          "issue": "26103",
+          "result": "0 0 0 6 0 2 8",
+          "model": 1,
+          "rand": 1
+        }
+      ]
+    },
+    {
+      "game": "ssq",
+      "name": "双色球",
+      "periods": 40,
+      "newest": "2026112",
+      "oldest_eval": "2026073",
+      "model_avg_best": 1.925,
+      "rand_avg_best": 1.875,
+      "delta_best": 0.05,
+      "model_blue_rate": 0.325,
+      "rand_blue_rate": 0.1,
+      "delta_blue": 0.225,
+      "tolerance": 0.2,
+      "verdict": "benign",
+      "recent10": [
+        {
+          "issue": "2026112",
+          "result": "01 04 11 12 17 29 + 11",
+          "model": 1,
+          "rand": 2
+        },
+        {
+          "issue": "2026111",
+          "result": "06 07 14 22 31 32 + 05",
+          "model": 3,
+          "rand": 2
+        },
+        {
+          "issue": "2026110",
+          "result": "02 05 16 19 26 32 + 14",
+          "model": 1,
+          "rand": 2
+        },
+        {
+          "issue": "2026109",
+          "result": "09 12 15 26 30 33 + 06",
+          "model": 2,
+          "rand": 3
+        },
+        {
+          "issue": "2026108",
+          "result": "06 11 13 14 20 28 + 16",
+          "model": 3,
+          "rand": 3
+        },
+        {
+          "issue": "2026107",
+          "result": "01 05 09 17 24 33 + 04",
+          "model": 2,
+          "rand": 2
+        },
+        {
+          "issue": "2026106",
+          "result": "06 11 13 14 22 30 + 14",
+          "model": 4,
+          "rand": 1
+        },
+        {
+          "issue": "2026105",
+          "result": "02 04 13 14 15 30 + 08",
+          "model": 2,
+          "rand": 2
+        },
+        {
+          "issue": "2026104",
+          "result": "11 12 13 19 20 31 + 03",
+          "model": 2,
+          "rand": 0
+        },
+        {
+          "issue": "2026103",
+          "result": "04 11 20 27 28 30 + 15",
+          "model": 1,
+          "rand": 2
+        }
+      ]
+    },
+    {
+      "game": "dlt",
+      "name": "大乐透",
+      "periods": 40,
+      "newest": "26111",
+      "oldest_eval": "26072",
+      "model_avg_best": 1.325,
+      "rand_avg_best": 1.625,
+      "delta_best": -0.3,
+      "model_back_avg": 0.775,
+      "rand_back_avg": 0.875,
+      "delta_back": -0.1,
+      "tolerance": 0.2,
+      "verdict": "weak_vs_random",
+      "recent10": [
+        {
+          "issue": "26111",
+          "result": "10 11 17 26 29 + 01 03",
+          "model": 2,
+          "rand": 1
+        },
+        {
+          "issue": "26110",
+          "result": "03 24 25 26 35 + 07 09",
+          "model": 2,
+          "rand": 1
+        },
+        {
+          "issue": "26109",
+          "result": "12 14 16 27 34 + 04 08",
+          "model": 1,
+          "rand": 2
+        },
+        {
+          "issue": "26108",
+          "result": "01 05 07 21 35 + 01 04",
+          "model": 0,
+          "rand": 2
+        },
+        {
+          "issue": "26107",
+          "result": "02 05 07 14 22 + 04 10",
+          "model": 2,
+          "rand": 1
+        },
+        {
+          "issue": "26106",
+          "result": "14 17 21 25 28 + 04 06",
+          "model": 1,
+          "rand": 2
+        },
+        {
+          "issue": "26105",
+          "result": "10 14 30 33 34 + 09 12",
+          "model": 2,
+          "rand": 2
+        },
+        {
+          "issue": "26104",
+          "result": "01 06 14 15 26 + 08 09",
+          "model": 2,
+          "rand": 3
+        },
+        {
+          "issue": "26103",
+          "result": "03 16 17 32 35 + 02 12",
+          "model": 2,
+          "rand": 1
+        },
+        {
+          "issue": "26102",
+          "result": "01 03 07 27 28 + 06 07",
+          "model": 1,
+          "rand": 1
+        }
+      ]
+    },
+    {
+      "game": "fc3d",
+      "name": "福彩3D",
+      "periods": 40,
+      "newest": "2026261",
+      "oldest_eval": "2026222",
+      "model_avg_best": 0.7,
+      "rand_avg_best": 1.025,
+      "delta_best": -0.325,
+      "model_exact_rate": 0.0,
+      "rand_exact_rate": 0.0,
+      "delta_exact": 0.0,
+      "n_pos": 3,
+      "tolerance": 0.15,
+      "verdict": "weak_vs_random",
+      "recent10": [
+        {
+          "issue": "2026261",
+          "result": "5 1 1",
+          "model": 0,
+          "rand": 1
+        },
+        {
+          "issue": "2026260",
+          "result": "6 1 9",
+          "model": 1,
+          "rand": 1
+        },
+        {
+          "issue": "2026259",
+          "result": "7 3 1",
+          "model": 0,
+          "rand": 1
+        },
+        {
+          "issue": "2026258",
+          "result": "6 3 5",
+          "model": 1,
+          "rand": 1
+        },
+        {
+          "issue": "2026257",
+          "result": "4 8 6",
+          "model": 0,
+          "rand": 1
+        },
+        {
+          "issue": "2026256",
+          "result": "0 5 1",
+          "model": 1,
+          "rand": 2
+        },
+        {
+          "issue": "2026255",
+          "result": "6 9 9",
+          "model": 0,
+          "rand": 0
+        },
+        {
+          "issue": "2026254",
+          "result": "8 5 0",
+          "model": 1,
+          "rand": 1
+        },
+        {
+          "issue": "2026253",
+          "result": "0 3 4",
+          "model": 1,
+          "rand": 2
+        },
+        {
+          "issue": "2026252",
+          "result": "0 9 2",
+          "model": 0,
+          "rand": 1
+        }
+      ]
+    }
+  ]
+}

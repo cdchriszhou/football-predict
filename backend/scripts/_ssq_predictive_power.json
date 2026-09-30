@@ -1,0 +1,246 @@
+{
+  "meta": {
+    "newest": "2026108",
+    "n_eval": 50,
+    "window": 40,
+    "tickets": 3,
+    "note": "Walk-forward; model vs matched-size random; lottery assumed fair."
+  },
+  "probability": {
+    "red_single_hypergeom_mean": 1.0909,
+    "red_single_pmf": {
+      "0": 0.267261,
+      "1": 0.437337,
+      "2": 0.237683,
+      "3": 0.052818,
+      "4": 0.004754,
+      "5": 0.000146,
+      "6": 1e-06
+    },
+    "red_max_of_3_theory_mean": 1.8095,
+    "red_max_of_3_theory_pmf": {
+      "0": 0.01909,
+      "1": 0.330713,
+      "2": 0.486841,
+      "3": 0.148725,
+      "4": 0.014189,
+      "5": 0.000439,
+      "6": 3e-06
+    },
+    "blue_single_p": 0.0625,
+    "blue_any_of_3_distinct_p": 0.1875
+  },
+  "empirical": {
+    "model_avg_best_red": 1.96,
+    "random_avg_best_red": 1.92,
+    "model_avg_primary_red": 1.16,
+    "model_best_dist": {
+      "0": 0,
+      "1": 12,
+      "2": 30,
+      "3": 6,
+      "4": 2,
+      "5": 0,
+      "6": 0
+    },
+    "random_best_dist": {
+      "0": 1,
+      "1": 15,
+      "2": 23,
+      "3": 9,
+      "4": 2,
+      "5": 0,
+      "6": 0
+    },
+    "theory_max3_expected_counts": {
+      "0": 0.95,
+      "1": 16.54,
+      "2": 24.34,
+      "3": 7.44,
+      "4": 0.71,
+      "5": 0.02,
+      "6": 0.0
+    },
+    "model_any_blue_rate": 0.28,
+    "random_any_blue_rate": 0.3,
+    "blue_hit_when_actual_high": 0.2857,
+    "blue_hit_when_actual_low": 0.2778,
+    "pkg_has_high_blue_rate": 1.0,
+    "actual_high_blue_rate": 0.28
+  },
+  "statistics": {
+    "delta_best_red_bootstrap_95ci": {
+      "mean": 0.04,
+      "lo": -0.26,
+      "hi": 0.32,
+      "n": 50
+    },
+    "delta_any_blue_bootstrap_95ci": {
+      "mean": -0.02,
+      "lo": -0.22,
+      "hi": 0.18,
+      "n": 50
+    },
+    "perm_pvalue_best_red": 0.892,
+    "perm_pvalue_any_blue": 1.0,
+    "z_best_red_vs_theory_max3": 1.463,
+    "pvalue_best_red_vs_theory": 0.1435,
+    "chi2_best_red_vs_theory": 2.837,
+    "chi2_df_approx": 2,
+    "wilson_model_blue": {
+      "lo": 0.1747,
+      "hi": 0.4167
+    },
+    "wilson_random_blue": {
+      "lo": 0.191,
+      "hi": 0.4375
+    }
+  },
+  "info_calculus": {
+    "desc": "Selection weights w_i=0.85+0.15*score; p=softmax-like normalize; H=-Σp log p; KL(p||U).",
+    "avg_weight_entropy_nats": 3.4963,
+    "max_entropy_uniform_nats": 3.4965,
+    "entropy_ratio_H_over_Hmax": 1.0,
+    "avg_kl_to_uniform_nats": 0.0002,
+    "primary_sum_mae_vs_actual": 23.26,
+    "loglik_primary_under_hypergeom": -63.04,
+    "note_calculus": "erf used for normal CDF; entropy/KL are continuous functionals on discrete simplex."
+  },
+  "verdict": {
+    "red_predictive_edge": "no_significant_edge",
+    "blue_vs_random": "no_significant_edge",
+    "summary_zh": "红球最大命中相对随机无显著优势；相对超几何 max-of-3 理论期望亦无稳定偏离。蓝球整包命中略高于同注数随机，主要来自互异+固定高区结构，不是开奖可预测性。选号权重接近均匀（熵比高、KL 很小），系统本质是轻偏置的分散参考号生成器。"
+  },
+  "recent_details": [
+    {
+      "issue": "2026108",
+      "actual": "06 11 13 14 20 28 + 16",
+      "model_best": 3,
+      "model_primary": 3,
+      "model_blues": [
+        11,
+        8,
+        10
+      ],
+      "any_blue": false,
+      "random_best": 3
+    },
+    {
+      "issue": "2026107",
+      "actual": "01 05 09 17 24 33 + 04",
+      "model_best": 2,
+      "model_primary": 1,
+      "model_blues": [
+        4,
+        8,
+        15
+      ],
+      "any_blue": true,
+      "random_best": 1
+    },
+    {
+      "issue": "2026106",
+      "actual": "06 11 13 14 22 30 + 14",
+      "model_best": 4,
+      "model_primary": 4,
+      "model_blues": [
+        8,
+        5,
+        11
+      ],
+      "any_blue": false,
+      "random_best": 1
+    },
+    {
+      "issue": "2026105",
+      "actual": "02 04 13 14 15 30 + 08",
+      "model_best": 2,
+      "model_primary": 0,
+      "model_blues": [
+        7,
+        2,
+        15
+      ],
+      "any_blue": false,
+      "random_best": 2
+    },
+    {
+      "issue": "2026104",
+      "actual": "11 12 13 19 20 31 + 03",
+      "model_best": 2,
+      "model_primary": 2,
+      "model_blues": [
+        4,
+        16,
+        10
+      ],
+      "any_blue": false,
+      "random_best": 2
+    },
+    {
+      "issue": "2026103",
+      "actual": "04 11 20 27 28 30 + 15",
+      "model_best": 1,
+      "model_primary": 0,
+      "model_blues": [
+        15,
+        4,
+        10
+      ],
+      "any_blue": true,
+      "random_best": 1
+    },
+    {
+      "issue": "2026102",
+      "actual": "03 04 10 13 16 25 + 09",
+      "model_best": 1,
+      "model_primary": 1,
+      "model_blues": [
+        4,
+        10,
+        13
+      ],
+      "any_blue": false,
+      "random_best": 2
+    },
+    {
+      "issue": "2026101",
+      "actual": "05 06 08 09 24 25 + 12",
+      "model_best": 2,
+      "model_primary": 2,
+      "model_blues": [
+        2,
+        9,
+        15
+      ],
+      "any_blue": false,
+      "random_best": 1
+    },
+    {
+      "issue": "2026100",
+      "actual": "03 04 09 13 22 31 + 04",
+      "model_best": 2,
+      "model_primary": 1,
+      "model_blues": [
+        5,
+        12,
+        3
+      ],
+      "any_blue": false,
+      "random_best": 2
+    },
+    {
+      "issue": "2026099",
+      "actual": "01 12 14 18 30 31 + 02",
+      "model_best": 2,
+      "model_primary": 2,
+      "model_blues": [
+        4,
+        2,
+        15
+      ],
+      "any_blue": true,
+      "random_best": 1
+    }
+  ]
+}

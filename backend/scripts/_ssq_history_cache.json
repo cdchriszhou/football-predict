@@ -1,0 +1,3002 @@
+[
+  {
+    "issue": "2026105",
+    "result": "02 04 13 14 15 30 + 08",
+    "digits": [
+      2,
+      4,
+      13,
+      14,
+      15,
+      30,
+      8
+    ],
+    "red": [
+      2,
+      4,
+      13,
+      14,
+      15,
+      30
+    ],
+    "blue": 8,
+    "draw_time": "2026-09-10(四)",
+    "sale_amount": 333874688.0,
+    "sale_amount_text": "333,874,688",
+    "pool_balance": 833007469.0,
+    "pool_balance_text": "833,007,469",
+    "prize_levels": [],
+    "has_floating_pool": true,
+    "kind": "ssq"
+  },
+  {
+    "issue": "2026104",
+    "result": "11 12 13 19 20 31 + 03",
+    "digits": [
+      11,
+      12,
+      13,
+      19,
+      20,
+      31,
+      3
+    ],
+    "red": [
+      11,
+      12,
+      13,
+      19,
+      20,
+      31
+    ],
+    "blue": 3,
+    "draw_time": "2026-09-08(二)",
+    "sale_amount": 333116798.0,
+    "sale_amount_text": "333,116,798",
+    "pool_balance": 798557035.0,
+    "pool_balance_text": "798,557,035",
+    "prize_levels": [],
+    "has_floating_pool": true,
+    "kind": "ssq"
+  },
+  {
+    "issue": "2026103",
+    "result": "04 11 20 27 28 30 + 15",
+    "digits": [
+      4,
+      11,
+      20,
+      27,
+      28,
+      30,
+      15
+    ],
+    "red": [
+      4,
+      11,
+      20,
+      27,
+      28,
+      30
+    ],
+    "blue": 15,
+    "draw_time": "2026-09-06(日)",
+    "sale_amount": 362416068.0,
+    "sale_amount_text": "362,416,068",
+    "pool_balance": 805259723.0,
+    "pool_balance_text": "805,259,723",
+    "prize_levels": [],
+    "has_floating_pool": true,
+    "kind": "ssq"
+  },
+  {
+    "issue": "2026102",
+    "result": "03 04 10 13 16 25 + 09",
+    "digits": [
+      3,
+      4,
+      10,
+      13,
+      16,
+      25,
+      9
+    ],
+    "red": [
+      3,
+      4,
+      10,
+      13,
+      16,
+      25
+    ],
+    "blue": 9,
+    "draw_time": "2026-09-03(四)",
+    "sale_amount": 335960988.0,
+    "sale_amount_text": "335,960,988",
+    "pool_balance": 782244968.0,
+    "pool_balance_text": "782,244,968",
+    "prize_levels": [],
+    "has_floating_pool": true,
+    "kind": "ssq"
+  },
+  {
+    "issue": "2026101",
+    "result": "05 06 08 09 24 25 + 12",
+    "digits": [
+      5,
+      6,
+      8,
+      9,
+      24,
+      25,
+      12
+    ],
+    "red": [
+      5,
+      6,
+      8,
+      9,
+      24,
+      25
+    ],
+    "blue": 12,
+    "draw_time": "2026-09-01(二)",
+    "sale_amount": 329493946.0,
+    "sale_amount_text": "329,493,946",
+    "pool_balance": 766096090.0,
+    "pool_balance_text": "766,096,090",
+    "prize_levels": [],
+    "has_floating_pool": true,
+    "kind": "ssq"
+  },
+  {
+    "issue": "2026100",
+    "result": "03 04 09 13 22 31 + 04",
+    "digits": [
+      3,
+      4,
+      9,
+      13,
+      22,
+      31,
+      4
+    ],
+    "red": [
+      3,
+      4,
+      9,
+      13,
+      22,
+      31
+    ],
+    "blue": 4,
+    "draw_time": "2026-08-30(日)",
+    "sale_amount": 357107230.0,
+    "sale_amount_text": "357,107,230",
+    "pool_balance": 743395010.0,
+    "pool_balance_text": "743,395,010",
+    "prize_levels": [],
+    "has_floating_pool": true,
+    "kind": "ssq"
+  },
+  {
+    "issue": "2026099",
+    "result": "01 12 14 18 30 31 + 02",
+    "digits": [
+      1,
+      12,
+      14,
+      18,
+      30,
+      31,
+      2
+    ],
+    "red": [
+      1,
+      12,
+      14,
+      18,
+      30,
+      31
+    ],
+    "blue": 2,
+    "draw_time": "2026-08-27(四)",
+    "sale_amount": 344486222.0,
+    "sale_amount_text": "344,486,222",
+    "pool_balance": 776452438.0,
+    "pool_balance_text": "776,452,438",
+    "prize_levels": [],
+    "has_floating_pool": true,
+    "kind": "ssq"
+  },
+  {
+    "issue": "2026098",
+    "result": "08 16 18 22 25 26 + 07",
+    "digits": [
+      8,
+      16,
+      18,
+      22,
+      25,
+      26,
+      7
+    ],
+    "red": [
+      8,
+      16,
+      18,
+      22,
+      25,
+      26
+    ],
+    "blue": 7,
+    "draw_time": "2026-08-25(二)",
+    "sale_amount": 337464770.0,
+    "sale_amount_text": "337,464,770",
+    "pool_balance": 711169786.0,
+    "pool_balance_text": "711,169,786",
+    "prize_levels": [],
+    "has_floating_pool": true,
+    "kind": "ssq"
+  },
+  {
+    "issue": "2026097",
+    "result": "05 16 24 26 29 30 + 02",
+    "digits": [
+      5,
+      16,
+      24,
+      26,
+      29,
+      30,
+      2
+    ],
+    "red": [
+      5,
+      16,
+      24,
+      26,
+      29,
+      30
+    ],
+    "blue": 2,
+    "draw_time": "2026-08-23(日)",
+    "sale_amount": 369897178.0,
+    "sale_amount_text": "369,897,178",
+    "pool_balance": 710238057.0,
+    "pool_balance_text": "710,238,057",
+    "prize_levels": [],
+    "has_floating_pool": true,
+    "kind": "ssq"
+  },
+  {
+    "issue": "2026096",
+    "result": "01 04 16 22 26 31 + 04",
+    "digits": [
+      1,
+      4,
+      16,
+      22,
+      26,
+      31,
+      4
+    ],
+    "red": [
+      1,
+      4,
+      16,
+      22,
+      26,
+      31
+    ],
+    "blue": 4,
+    "draw_time": "2026-08-20(四)",
+    "sale_amount": 344932190.0,
+    "sale_amount_text": "344,932,190",
+    "pool_balance": 654135395.0,
+    "pool_balance_text": "654,135,395",
+    "prize_levels": [],
+    "has_floating_pool": true,
+    "kind": "ssq"
+  },
+  {
+    "issue": "2026095",
+    "result": "04 06 14 21 22 33 + 16",
+    "digits": [
+      4,
+      6,
+      14,
+      21,
+      22,
+      33,
+      16
+    ],
+    "red": [
+      4,
+      6,
+      14,
+      21,
+      22,
+      33
+    ],
+    "blue": 16,
+    "draw_time": "2026-08-18(二)",
+    "sale_amount": 347737104.0,
+    "sale_amount_text": "347,737,104",
+    "pool_balance": 628888733.0,
+    "pool_balance_text": "628,888,733",
+    "prize_levels": [],
+    "has_floating_pool": true,
+    "kind": "ssq"
+  },
+  {
+    "issue": "2026094",
+    "result": "06 13 15 17 24 25 + 01",
+    "digits": [
+      6,
+      13,
+      15,
+      17,
+      24,
+      25,
+      1
+    ],
+    "red": [
+      6,
+      13,
+      15,
+      17,
+      24,
+      25
+    ],
+    "blue": 1,
+    "draw_time": "2026-08-16(日)",
+    "sale_amount": 373881722.0,
+    "sale_amount_text": "373,881,722",
+    "pool_balance": 616242219.0,
+    "pool_balance_text": "616,242,219",
+    "prize_levels": [],
+    "has_floating_pool": true,
+    "kind": "ssq"
+  },
+  {
+    "issue": "2026093",
+    "result": "05 08 15 20 21 24 + 09",
+    "digits": [
+      5,
+      8,
+      15,
+      20,
+      21,
+      24,
+      9
+    ],
+    "red": [
+      5,
+      8,
+      15,
+      20,
+      21,
+      24
+    ],
+    "blue": 9,
+    "draw_time": "2026-08-13(四)",
+    "sale_amount": 348046564.0,
+    "sale_amount_text": "348,046,564",
+    "pool_balance": 566415284.0,
+    "pool_balance_text": "566,415,284",
+    "prize_levels": [],
+    "has_floating_pool": true,
+    "kind": "ssq"
+  },
+  {
+    "issue": "2026092",
+    "result": "09 11 12 25 30 33 + 11",
+    "digits": [
+      9,
+      11,
+      12,
+      25,
+      30,
+      33,
+      11
+    ],
+    "red": [
+      9,
+      11,
+      12,
+      25,
+      30,
+      33
+    ],
+    "blue": 11,
+    "draw_time": "2026-08-11(二)",
+    "sale_amount": 339633672.0,
+    "sale_amount_text": "339,633,672",
+    "pool_balance": 571623532.0,
+    "pool_balance_text": "571,623,532",
+    "prize_levels": [],
+    "has_floating_pool": true,
+    "kind": "ssq"
+  },
+  {
+    "issue": "2026091",
+    "result": "02 13 14 16 20 24 + 05",
+    "digits": [
+      2,
+      13,
+      14,
+      16,
+      20,
+      24,
+      5
+    ],
+    "red": [
+      2,
+      13,
+      14,
+      16,
+      20,
+      24
+    ],
+    "blue": 5,
+    "draw_time": "2026-08-09(日)",
+    "sale_amount": 367362274.0,
+    "sale_amount_text": "367,362,274",
+    "pool_balance": 583235682.0,
+    "pool_balance_text": "583,235,682",
+    "prize_levels": [],
+    "has_floating_pool": true,
+    "kind": "ssq"
+  },
+  {
+    "issue": "2026090",
+    "result": "02 04 15 23 25 27 + 03",
+    "digits": [
+      2,
+      4,
+      15,
+      23,
+      25,
+      27,
+      3
+    ],
+    "red": [
+      2,
+      4,
+      15,
+      23,
+      25,
+      27
+    ],
+    "blue": 3,
+    "draw_time": "2026-08-06(四)",
+    "sale_amount": 348980318.0,
+    "sale_amount_text": "348,980,318",
+    "pool_balance": 545331466.0,
+    "pool_balance_text": "545,331,466",
+    "prize_levels": [],
+    "has_floating_pool": true,
+    "kind": "ssq"
+  },
+  {
+    "issue": "2026089",
+    "result": "05 18 23 24 27 33 + 03",
+    "digits": [
+      5,
+      18,
+      23,
+      24,
+      27,
+      33,
+      3
+    ],
+    "red": [
+      5,
+      18,
+      23,
+      24,
+      27,
+      33
+    ],
+    "blue": 3,
+    "draw_time": "2026-08-04(二)",
+    "sale_amount": 345041020.0,
+    "sale_amount_text": "345,041,020",
+    "pool_balance": 489539135.0,
+    "pool_balance_text": "489,539,135",
+    "prize_levels": [],
+    "has_floating_pool": true,
+    "kind": "ssq"
+  },
+  {
+    "issue": "2026088",
+    "result": "06 07 11 18 22 33 + 05",
+    "digits": [
+      6,
+      7,
+      11,
+      18,
+      22,
+      33,
+      5
+    ],
+    "red": [
+      6,
+      7,
+      11,
+      18,
+      22,
+      33
+    ],
+    "blue": 5,
+    "draw_time": "2026-08-02(日)",
+    "sale_amount": 373747432.0,
+    "sale_amount_text": "373,747,432",
+    "pool_balance": 442158322.0,
+    "pool_balance_text": "442,158,322",
+    "prize_levels": [],
+    "has_floating_pool": true,
+    "kind": "ssq"
+  },
+  {
+    "issue": "2026087",
+    "result": "04 06 10 18 23 31 + 11",
+    "digits": [
+      4,
+      6,
+      10,
+      18,
+      23,
+      31,
+      11
+    ],
+    "red": [
+      4,
+      6,
+      10,
+      18,
+      23,
+      31
+    ],
+    "blue": 11,
+    "draw_time": "2026-07-30(四)",
+    "sale_amount": 349545040.0,
+    "sale_amount_text": "349,545,040",
+    "pool_balance": 473791046.0,
+    "pool_balance_text": "473,791,046",
+    "prize_levels": [],
+    "has_floating_pool": true,
+    "kind": "ssq"
+  },
+  {
+    "issue": "2026086",
+    "result": "02 05 14 25 30 32 + 05",
+    "digits": [
+      2,
+      5,
+      14,
+      25,
+      30,
+      32,
+      5
+    ],
+    "red": [
+      2,
+      5,
+      14,
+      25,
+      30,
+      32
+    ],
+    "blue": 5,
+    "draw_time": "2026-07-28(二)",
+    "sale_amount": 345608568.0,
+    "sale_amount_text": "345,608,568",
+    "pool_balance": 463257269.0,
+    "pool_balance_text": "463,257,269",
+    "prize_levels": [],
+    "has_floating_pool": true,
+    "kind": "ssq"
+  },
+  {
+    "issue": "2026085",
+    "result": "06 09 13 17 24 28 + 15",
+    "digits": [
+      6,
+      9,
+      13,
+      17,
+      24,
+      28,
+      15
+    ],
+    "red": [
+      6,
+      9,
+      13,
+      17,
+      24,
+      28
+    ],
+    "blue": 15,
+    "draw_time": "2026-07-26(日)",
+    "sale_amount": 368292652.0,
+    "sale_amount_text": "368,292,652",
+    "pool_balance": 450096595.0,
+    "pool_balance_text": "450,096,595",
+    "prize_levels": [],
+    "has_floating_pool": true,
+    "kind": "ssq"
+  },
+  {
+    "issue": "2026084",
+    "result": "01 05 06 10 12 16 + 05",
+    "digits": [
+      1,
+      5,
+      6,
+      10,
+      12,
+      16,
+      5
+    ],
+    "red": [
+      1,
+      5,
+      6,
+      10,
+      12,
+      16
+    ],
+    "blue": 5,
+    "draw_time": "2026-07-23(四)",
+    "sale_amount": 348718788.0,
+    "sale_amount_text": "348,718,788",
+    "pool_balance": 480566551.0,
+    "pool_balance_text": "480,566,551",
+    "prize_levels": [],
+    "has_floating_pool": true,
+    "kind": "ssq"
+  },
+  {
+    "issue": "2026083",
+    "result": "07 14 15 23 28 33 + 03",
+    "digits": [
+      7,
+      14,
+      15,
+      23,
+      28,
+      33,
+      3
+    ],
+    "red": [
+      7,
+      14,
+      15,
+      23,
+      28,
+      33
+    ],
+    "blue": 3,
+    "draw_time": "2026-07-21(二)",
+    "sale_amount": 348240258.0,
+    "sale_amount_text": "348,240,258",
+    "pool_balance": 480802779.0,
+    "pool_balance_text": "480,802,779",
+    "prize_levels": [],
+    "has_floating_pool": true,
+    "kind": "ssq"
+  },
+  {
+    "issue": "2026082",
+    "result": "05 07 10 14 21 28 + 04",
+    "digits": [
+      5,
+      7,
+      10,
+      14,
+      21,
+      28,
+      4
+    ],
+    "red": [
+      5,
+      7,
+      10,
+      14,
+      21,
+      28
+    ],
+    "blue": 4,
+    "draw_time": "2026-07-19(日)",
+    "sale_amount": 375000824.0,
+    "sale_amount_text": "375,000,824",
+    "pool_balance": 409487566.0,
+    "pool_balance_text": "409,487,566",
+    "prize_levels": [],
+    "has_floating_pool": true,
+    "kind": "ssq"
+  },
+  {
+    "issue": "2026081",
+    "result": "06 10 12 15 24 27 + 12",
+    "digits": [
+      6,
+      10,
+      12,
+      15,
+      24,
+      27,
+      12
+    ],
+    "red": [
+      6,
+      10,
+      12,
+      15,
+      24,
+      27
+    ],
+    "blue": 12,
+    "draw_time": "2026-07-16(四)",
+    "sale_amount": 350765488.0,
+    "sale_amount_text": "350,765,488",
+    "pool_balance": 401606257.0,
+    "pool_balance_text": "401,606,257",
+    "prize_levels": [],
+    "has_floating_pool": true,
+    "kind": "ssq"
+  },
+  {
+    "issue": "2026080",
+    "result": "04 05 11 19 27 32 + 01",
+    "digits": [
+      4,
+      5,
+      11,
+      19,
+      27,
+      32,
+      1
+    ],
+    "red": [
+      4,
+      5,
+      11,
+      19,
+      27,
+      32
+    ],
+    "blue": 1,
+    "draw_time": "2026-07-14(二)",
+    "sale_amount": 344697650.0,
+    "sale_amount_text": "344,697,650",
+    "pool_balance": 384218118.0,
+    "pool_balance_text": "384,218,118",
+    "prize_levels": [],
+    "has_floating_pool": true,
+    "kind": "ssq"
+  },
+  {
+    "issue": "2026079",
+    "result": "01 11 17 22 24 29 + 04",
+    "digits": [
+      1,
+      11,
+      17,
+      22,
+      24,
+      29,
+      4
+    ],
+    "red": [
+      1,
+      11,
+      17,
+      22,
+      24,
+      29
+    ],
+    "blue": 4,
+    "draw_time": "2026-07-12(日)",
+    "sale_amount": 373452200.0,
+    "sale_amount_text": "373,452,200",
+    "pool_balance": 367458887.0,
+    "pool_balance_text": "367,458,887",
+    "prize_levels": [],
+    "has_floating_pool": true,
+    "kind": "ssq"
+  },
+  {
+    "issue": "2026078",
+    "result": "07 11 14 16 27 28 + 06",
+    "digits": [
+      7,
+      11,
+      14,
+      16,
+      27,
+      28,
+      6
+    ],
+    "red": [
+      7,
+      11,
+      14,
+      16,
+      27,
+      28
+    ],
+    "blue": 6,
+    "draw_time": "2026-07-09(四)",
+    "sale_amount": 355852948.0,
+    "sale_amount_text": "355,852,948",
+    "pool_balance": 285632700.0,
+    "pool_balance_text": "285,632,700",
+    "prize_levels": [],
+    "has_floating_pool": true,
+    "kind": "ssq"
+  },
+  {
+    "issue": "2026077",
+    "result": "01 04 05 14 18 25 + 04",
+    "digits": [
+      1,
+      4,
+      5,
+      14,
+      18,
+      25,
+      4
+    ],
+    "red": [
+      1,
+      4,
+      5,
+      14,
+      18,
+      25
+    ],
+    "blue": 4,
+    "draw_time": "2026-07-07(二)",
+    "sale_amount": 353662546.0,
+    "sale_amount_text": "353,662,546",
+    "pool_balance": 320076738.0,
+    "pool_balance_text": "320,076,738",
+    "prize_levels": [],
+    "has_floating_pool": true,
+    "kind": "ssq"
+  },
+  {
+    "issue": "2026076",
+    "result": "01 03 19 20 24 25 + 07",
+    "digits": [
+      1,
+      3,
+      19,
+      20,
+      24,
+      25,
+      7
+    ],
+    "red": [
+      1,
+      3,
+      19,
+      20,
+      24,
+      25
+    ],
+    "blue": 7,
+    "draw_time": "2026-07-05(日)",
+    "sale_amount": 382507054.0,
+    "sale_amount_text": "382,507,054",
+    "pool_balance": 292048181.0,
+    "pool_balance_text": "292,048,181",
+    "prize_levels": [],
+    "has_floating_pool": true,
+    "kind": "ssq"
+  },
+  {
+    "issue": "2026075",
+    "result": "08 12 18 21 24 30 + 01",
+    "digits": [
+      8,
+      12,
+      18,
+      21,
+      24,
+      30,
+      1
+    ],
+    "red": [
+      8,
+      12,
+      18,
+      21,
+      24,
+      30
+    ],
+    "blue": 1,
+    "draw_time": "2026-07-02(四)",
+    "sale_amount": 370657052.0,
+    "sale_amount_text": "370,657,052",
+    "pool_balance": 283183968.0,
+    "pool_balance_text": "283,183,968",
+    "prize_levels": [],
+    "has_floating_pool": true,
+    "kind": "ssq"
+  },
+  {
+    "issue": "2026074",
+    "result": "02 23 24 26 28 32 + 04",
+    "digits": [
+      2,
+      23,
+      24,
+      26,
+      28,
+      32,
+      4
+    ],
+    "red": [
+      2,
+      23,
+      24,
+      26,
+      28,
+      32
+    ],
+    "blue": 4,
+    "draw_time": "2026-06-30(二)",
+    "sale_amount": 370952514.0,
+    "sale_amount_text": "370,952,514",
+    "pool_balance": 308183968.0,
+    "pool_balance_text": "308,183,968",
+    "prize_levels": [],
+    "has_floating_pool": true,
+    "kind": "ssq"
+  },
+  {
+    "issue": "2026073",
+    "result": "09 10 13 16 19 21 + 08",
+    "digits": [
+      9,
+      10,
+      13,
+      16,
+      19,
+      21,
+      8
+    ],
+    "red": [
+      9,
+      10,
+      13,
+      16,
+      19,
+      21
+    ],
+    "blue": 8,
+    "draw_time": "2026-06-28(日)",
+    "sale_amount": 398594042.0,
+    "sale_amount_text": "398,594,042",
+    "pool_balance": 328183968.0,
+    "pool_balance_text": "328,183,968",
+    "prize_levels": [],
+    "has_floating_pool": true,
+    "kind": "ssq"
+  },
+  {
+    "issue": "2026072",
+    "result": "07 08 12 15 17 21 + 01",
+    "digits": [
+      7,
+      8,
+      12,
+      15,
+      17,
+      21,
+      1
+    ],
+    "red": [
+      7,
+      8,
+      12,
+      15,
+      17,
+      21
+    ],
+    "blue": 1,
+    "draw_time": "2026-06-25(四)",
+    "sale_amount": 377591844.0,
+    "sale_amount_text": "377,591,844",
+    "pool_balance": 378183968.0,
+    "pool_balance_text": "378,183,968",
+    "prize_levels": [],
+    "has_floating_pool": true,
+    "kind": "ssq"
+  },
+  {
+    "issue": "2026071",
+    "result": "03 08 19 25 31 33 + 05",
+    "digits": [
+      3,
+      8,
+      19,
+      25,
+      31,
+      33,
+      5
+    ],
+    "red": [
+      3,
+      8,
+      19,
+      25,
+      31,
+      33
+    ],
+    "blue": 5,
+    "draw_time": "2026-06-23(二)",
+    "sale_amount": 373089958.0,
+    "sale_amount_text": "373,089,958",
+    "pool_balance": 398183968.0,
+    "pool_balance_text": "398,183,968",
+    "prize_levels": [],
+    "has_floating_pool": true,
+    "kind": "ssq"
+  },
+  {
+    "issue": "2026070",
+    "result": "03 06 08 14 26 27 + 08",
+    "digits": [
+      3,
+      6,
+      8,
+      14,
+      26,
+      27,
+      8
+    ],
+    "red": [
+      3,
+      6,
+      8,
+      14,
+      26,
+      27
+    ],
+    "blue": 8,
+    "draw_time": "2026-06-21(日)",
+    "sale_amount": 398555946.0,
+    "sale_amount_text": "398,555,946",
+    "pool_balance": 438183968.0,
+    "pool_balance_text": "438,183,968",
+    "prize_levels": [],
+    "has_floating_pool": true,
+    "kind": "ssq"
+  },
+  {
+    "issue": "2026069",
+    "result": "12 14 16 17 18 32 + 08",
+    "digits": [
+      12,
+      14,
+      16,
+      17,
+      18,
+      32,
+      8
+    ],
+    "red": [
+      12,
+      14,
+      16,
+      17,
+      18,
+      32
+    ],
+    "blue": 8,
+    "draw_time": "2026-06-18(四)",
+    "sale_amount": 373992648.0,
+    "sale_amount_text": "373,992,648",
+    "pool_balance": 493183968.0,
+    "pool_balance_text": "493,183,968",
+    "prize_levels": [],
+    "has_floating_pool": true,
+    "kind": "ssq"
+  },
+  {
+    "issue": "2026068",
+    "result": "03 05 16 18 29 32 + 04",
+    "digits": [
+      3,
+      5,
+      16,
+      18,
+      29,
+      32,
+      4
+    ],
+    "red": [
+      3,
+      5,
+      16,
+      18,
+      29,
+      32
+    ],
+    "blue": 4,
+    "draw_time": "2026-06-16(二)",
+    "sale_amount": 379517740.0,
+    "sale_amount_text": "379,517,740",
+    "pool_balance": 588469423.0,
+    "pool_balance_text": "588,469,423",
+    "prize_levels": [],
+    "has_floating_pool": true,
+    "kind": "ssq"
+  },
+  {
+    "issue": "2026067",
+    "result": "04 19 27 29 30 32 + 13",
+    "digits": [
+      4,
+      19,
+      27,
+      29,
+      30,
+      32,
+      13
+    ],
+    "red": [
+      4,
+      19,
+      27,
+      29,
+      30,
+      32
+    ],
+    "blue": 13,
+    "draw_time": "2026-06-14(日)",
+    "sale_amount": 414869642.0,
+    "sale_amount_text": "414,869,642",
+    "pool_balance": 658469423.0,
+    "pool_balance_text": "658,469,423",
+    "prize_levels": [],
+    "has_floating_pool": true,
+    "kind": "ssq"
+  },
+  {
+    "issue": "2026066",
+    "result": "05 11 21 23 24 29 + 16",
+    "digits": [
+      5,
+      11,
+      21,
+      23,
+      24,
+      29,
+      16
+    ],
+    "red": [
+      5,
+      11,
+      21,
+      23,
+      24,
+      29
+    ],
+    "blue": 16,
+    "draw_time": "2026-06-11(四)",
+    "sale_amount": 392786646.0,
+    "sale_amount_text": "392,786,646",
+    "pool_balance": 671837950.0,
+    "pool_balance_text": "671,837,950",
+    "prize_levels": [],
+    "has_floating_pool": true,
+    "kind": "ssq"
+  },
+  {
+    "issue": "2026065",
+    "result": "07 08 16 24 30 32 + 02",
+    "digits": [
+      7,
+      8,
+      16,
+      24,
+      30,
+      32,
+      2
+    ],
+    "red": [
+      7,
+      8,
+      16,
+      24,
+      30,
+      32
+    ],
+    "blue": 2,
+    "draw_time": "2026-06-09(二)",
+    "sale_amount": 386314046.0,
+    "sale_amount_text": "386,314,046",
+    "pool_balance": 706837950.0,
+    "pool_balance_text": "706,837,950",
+    "prize_levels": [],
+    "has_floating_pool": true,
+    "kind": "ssq"
+  },
+  {
+    "issue": "2026064",
+    "result": "01 09 15 18 29 33 + 15",
+    "digits": [
+      1,
+      9,
+      15,
+      18,
+      29,
+      33,
+      15
+    ],
+    "red": [
+      1,
+      9,
+      15,
+      18,
+      29,
+      33
+    ],
+    "blue": 15,
+    "draw_time": "2026-06-07(日)",
+    "sale_amount": 427210484.0,
+    "sale_amount_text": "427,210,484",
+    "pool_balance": 741837950.0,
+    "pool_balance_text": "741,837,950",
+    "prize_levels": [],
+    "has_floating_pool": true,
+    "kind": "ssq"
+  },
+  {
+    "issue": "2026063",
+    "result": "02 08 25 28 30 31 + 02",
+    "digits": [
+      2,
+      8,
+      25,
+      28,
+      30,
+      31,
+      2
+    ],
+    "red": [
+      2,
+      8,
+      25,
+      28,
+      30,
+      31
+    ],
+    "blue": 2,
+    "draw_time": "2026-06-04(四)",
+    "sale_amount": 393294950.0,
+    "sale_amount_text": "393,294,950",
+    "pool_balance": 816837950.0,
+    "pool_balance_text": "816,837,950",
+    "prize_levels": [],
+    "has_floating_pool": true,
+    "kind": "ssq"
+  },
+  {
+    "issue": "2026062",
+    "result": "02 04 07 14 28 29 + 09",
+    "digits": [
+      2,
+      4,
+      7,
+      14,
+      28,
+      29,
+      9
+    ],
+    "red": [
+      2,
+      4,
+      7,
+      14,
+      28,
+      29
+    ],
+    "blue": 9,
+    "draw_time": "2026-06-02(二)",
+    "sale_amount": 402189304.0,
+    "sale_amount_text": "402,189,304",
+    "pool_balance": 909990283.0,
+    "pool_balance_text": "909,990,283",
+    "prize_levels": [],
+    "has_floating_pool": true,
+    "kind": "ssq"
+  },
+  {
+    "issue": "2026061",
+    "result": "01 04 05 15 23 28 + 07",
+    "digits": [
+      1,
+      4,
+      5,
+      15,
+      23,
+      28,
+      7
+    ],
+    "red": [
+      1,
+      4,
+      5,
+      15,
+      23,
+      28
+    ],
+    "blue": 7,
+    "draw_time": "2026-05-31(日)",
+    "sale_amount": 429422172.0,
+    "sale_amount_text": "429,422,172",
+    "pool_balance": 1009990273.0,
+    "pool_balance_text": "1,009,990,273",
+    "prize_levels": [],
+    "has_floating_pool": true,
+    "kind": "ssq"
+  },
+  {
+    "issue": "2026060",
+    "result": "07 09 10 16 22 27 + 11",
+    "digits": [
+      7,
+      9,
+      10,
+      16,
+      22,
+      27,
+      11
+    ],
+    "red": [
+      7,
+      9,
+      10,
+      16,
+      22,
+      27
+    ],
+    "blue": 11,
+    "draw_time": "2026-05-28(四)",
+    "sale_amount": 398771788.0,
+    "sale_amount_text": "398,771,788",
+    "pool_balance": 1049990273.0,
+    "pool_balance_text": "1,049,990,273",
+    "prize_levels": [],
+    "has_floating_pool": true,
+    "kind": "ssq"
+  },
+  {
+    "issue": "2026059",
+    "result": "08 16 26 28 29 30 + 15",
+    "digits": [
+      8,
+      16,
+      26,
+      28,
+      29,
+      30,
+      15
+    ],
+    "red": [
+      8,
+      16,
+      26,
+      28,
+      29,
+      30
+    ],
+    "blue": 15,
+    "draw_time": "2026-05-26(二)",
+    "sale_amount": 392773558.0,
+    "sale_amount_text": "392,773,558",
+    "pool_balance": 1139990273.0,
+    "pool_balance_text": "1,139,990,273",
+    "prize_levels": [],
+    "has_floating_pool": true,
+    "kind": "ssq"
+  },
+  {
+    "issue": "2026058",
+    "result": "01 04 07 21 29 30 + 01",
+    "digits": [
+      1,
+      4,
+      7,
+      21,
+      29,
+      30,
+      1
+    ],
+    "red": [
+      1,
+      4,
+      7,
+      21,
+      29,
+      30
+    ],
+    "blue": 1,
+    "draw_time": "2026-05-24(日)",
+    "sale_amount": 425121686.0,
+    "sale_amount_text": "425,121,686",
+    "pool_balance": 1154771516.0,
+    "pool_balance_text": "1,154,771,516",
+    "prize_levels": [],
+    "has_floating_pool": true,
+    "kind": "ssq"
+  },
+  {
+    "issue": "2026057",
+    "result": "01 10 22 24 28 30 + 07",
+    "digits": [
+      1,
+      10,
+      22,
+      24,
+      28,
+      30,
+      7
+    ],
+    "red": [
+      1,
+      10,
+      22,
+      24,
+      28,
+      30
+    ],
+    "blue": 7,
+    "draw_time": "2026-05-21(四)",
+    "sale_amount": 397400020.0,
+    "sale_amount_text": "397,400,020",
+    "pool_balance": 1199771516.0,
+    "pool_balance_text": "1,199,771,516",
+    "prize_levels": [],
+    "has_floating_pool": true,
+    "kind": "ssq"
+  },
+  {
+    "issue": "2026056",
+    "result": "10 19 21 22 31 33 + 05",
+    "digits": [
+      10,
+      19,
+      21,
+      22,
+      31,
+      33,
+      5
+    ],
+    "red": [
+      10,
+      19,
+      21,
+      22,
+      31,
+      33
+    ],
+    "blue": 5,
+    "draw_time": "2026-05-19(二)",
+    "sale_amount": 391304582.0,
+    "sale_amount_text": "391,304,582",
+    "pool_balance": 1229771516.0,
+    "pool_balance_text": "1,229,771,516",
+    "prize_levels": [],
+    "has_floating_pool": true,
+    "kind": "ssq"
+  },
+  {
+    "issue": "2026055",
+    "result": "04 11 24 25 32 33 + 13",
+    "digits": [
+      4,
+      11,
+      24,
+      25,
+      32,
+      33,
+      13
+    ],
+    "red": [
+      4,
+      11,
+      24,
+      25,
+      32,
+      33
+    ],
+    "blue": 13,
+    "draw_time": "2026-05-17(日)",
+    "sale_amount": 422769486.0,
+    "sale_amount_text": "422,769,486",
+    "pool_balance": 1237107160.0,
+    "pool_balance_text": "1,237,107,160",
+    "prize_levels": [],
+    "has_floating_pool": true,
+    "kind": "ssq"
+  },
+  {
+    "issue": "2026054",
+    "result": "13 20 25 29 30 33 + 02",
+    "digits": [
+      13,
+      20,
+      25,
+      29,
+      30,
+      33,
+      2
+    ],
+    "red": [
+      13,
+      20,
+      25,
+      29,
+      30,
+      33
+    ],
+    "blue": 2,
+    "draw_time": "2026-05-14(四)",
+    "sale_amount": 391858874.0,
+    "sale_amount_text": "391,858,874",
+    "pool_balance": 1251883761.0,
+    "pool_balance_text": "1,251,883,761",
+    "prize_levels": [],
+    "has_floating_pool": true,
+    "kind": "ssq"
+  },
+  {
+    "issue": "2026053",
+    "result": "01 02 03 08 13 14 + 02",
+    "digits": [
+      1,
+      2,
+      3,
+      8,
+      13,
+      14,
+      2
+    ],
+    "red": [
+      1,
+      2,
+      3,
+      8,
+      13,
+      14
+    ],
+    "blue": 2,
+    "draw_time": "2026-05-12(二)",
+    "sale_amount": 395029142.0,
+    "sale_amount_text": "395,029,142",
+    "pool_balance": 1276883761.0,
+    "pool_balance_text": "1,276,883,761",
+    "prize_levels": [],
+    "has_floating_pool": true,
+    "kind": "ssq"
+  },
+  {
+    "issue": "2026052",
+    "result": "01 03 11 22 26 31 + 11",
+    "digits": [
+      1,
+      3,
+      11,
+      22,
+      26,
+      31,
+      11
+    ],
+    "red": [
+      1,
+      3,
+      11,
+      22,
+      26,
+      31
+    ],
+    "blue": 11,
+    "draw_time": "2026-05-10(日)",
+    "sale_amount": 417267288.0,
+    "sale_amount_text": "417,267,288",
+    "pool_balance": 1306883761.0,
+    "pool_balance_text": "1,306,883,761",
+    "prize_levels": [],
+    "has_floating_pool": true,
+    "kind": "ssq"
+  },
+  {
+    "issue": "2026051",
+    "result": "09 14 15 16 29 30 + 10",
+    "digits": [
+      9,
+      14,
+      15,
+      16,
+      29,
+      30,
+      10
+    ],
+    "red": [
+      9,
+      14,
+      15,
+      16,
+      29,
+      30
+    ],
+    "blue": 10,
+    "draw_time": "2026-05-07(四)",
+    "sale_amount": 386809756.0,
+    "sale_amount_text": "386,809,756",
+    "pool_balance": 1400262206.0,
+    "pool_balance_text": "1,400,262,206",
+    "prize_levels": [],
+    "has_floating_pool": true,
+    "kind": "ssq"
+  },
+  {
+    "issue": "2026050",
+    "result": "06 09 25 27 28 30 + 03",
+    "digits": [
+      6,
+      9,
+      25,
+      27,
+      28,
+      30,
+      3
+    ],
+    "red": [
+      6,
+      9,
+      25,
+      27,
+      28,
+      30
+    ],
+    "blue": 3,
+    "draw_time": "2026-05-05(二)",
+    "sale_amount": 368215788.0,
+    "sale_amount_text": "368,215,788",
+    "pool_balance": 1470262206.0,
+    "pool_balance_text": "1,470,262,206",
+    "prize_levels": [],
+    "has_floating_pool": true,
+    "kind": "ssq"
+  },
+  {
+    "issue": "2026049",
+    "result": "03 04 14 15 18 20 + 02",
+    "digits": [
+      3,
+      4,
+      14,
+      15,
+      18,
+      20,
+      2
+    ],
+    "red": [
+      3,
+      4,
+      14,
+      15,
+      18,
+      20
+    ],
+    "blue": 2,
+    "draw_time": "2026-05-03(日)",
+    "sale_amount": 378548054.0,
+    "sale_amount_text": "378,548,054",
+    "pool_balance": 1490262206.0,
+    "pool_balance_text": "1,490,262,206",
+    "prize_levels": [],
+    "has_floating_pool": true,
+    "kind": "ssq"
+  },
+  {
+    "issue": "2026048",
+    "result": "09 15 18 24 28 33 + 01",
+    "digits": [
+      9,
+      15,
+      18,
+      24,
+      28,
+      33,
+      1
+    ],
+    "red": [
+      9,
+      15,
+      18,
+      24,
+      28,
+      33
+    ],
+    "blue": 1,
+    "draw_time": "2026-04-30(四)",
+    "sale_amount": 381163108.0,
+    "sale_amount_text": "381,163,108",
+    "pool_balance": 1520262206.0,
+    "pool_balance_text": "1,520,262,206",
+    "prize_levels": [],
+    "has_floating_pool": true,
+    "kind": "ssq"
+  },
+  {
+    "issue": "2026047",
+    "result": "07 16 21 24 27 30 + 07",
+    "digits": [
+      7,
+      16,
+      21,
+      24,
+      27,
+      30,
+      7
+    ],
+    "red": [
+      7,
+      16,
+      21,
+      24,
+      27,
+      30
+    ],
+    "blue": 7,
+    "draw_time": "2026-04-28(二)",
+    "sale_amount": 383992530.0,
+    "sale_amount_text": "383,992,530",
+    "pool_balance": 1505111504.0,
+    "pool_balance_text": "1,505,111,504",
+    "prize_levels": [],
+    "has_floating_pool": true,
+    "kind": "ssq"
+  },
+  {
+    "issue": "2026046",
+    "result": "02 09 10 24 31 33 + 16",
+    "digits": [
+      2,
+      9,
+      10,
+      24,
+      31,
+      33,
+      16
+    ],
+    "red": [
+      2,
+      9,
+      10,
+      24,
+      31,
+      33
+    ],
+    "blue": 16,
+    "draw_time": "2026-04-26(日)",
+    "sale_amount": 425615512.0,
+    "sale_amount_text": "425,615,512",
+    "pool_balance": 1535111504.0,
+    "pool_balance_text": "1,535,111,504",
+    "prize_levels": [],
+    "has_floating_pool": true,
+    "kind": "ssq"
+  },
+  {
+    "issue": "2026045",
+    "result": "04 11 15 17 24 30 + 15",
+    "digits": [
+      4,
+      11,
+      15,
+      17,
+      24,
+      30,
+      15
+    ],
+    "red": [
+      4,
+      11,
+      15,
+      17,
+      24,
+      30
+    ],
+    "blue": 15,
+    "draw_time": "2026-04-23(四)",
+    "sale_amount": 395637026.0,
+    "sale_amount_text": "395,637,026",
+    "pool_balance": 1559981238.0,
+    "pool_balance_text": "1,559,981,238",
+    "prize_levels": [],
+    "has_floating_pool": true,
+    "kind": "ssq"
+  },
+  {
+    "issue": "2026044",
+    "result": "02 14 17 18 22 30 + 01",
+    "digits": [
+      2,
+      14,
+      17,
+      18,
+      22,
+      30,
+      1
+    ],
+    "red": [
+      2,
+      14,
+      17,
+      18,
+      22,
+      30
+    ],
+    "blue": 1,
+    "draw_time": "2026-04-21(二)",
+    "sale_amount": 395282770.0,
+    "sale_amount_text": "395,282,770",
+    "pool_balance": 1619981238.0,
+    "pool_balance_text": "1,619,981,238",
+    "prize_levels": [],
+    "has_floating_pool": true,
+    "kind": "ssq"
+  },
+  {
+    "issue": "2026043",
+    "result": "06 09 14 16 25 32 + 16",
+    "digits": [
+      6,
+      9,
+      14,
+      16,
+      25,
+      32,
+      16
+    ],
+    "red": [
+      6,
+      9,
+      14,
+      16,
+      25,
+      32
+    ],
+    "blue": 16,
+    "draw_time": "2026-04-19(日)",
+    "sale_amount": 423102342.0,
+    "sale_amount_text": "423,102,342",
+    "pool_balance": 1649981238.0,
+    "pool_balance_text": "1,649,981,238",
+    "prize_levels": [],
+    "has_floating_pool": true,
+    "kind": "ssq"
+  },
+  {
+    "issue": "2026042",
+    "result": "02 07 12 19 24 31 + 10",
+    "digits": [
+      2,
+      7,
+      12,
+      19,
+      24,
+      31,
+      10
+    ],
+    "red": [
+      2,
+      7,
+      12,
+      19,
+      24,
+      31
+    ],
+    "blue": 10,
+    "draw_time": "2026-04-16(四)",
+    "sale_amount": 400801534.0,
+    "sale_amount_text": "400,801,534",
+    "pool_balance": 1729981238.0,
+    "pool_balance_text": "1,729,981,238",
+    "prize_levels": [],
+    "has_floating_pool": true,
+    "kind": "ssq"
+  },
+  {
+    "issue": "2026041",
+    "result": "02 08 10 17 19 24 + 13",
+    "digits": [
+      2,
+      8,
+      10,
+      17,
+      19,
+      24,
+      13
+    ],
+    "red": [
+      2,
+      8,
+      10,
+      17,
+      19,
+      24
+    ],
+    "blue": 13,
+    "draw_time": "2026-04-14(二)",
+    "sale_amount": 396284492.0,
+    "sale_amount_text": "396,284,492",
+    "pool_balance": 1799981238.0,
+    "pool_balance_text": "1,799,981,238",
+    "prize_levels": [],
+    "has_floating_pool": true,
+    "kind": "ssq"
+  },
+  {
+    "issue": "2026040",
+    "result": "03 04 14 22 23 33 + 04",
+    "digits": [
+      3,
+      4,
+      14,
+      22,
+      23,
+      33,
+      4
+    ],
+    "red": [
+      3,
+      4,
+      14,
+      22,
+      23,
+      33
+    ],
+    "blue": 4,
+    "draw_time": "2026-04-12(日)",
+    "sale_amount": 421923472.0,
+    "sale_amount_text": "421,923,472",
+    "pool_balance": 1869981238.0,
+    "pool_balance_text": "1,869,981,238",
+    "prize_levels": [],
+    "has_floating_pool": true,
+    "kind": "ssq"
+  },
+  {
+    "issue": "2026039",
+    "result": "08 17 18 21 25 30 + 05",
+    "digits": [
+      8,
+      17,
+      18,
+      21,
+      25,
+      30,
+      5
+    ],
+    "red": [
+      8,
+      17,
+      18,
+      21,
+      25,
+      30
+    ],
+    "blue": 5,
+    "draw_time": "2026-04-09(四)",
+    "sale_amount": 393444014.0,
+    "sale_amount_text": "393,444,014",
+    "pool_balance": 1934981238.0,
+    "pool_balance_text": "1,934,981,238",
+    "prize_levels": [],
+    "has_floating_pool": true,
+    "kind": "ssq"
+  },
+  {
+    "issue": "2026038",
+    "result": "01 02 13 23 25 27 + 05",
+    "digits": [
+      1,
+      2,
+      13,
+      23,
+      25,
+      27,
+      5
+    ],
+    "red": [
+      1,
+      2,
+      13,
+      23,
+      25,
+      27
+    ],
+    "blue": 5,
+    "draw_time": "2026-04-07(二)",
+    "sale_amount": 382309000.0,
+    "sale_amount_text": "382,309,000",
+    "pool_balance": 1933841973.0,
+    "pool_balance_text": "1,933,841,973",
+    "prize_levels": [],
+    "has_floating_pool": true,
+    "kind": "ssq"
+  },
+  {
+    "issue": "2026037",
+    "result": "11 22 27 29 31 33 + 12",
+    "digits": [
+      11,
+      22,
+      27,
+      29,
+      31,
+      33,
+      12
+    ],
+    "red": [
+      11,
+      22,
+      27,
+      29,
+      31,
+      33
+    ],
+    "blue": 12,
+    "draw_time": "2026-04-05(日)",
+    "sale_amount": 398672542.0,
+    "sale_amount_text": "398,672,542",
+    "pool_balance": 1973841973.0,
+    "pool_balance_text": "1,973,841,973",
+    "prize_levels": [],
+    "has_floating_pool": true,
+    "kind": "ssq"
+  },
+  {
+    "issue": "2026036",
+    "result": "06 10 12 15 22 28 + 08",
+    "digits": [
+      6,
+      10,
+      12,
+      15,
+      22,
+      28,
+      8
+    ],
+    "red": [
+      6,
+      10,
+      12,
+      15,
+      22,
+      28
+    ],
+    "blue": 8,
+    "draw_time": "2026-04-02(四)",
+    "sale_amount": 398552206.0,
+    "sale_amount_text": "398,552,206",
+    "pool_balance": 2063784926.0,
+    "pool_balance_text": "2,063,784,926",
+    "prize_levels": [],
+    "has_floating_pool": true,
+    "kind": "ssq"
+  },
+  {
+    "issue": "2026035",
+    "result": "02 06 12 24 25 32 + 02",
+    "digits": [
+      2,
+      6,
+      12,
+      24,
+      25,
+      32,
+      2
+    ],
+    "red": [
+      2,
+      6,
+      12,
+      24,
+      25,
+      32
+    ],
+    "blue": 2,
+    "draw_time": "2026-03-31(二)",
+    "sale_amount": 389527084.0,
+    "sale_amount_text": "389,527,084",
+    "pool_balance": 2108784926.0,
+    "pool_balance_text": "2,108,784,926",
+    "prize_levels": [],
+    "has_floating_pool": true,
+    "kind": "ssq"
+  },
+  {
+    "issue": "2026034",
+    "result": "01 03 07 13 22 23 + 07",
+    "digits": [
+      1,
+      3,
+      7,
+      13,
+      22,
+      23,
+      7
+    ],
+    "red": [
+      1,
+      3,
+      7,
+      13,
+      22,
+      23
+    ],
+    "blue": 7,
+    "draw_time": "2026-03-29(日)",
+    "sale_amount": 425726210.0,
+    "sale_amount_text": "425,726,210",
+    "pool_balance": 2138784926.0,
+    "pool_balance_text": "2,138,784,926",
+    "prize_levels": [],
+    "has_floating_pool": true,
+    "kind": "ssq"
+  },
+  {
+    "issue": "2026033",
+    "result": "03 06 13 21 28 29 + 06",
+    "digits": [
+      3,
+      6,
+      13,
+      21,
+      28,
+      29,
+      6
+    ],
+    "red": [
+      3,
+      6,
+      13,
+      21,
+      28,
+      29
+    ],
+    "blue": 6,
+    "draw_time": "2026-03-26(四)",
+    "sale_amount": 397739574.0,
+    "sale_amount_text": "397,739,574",
+    "pool_balance": 2203784926.0,
+    "pool_balance_text": "2,203,784,926",
+    "prize_levels": [],
+    "has_floating_pool": true,
+    "kind": "ssq"
+  },
+  {
+    "issue": "2026032",
+    "result": "01 03 11 18 31 33 + 02",
+    "digits": [
+      1,
+      3,
+      11,
+      18,
+      31,
+      33,
+      2
+    ],
+    "red": [
+      1,
+      3,
+      11,
+      18,
+      31,
+      33
+    ],
+    "blue": 2,
+    "draw_time": "2026-03-24(二)",
+    "sale_amount": 392702390.0,
+    "sale_amount_text": "392,702,390",
+    "pool_balance": 2278784926.0,
+    "pool_balance_text": "2,278,784,926",
+    "prize_levels": [],
+    "has_floating_pool": true,
+    "kind": "ssq"
+  },
+  {
+    "issue": "2026031",
+    "result": "03 10 12 13 18 33 + 08",
+    "digits": [
+      3,
+      10,
+      12,
+      13,
+      18,
+      33,
+      8
+    ],
+    "red": [
+      3,
+      10,
+      12,
+      13,
+      18,
+      33
+    ],
+    "blue": 8,
+    "draw_time": "2026-03-22(日)",
+    "sale_amount": 430685136.0,
+    "sale_amount_text": "430,685,136",
+    "pool_balance": 2308784926.0,
+    "pool_balance_text": "2,308,784,926",
+    "prize_levels": [],
+    "has_floating_pool": true,
+    "kind": "ssq"
+  },
+  {
+    "issue": "2026030",
+    "result": "10 11 14 19 22 24 + 04",
+    "digits": [
+      10,
+      11,
+      14,
+      19,
+      22,
+      24,
+      4
+    ],
+    "red": [
+      10,
+      11,
+      14,
+      19,
+      22,
+      24
+    ],
+    "blue": 4,
+    "draw_time": "2026-03-19(四)",
+    "sale_amount": 401991268.0,
+    "sale_amount_text": "401,991,268",
+    "pool_balance": 2358784926.0,
+    "pool_balance_text": "2,358,784,926",
+    "prize_levels": [],
+    "has_floating_pool": true,
+    "kind": "ssq"
+  },
+  {
+    "issue": "2026029",
+    "result": "06 19 22 23 28 31 + 05",
+    "digits": [
+      6,
+      19,
+      22,
+      23,
+      28,
+      31,
+      5
+    ],
+    "red": [
+      6,
+      19,
+      22,
+      23,
+      28,
+      31
+    ],
+    "blue": 5,
+    "draw_time": "2026-03-17(二)",
+    "sale_amount": 390925844.0,
+    "sale_amount_text": "390,925,844",
+    "pool_balance": 2383784926.0,
+    "pool_balance_text": "2,383,784,926",
+    "prize_levels": [],
+    "has_floating_pool": true,
+    "kind": "ssq"
+  },
+  {
+    "issue": "2026028",
+    "result": "02 06 09 17 25 28 + 15",
+    "digits": [
+      2,
+      6,
+      9,
+      17,
+      25,
+      28,
+      15
+    ],
+    "red": [
+      2,
+      6,
+      9,
+      17,
+      25,
+      28
+    ],
+    "blue": 15,
+    "draw_time": "2026-03-15(日)",
+    "sale_amount": 425241582.0,
+    "sale_amount_text": "425,241,582",
+    "pool_balance": 2403784926.0,
+    "pool_balance_text": "2,403,784,926",
+    "prize_levels": [],
+    "has_floating_pool": true,
+    "kind": "ssq"
+  },
+  {
+    "issue": "2026027",
+    "result": "02 13 17 18 25 26 + 13",
+    "digits": [
+      2,
+      13,
+      17,
+      18,
+      25,
+      26,
+      13
+    ],
+    "red": [
+      2,
+      13,
+      17,
+      18,
+      25,
+      26
+    ],
+    "blue": 13,
+    "draw_time": "2026-03-12(四)",
+    "sale_amount": 397777968.0,
+    "sale_amount_text": "397,777,968",
+    "pool_balance": 2428784926.0,
+    "pool_balance_text": "2,428,784,926",
+    "prize_levels": [],
+    "has_floating_pool": true,
+    "kind": "ssq"
+  },
+  {
+    "issue": "2026026",
+    "result": "02 09 16 22 25 29 + 03",
+    "digits": [
+      2,
+      9,
+      16,
+      22,
+      25,
+      29,
+      3
+    ],
+    "red": [
+      2,
+      9,
+      16,
+      22,
+      25,
+      29
+    ],
+    "blue": 3,
+    "draw_time": "2026-03-10(二)",
+    "sale_amount": 377828982.0,
+    "sale_amount_text": "377,828,982",
+    "pool_balance": 2518926159.0,
+    "pool_balance_text": "2,518,926,159",
+    "prize_levels": [],
+    "has_floating_pool": true,
+    "kind": "ssq"
+  },
+  {
+    "issue": "2026025",
+    "result": "02 03 15 20 23 24 + 10",
+    "digits": [
+      2,
+      3,
+      15,
+      20,
+      23,
+      24,
+      10
+    ],
+    "red": [
+      2,
+      3,
+      15,
+      20,
+      23,
+      24
+    ],
+    "blue": 10,
+    "draw_time": "2026-03-08(日)",
+    "sale_amount": 404403816.0,
+    "sale_amount_text": "404,403,816",
+    "pool_balance": 2553926159.0,
+    "pool_balance_text": "2,553,926,159",
+    "prize_levels": [],
+    "has_floating_pool": true,
+    "kind": "ssq"
+  },
+  {
+    "issue": "2026024",
+    "result": "01 02 13 21 23 29 + 14",
+    "digits": [
+      1,
+      2,
+      13,
+      21,
+      23,
+      29,
+      14
+    ],
+    "red": [
+      1,
+      2,
+      13,
+      21,
+      23,
+      29
+    ],
+    "blue": 14,
+    "draw_time": "2026-03-05(四)",
+    "sale_amount": 370443834.0,
+    "sale_amount_text": "370,443,834",
+    "pool_balance": 2588926159.0,
+    "pool_balance_text": "2,588,926,159",
+    "prize_levels": [],
+    "has_floating_pool": true,
+    "kind": "ssq"
+  },
+  {
+    "issue": "2026023",
+    "result": "01 03 08 10 23 29 + 06",
+    "digits": [
+      1,
+      3,
+      8,
+      10,
+      23,
+      29,
+      6
+    ],
+    "red": [
+      1,
+      3,
+      8,
+      10,
+      23,
+      29
+    ],
+    "blue": 6,
+    "draw_time": "2026-03-03(二)",
+    "sale_amount": 361967792.0,
+    "sale_amount_text": "361,967,792",
+    "pool_balance": 2592273374.0,
+    "pool_balance_text": "2,592,273,374",
+    "prize_levels": [],
+    "has_floating_pool": true,
+    "kind": "ssq"
+  },
+  {
+    "issue": "2026022",
+    "result": "15 18 23 25 28 32 + 11",
+    "digits": [
+      15,
+      18,
+      23,
+      25,
+      28,
+      32,
+      11
+    ],
+    "red": [
+      15,
+      18,
+      23,
+      25,
+      28,
+      32
+    ],
+    "blue": 11,
+    "draw_time": "2026-03-01(日)",
+    "sale_amount": 380507698.0,
+    "sale_amount_text": "380,507,698",
+    "pool_balance": 2652273374.0,
+    "pool_balance_text": "2,652,273,374",
+    "prize_levels": [],
+    "has_floating_pool": true,
+    "kind": "ssq"
+  },
+  {
+    "issue": "2026021",
+    "result": "03 13 25 26 30 31 + 04",
+    "digits": [
+      3,
+      13,
+      25,
+      26,
+      30,
+      31,
+      4
+    ],
+    "red": [
+      3,
+      13,
+      25,
+      26,
+      30,
+      31
+    ],
+    "blue": 4,
+    "draw_time": "2026-02-26(四)",
+    "sale_amount": 351619166.0,
+    "sale_amount_text": "351,619,166",
+    "pool_balance": 2682273374.0,
+    "pool_balance_text": "2,682,273,374",
+    "prize_levels": [],
+    "has_floating_pool": true,
+    "kind": "ssq"
+  },
+  {
+    "issue": "2026020",
+    "result": "01 13 14 21 24 30 + 02",
+    "digits": [
+      1,
+      13,
+      14,
+      21,
+      24,
+      30,
+      2
+    ],
+    "red": [
+      1,
+      13,
+      14,
+      21,
+      24,
+      30
+    ],
+    "blue": 2,
+    "draw_time": "2026-02-24(二)",
+    "sale_amount": 381989060.0,
+    "sale_amount_text": "381,989,060",
+    "pool_balance": 2712273374.0,
+    "pool_balance_text": "2,712,273,374",
+    "prize_levels": [],
+    "has_floating_pool": true,
+    "kind": "ssq"
+  },
+  {
+    "issue": "2026019",
+    "result": "07 08 16 17 18 30 + 01",
+    "digits": [
+      7,
+      8,
+      16,
+      17,
+      18,
+      30,
+      1
+    ],
+    "red": [
+      7,
+      8,
+      16,
+      17,
+      18,
+      30
+    ],
+    "blue": 1,
+    "draw_time": "2026-02-12(四)",
+    "sale_amount": 428387634.0,
+    "sale_amount_text": "428,387,634",
+    "pool_balance": 2716368081.0,
+    "pool_balance_text": "2,716,368,081",
+    "prize_levels": [],
+    "has_floating_pool": true,
+    "kind": "ssq"
+  },
+  {
+    "issue": "2026018",
+    "result": "11 15 17 22 25 30 + 07",
+    "digits": [
+      11,
+      15,
+      17,
+      22,
+      25,
+      30,
+      7
+    ],
+    "red": [
+      11,
+      15,
+      17,
+      22,
+      25,
+      30
+    ],
+    "blue": 7,
+    "draw_time": "2026-02-10(二)",
+    "sale_amount": 365733450.0,
+    "sale_amount_text": "365,733,450",
+    "pool_balance": 2751368081.0,
+    "pool_balance_text": "2,751,368,081",
+    "prize_levels": [],
+    "has_floating_pool": true,
+    "kind": "ssq"
+  },
+  {
+    "issue": "2026017",
+    "result": "01 03 05 18 29 32 + 04",
+    "digits": [
+      1,
+      3,
+      5,
+      18,
+      29,
+      32,
+      4
+    ],
+    "red": [
+      1,
+      3,
+      5,
+      18,
+      29,
+      32
+    ],
+    "blue": 4,
+    "draw_time": "2026-02-08(日)",
+    "sale_amount": 387896530.0,
+    "sale_amount_text": "387,896,530",
+    "pool_balance": 2781368081.0,
+    "pool_balance_text": "2,781,368,081",
+    "prize_levels": [],
+    "has_floating_pool": true,
+    "kind": "ssq"
+  },
+  {
+    "issue": "2026016",
+    "result": "04 05 09 10 27 30 + 13",
+    "digits": [
+      4,
+      5,
+      9,
+      10,
+      27,
+      30,
+      13
+    ],
+    "red": [
+      4,
+      5,
+      9,
+      10,
+      27,
+      30
+    ],
+    "blue": 13,
+    "draw_time": "2026-02-05(四)",
+    "sale_amount": 364669398.0,
+    "sale_amount_text": "364,669,398",
+    "pool_balance": 2811368081.0,
+    "pool_balance_text": "2,811,368,081",
+    "prize_levels": [],
+    "has_floating_pool": true,
+    "kind": "ssq"
+  },
+  {
+    "issue": "2026015",
+    "result": "07 10 13 22 27 31 + 12",
+    "digits": [
+      7,
+      10,
+      13,
+      22,
+      27,
+      31,
+      12
+    ],
+    "red": [
+      7,
+      10,
+      13,
+      22,
+      27,
+      31
+    ],
+    "blue": 12,
+    "draw_time": "2026-02-03(二)",
+    "sale_amount": 359738534.0,
+    "sale_amount_text": "359,738,534",
+    "pool_balance": 2851368081.0,
+    "pool_balance_text": "2,851,368,081",
+    "prize_levels": [],
+    "has_floating_pool": true,
+    "kind": "ssq"
+  },
+  {
+    "issue": "2026014",
+    "result": "07 13 19 22 26 32 + 01",
+    "digits": [
+      7,
+      13,
+      19,
+      22,
+      26,
+      32,
+      1
+    ],
+    "red": [
+      7,
+      13,
+      19,
+      22,
+      26,
+      32
+    ],
+    "blue": 1,
+    "draw_time": "2026-02-01(日)",
+    "sale_amount": 386492580.0,
+    "sale_amount_text": "386,492,580",
+    "pool_balance": 2876368081.0,
+    "pool_balance_text": "2,876,368,081",
+    "prize_levels": [],
+    "has_floating_pool": true,
+    "kind": "ssq"
+  },
+  {
+    "issue": "2026013",
+    "result": "04 09 12 13 16 20 + 01",
+    "digits": [
+      4,
+      9,
+      12,
+      13,
+      16,
+      20,
+      1
+    ],
+    "red": [
+      4,
+      9,
+      12,
+      13,
+      16,
+      20
+    ],
+    "blue": 1,
+    "draw_time": "2026-01-29(四)",
+    "sale_amount": 380549690.0,
+    "sale_amount_text": "380,549,690",
+    "pool_balance": 2961315457.0,
+    "pool_balance_text": "2,961,315,457",
+    "prize_levels": [],
+    "has_floating_pool": true,
+    "kind": "ssq"
+  },
+  {
+    "issue": "2026012",
+    "result": "03 05 07 16 20 24 + 08",
+    "digits": [
+      3,
+      5,
+      7,
+      16,
+      20,
+      24,
+      8
+    ],
+    "red": [
+      3,
+      5,
+      7,
+      16,
+      20,
+      24
+    ],
+    "blue": 8,
+    "draw_time": "2026-01-27(二)",
+    "sale_amount": 358422924.0,
+    "sale_amount_text": "358,422,924",
+    "pool_balance": 2925358915.0,
+    "pool_balance_text": "2,925,358,915",
+    "prize_levels": [],
+    "has_floating_pool": true,
+    "kind": "ssq"
+  },
+  {
+    "issue": "2026011",
+    "result": "02 03 04 20 31 32 + 04",
+    "digits": [
+      2,
+      3,
+      4,
+      20,
+      31,
+      32,
+      4
+    ],
+    "red": [
+      2,
+      3,
+      4,
+      20,
+      31,
+      32
+    ],
+    "blue": 4,
+    "draw_time": "2026-01-25(日)",
+    "sale_amount": 394441490.0,
+    "sale_amount_text": "394,441,490",
+    "pool_balance": 2925771107.0,
+    "pool_balance_text": "2,925,771,107",
+    "prize_levels": [],
+    "has_floating_pool": true,
+    "kind": "ssq"
+  },
+  {
+    "issue": "2026010",
+    "result": "04 09 10 15 19 26 + 12",
+    "digits": [
+      4,
+      9,
+      10,
+      15,
+      19,
+      26,
+      12
+    ],
+    "red": [
+      4,
+      9,
+      10,
+      15,
+      19,
+      26
+    ],
+    "blue": 12,
+    "draw_time": "2026-01-22(四)",
+    "sale_amount": 358486254.0,
+    "sale_amount_text": "358,486,254",
+    "pool_balance": 2865932466.0,
+    "pool_balance_text": "2,865,932,466",
+    "prize_levels": [],
+    "has_floating_pool": true,
+    "kind": "ssq"
+  },
+  {
+    "issue": "2026009",
+    "result": "03 06 13 19 23 25 + 10",
+    "digits": [
+      3,
+      6,
+      13,
+      19,
+      23,
+      25,
+      10
+    ],
+    "red": [
+      3,
+      6,
+      13,
+      19,
+      23,
+      25
+    ],
+    "blue": 10,
+    "draw_time": "2026-01-20(二)",
+    "sale_amount": 347159860.0,
+    "sale_amount_text": "347,159,860",
+    "pool_balance": 2924245047.0,
+    "pool_balance_text": "2,924,245,047",
+    "prize_levels": [],
+    "has_floating_pool": true,
+    "kind": "ssq"
+  },
+  {
+    "issue": "2026008",
+    "result": "06 09 16 27 31 33 + 10",
+    "digits": [
+      6,
+      9,
+      16,
+      27,
+      31,
+      33,
+      10
+    ],
+    "red": [
+      6,
+      9,
+      16,
+      27,
+      31,
+      33
+    ],
+    "blue": 10,
+    "draw_time": "2026-01-18(日)",
+    "sale_amount": 388652642.0,
+    "sale_amount_text": "388,652,642",
+    "pool_balance": 2921931052.0,
+    "pool_balance_text": "2,921,931,052",
+    "prize_levels": [],
+    "has_floating_pool": true,
+    "kind": "ssq"
+  },
+  {
+    "issue": "2026007",
+    "result": "09 13 19 27 29 30 + 01",
+    "digits": [
+      9,
+      13,
+      19,
+      27,
+      29,
+      30,
+      1
+    ],
+    "red": [
+      9,
+      13,
+      19,
+      27,
+      29,
+      30
+    ],
+    "blue": 1,
+    "draw_time": "2026-01-15(四)",
+    "sale_amount": 360236814.0,
+    "sale_amount_text": "360,236,814",
+    "pool_balance": 2890464389.0,
+    "pool_balance_text": "2,890,464,389",
+    "prize_levels": [],
+    "has_floating_pool": true,
+    "kind": "ssq"
+  },
+  {
+    "issue": "2026006",
+    "result": "02 06 22 23 24 28 + 15",
+    "digits": [
+      2,
+      6,
+      22,
+      23,
+      24,
+      28,
+      15
+    ],
+    "red": [
+      2,
+      6,
+      22,
+      23,
+      24,
+      28
+    ],
+    "blue": 15,
+    "draw_time": "2026-01-13(二)",
+    "sale_amount": 352228044.0,
+    "sale_amount_text": "352,228,044",
+    "pool_balance": 2880241083.0,
+    "pool_balance_text": "2,880,241,083",
+    "prize_levels": [],
+    "has_floating_pool": true,
+    "kind": "ssq"
+  }
+]

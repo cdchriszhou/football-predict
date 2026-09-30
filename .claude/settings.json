@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -c \"from crawler.odds_crawler import _has_crs_data; print\\('_has_crs_data\\({}\\) =', _has_crs_data\\({}\\)\\); print\\('_has_crs_data\\({\\\\\"1:0\\\\\":7.0,\\\\\"2:0\\\\\":9.0,\\\\\"1:1\\\\\":8.0}\\) =', _has_crs_data\\({'1:0':7.0,'2:0':9.0,'1:1':8.0}\\)\\); print\\('_has_crs_data\\({\\\\\"_meta\\\\\":{}}\\) =', _has_crs_data\\({'_meta':{}}\\)\\); print\\('OK'\\)\")",
+      "Bash(python -m pytest tests/test_score_pick.py tests/test_score_backtest.py tests/test_score_context.py tests/test_worldcup_score_sync.py -x -q)"
+    ]
+  }
+}

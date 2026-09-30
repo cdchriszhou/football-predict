@@ -1,0 +1,536 @@
+{
+  "matches": [
+    {
+      "id": 2878,
+      "league": "serie-a",
+      "md": 1,
+      "kickoff": "2026-08-25 00:30:00.000000",
+      "home": "博洛尼亚",
+      "away": "拉齐奥",
+      "actual": "0:1",
+      "actual_out": "away",
+      "euro": [
+        2.08,
+        2.85,
+        3.36
+      ],
+      "handicap": "-1",
+      "implied_wdl": [
+        42.6,
+        31.1,
+        26.4
+      ],
+      "naive_backtest_10_10": {
+        "primary": "1:1",
+        "secondary": "1:0",
+        "upset": "0:1",
+        "hit_primary": false,
+        "hit_any3": true
+      },
+      "ranked_replay": {
+        "ranks": [
+          9,
+          7
+        ],
+        "rule_wdl": [
+          42.7,
+          24.0,
+          33.3
+        ],
+        "rule_xg": [
+          1.55,
+          1.36
+        ],
+        "used_wdl": [
+          42.6,
+          31.1,
+          26.4
+        ],
+        "crs_source": "book",
+        "top_crs": [
+          {
+            "score": "1:1",
+            "odd": 5.75
+          },
+          {
+            "score": "1:0",
+            "odd": 6.5
+          },
+          {
+            "score": "2:1",
+            "odd": 8.0
+          },
+          {
+            "score": "0:1",
+            "odd": 8.5
+          },
+          {
+            "score": "0:0",
+            "odd": 9.0
+          },
+          {
+            "score": "2:0",
+            "odd": 9.0
+          },
+          {
+            "score": "1:2",
+            "odd": 11.0
+          },
+          {
+            "score": "2:2",
+            "odd": 14.0
+          }
+        ],
+        "primary": "1:1",
+        "secondary": "1:0",
+        "upset": "0:1",
+        "hit_primary": false,
+        "hit_any3": true,
+        "warnings": []
+      }
+    },
+    {
+      "id": 2504,
+      "league": "la-liga",
+      "md": 2,
+      "kickoff": "2026-08-25 01:30:00.000000",
+      "home": "奥萨苏纳",
+      "away": "莱万特",
+      "actual": "0:0",
+      "actual_out": "draw",
+      "euro": [
+        1.62,
+        3.36,
+        4.66
+      ],
+      "handicap": "-1",
+      "implied_wdl": [
+        54.7,
+        26.3,
+        19.0
+      ],
+      "naive_backtest_10_10": {
+        "primary": "1:1",
+        "secondary": "1:0",
+        "upset": "0:1",
+        "hit_primary": false,
+        "hit_any3": false
+      },
+      "ranked_replay": {
+        "ranks": [
+          11,
+          17
+        ],
+        "rule_wdl": [
+          52.2,
+          24.0,
+          23.8
+        ],
+        "rule_xg": [
+          1.88,
+          1.05
+        ],
+        "used_wdl": [
+          54.7,
+          26.3,
+          19.0
+        ],
+        "crs_source": "book",
+        "top_crs": [
+          {
+            "score": "1:1",
+            "odd": 6.4
+          },
+          {
+            "score": "1:0",
+            "odd": 6.5
+          },
+          {
+            "score": "2:1",
+            "odd": 7.0
+          },
+          {
+            "score": "2:0",
+            "odd": 7.75
+          },
+          {
+            "score": "0:0",
+            "odd": 10.5
+          },
+          {
+            "score": "0:1",
+            "odd": 12.5
+          },
+          {
+            "score": "1:2",
+            "odd": 13.0
+          },
+          {
+            "score": "3:0",
+            "odd": 13.0
+          }
+        ],
+        "primary": "1:1",
+        "secondary": "2:1",
+        "upset": "0:1",
+        "hit_primary": false,
+        "hit_any3": false,
+        "warnings": []
+      }
+    },
+    {
+      "id": 2879,
+      "league": "serie-a",
+      "md": 1,
+      "kickoff": "2026-08-25 02:45:00.000000",
+      "home": "罗马",
+      "away": "佛罗伦萨",
+      "actual": "4:0",
+      "actual_out": "home",
+      "euro": [
+        1.54,
+        3.55,
+        5.05
+      ],
+      "handicap": "-1",
+      "implied_wdl": [
+        57.5,
+        24.9,
+        17.5
+      ],
+      "naive_backtest_10_10": {
+        "primary": "1:0",
+        "secondary": "2:1",
+        "upset": "0:0",
+        "hit_primary": false,
+        "hit_any3": false
+      },
+      "ranked_replay": {
+        "ranks": [
+          6,
+          8
+        ],
+        "rule_wdl": [
+          47.6,
+          24.0,
+          28.4
+        ],
+        "rule_xg": [
+          1.7,
+          1.2
+        ],
+        "used_wdl": [
+          57.5,
+          24.9,
+          17.5
+        ],
+        "crs_source": "book",
+        "top_crs": [
+          {
+            "score": "1:0",
+            "odd": 6.7
+          },
+          {
+            "score": "1:1",
+            "odd": 7.0
+          },
+          {
+            "score": "2:1",
+            "odd": 7.0
+          },
+          {
+            "score": "2:0",
+            "odd": 7.5
+          },
+          {
+            "score": "3:0",
+            "odd": 11.0
+          },
+          {
+            "score": "0:0",
+            "odd": 12.0
+          },
+          {
+            "score": "3:1",
+            "odd": 12.0
+          },
+          {
+            "score": "0:1",
+            "odd": 14.0
+          }
+        ],
+        "primary": "1:0",
+        "secondary": "2:0",
+        "upset": "0:0",
+        "hit_primary": false,
+        "hit_any3": false,
+        "warnings": [
+          "三选方向覆盖不足（仅 2 个赛果方向，建议至少 3 个）"
+        ]
+      }
+    },
+    {
+      "id": 2119,
+      "league": "premier-league",
+      "md": 1,
+      "kickoff": "2026-08-25 03:00:00.000000",
+      "home": "富勒姆",
+      "away": "切尔西",
+      "actual": "2:3",
+      "actual_out": "away",
+      "euro": [
+        4.05,
+        3.75,
+        1.63
+      ],
+      "handicap": "+1",
+      "implied_wdl": [
+        21.9,
+        23.7,
+        54.4
+      ],
+      "naive_backtest_10_10": {
+        "primary": "1:2",
+        "secondary": "0:0",
+        "upset": "2:1",
+        "hit_primary": false,
+        "hit_any3": false
+      },
+      "ranked_replay": {
+        "ranks": [
+          11,
+          4
+        ],
+        "rule_wdl": [
+          36.3,
+          24.0,
+          39.7
+        ],
+        "rule_xg": [
+          1.37,
+          1.57
+        ],
+        "used_wdl": [
+          21.9,
+          23.7,
+          54.4
+        ],
+        "crs_source": "book",
+        "top_crs": [
+          {
+            "score": "1:2",
+            "odd": 6.75
+          },
+          {
+            "score": "1:1",
+            "odd": 7.5
+          },
+          {
+            "score": "0:1",
+            "odd": 8.5
+          },
+          {
+            "score": "0:2",
+            "odd": 9.0
+          },
+          {
+            "score": "1:3",
+            "odd": 12.0
+          },
+          {
+            "score": "2:2",
+            "odd": 12.5
+          },
+          {
+            "score": "2:1",
+            "odd": 13.0
+          },
+          {
+            "score": "0:0",
+            "odd": 14.0
+          }
+        ],
+        "primary": "1:2",
+        "secondary": "0:0",
+        "upset": "2:1",
+        "hit_primary": false,
+        "hit_any3": false,
+        "warnings": []
+      }
+    },
+    {
+      "id": 2505,
+      "league": "la-liga",
+      "md": 2,
+      "kickoff": "2026-08-25 03:30:00.000000",
+      "home": "马拉加",
+      "away": "拉科鲁尼亚",
+      "actual": "1:1",
+      "actual_out": "draw",
+      "euro": [
+        2.28,
+        2.78,
+        3.02
+      ],
+      "handicap": "-1",
+      "implied_wdl": [
+        38.8,
+        31.8,
+        29.3
+      ],
+      "naive_backtest_10_10": {
+        "primary": "1:1",
+        "secondary": "0:0",
+        "upset": "1:0",
+        "hit_primary": true,
+        "hit_any3": true
+      },
+      "ranked_replay": {
+        "ranks": [
+          20,
+          19
+        ],
+        "rule_wdl": [
+          43.9,
+          24.0,
+          32.1
+        ],
+        "rule_xg": [
+          1.57,
+          1.33
+        ],
+        "used_wdl": [
+          38.8,
+          31.8,
+          29.3
+        ],
+        "crs_source": "book",
+        "top_crs": [
+          {
+            "score": "1:1",
+            "odd": 5.4
+          },
+          {
+            "score": "1:0",
+            "odd": 6.5
+          },
+          {
+            "score": "0:0",
+            "odd": 8.0
+          },
+          {
+            "score": "0:1",
+            "odd": 8.0
+          },
+          {
+            "score": "2:1",
+            "odd": 8.0
+          },
+          {
+            "score": "1:2",
+            "odd": 10.0
+          },
+          {
+            "score": "2:0",
+            "odd": 10.5
+          },
+          {
+            "score": "0:2",
+            "odd": 14.0
+          }
+        ],
+        "primary": "1:1",
+        "secondary": "1:0",
+        "upset": "0:1",
+        "hit_primary": true,
+        "hit_any3": true,
+        "warnings": []
+      }
+    },
+    {
+      "id": 2506,
+      "league": "la-liga",
+      "md": 1,
+      "kickoff": "2026-08-26 03:00:00.000000",
+      "home": "瓦伦西亚",
+      "away": "贝蒂斯",
+      "actual": "0:1",
+      "actual_out": "away",
+      "euro": [
+        null,
+        null,
+        null
+      ],
+      "handicap": null,
+      "implied_wdl": null,
+      "naive_backtest_10_10": {
+        "primary": null,
+        "secondary": null,
+        "upset": null,
+        "hit_primary": null,
+        "hit_any3": null
+      },
+      "ranked_replay": {
+        "ranks": [
+          9,
+          6
+        ],
+        "rule_wdl": [
+          41.2,
+          24.0,
+          34.8
+        ],
+        "rule_xg": [
+          1.5,
+          1.4
+        ],
+        "used_wdl": [
+          41.2,
+          24.0,
+          34.8
+        ],
+        "crs_source": "synthetic",
+        "top_crs": [
+          {
+            "score": "1:1",
+            "odd": 4.0
+          },
+          {
+            "score": "2:1",
+            "odd": 5.77
+          },
+          {
+            "score": "1:2",
+            "odd": 6.2
+          },
+          {
+            "score": "0:0",
+            "odd": 6.6
+          },
+          {
+            "score": "1:0",
+            "odd": 7.32
+          },
+          {
+            "score": "0:1",
+            "odd": 7.97
+          },
+          {
+            "score": "2:0",
+            "odd": 8.09
+          },
+          {
+            "score": "0:2",
+            "odd": 9.33
+          }
+        ],
+        "primary": "1:1",
+        "secondary": "1:0",
+        "upset": "0:1",
+        "hit_primary": false,
+        "hit_any3": true,
+        "warnings": []
+      }
+    }
+  ]
+}

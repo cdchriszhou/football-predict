@@ -1,0 +1,1710 @@
+{
+  "season": "2026/27",
+  "started_leagues": [
+    "premier-league",
+    "la-liga",
+    "serie-a",
+    "ligue-1"
+  ],
+  "not_started_or_no_results": [
+    "bundesliga"
+  ],
+  "totals": {
+    "finished": 45,
+    "with_published": 4,
+    "published_primary": "1/4",
+    "published_any3": "4/4",
+    "replay_primary": "2/9",
+    "replay_any3": "5/9",
+    "replay_primary_pct": 0.222,
+    "replay_any3_pct": 0.556
+  },
+  "leagues": [
+    {
+      "slug": "premier-league",
+      "name": "英超",
+      "season": "2026/27",
+      "opening_date": "2026-08-21T19:00:00Z",
+      "finished": 10,
+      "with_euro": 1,
+      "with_crs": 1,
+      "with_published": 0,
+      "outcomes": {
+        "home": 7,
+        "draw": 1,
+        "away": 2
+      },
+      "summary": {
+        "published": {
+          "n": 0,
+          "primary_hits": 0,
+          "primary_pct": null,
+          "any3_hits": 0,
+          "any3_pct": null
+        },
+        "replay_all": {
+          "n": 1,
+          "primary_hits": 0,
+          "primary_pct": 0.0,
+          "any3_hits": 0,
+          "any3_pct": 0.0
+        },
+        "replay_book_crs": {
+          "n": 1,
+          "primary_hits": 0,
+          "primary_pct": 0.0,
+          "any3_hits": 0,
+          "any3_pct": 0.0
+        },
+        "replay_synthetic": {
+          "n": 0,
+          "primary_hits": 0,
+          "primary_pct": null,
+          "any3_hits": 0,
+          "any3_pct": null
+        },
+        "replay_bias": {
+          "home": 0,
+          "draw": 0,
+          "away": 1,
+          "other": 0
+        }
+      },
+      "issues": [],
+      "matches": [
+        {
+          "match_id": 2110,
+          "matchday": 1,
+          "kickoff": "2026-08-22 03:00:00.000000",
+          "home": "阿森纳",
+          "away": "考文垂",
+          "actual": "3:0",
+          "euro": [
+            null,
+            null,
+            null
+          ],
+          "has_crs": false,
+          "crs_source": "empty",
+          "stored_wdl": null,
+          "confidence": null,
+          "model": null,
+          "published": null,
+          "replay": {
+            "primary": null,
+            "secondary": null,
+            "upset": null,
+            "hit_primary": null,
+            "hit_any3": null
+          },
+          "backtest_row": null
+        },
+        {
+          "match_id": 2111,
+          "matchday": 1,
+          "kickoff": "2026-08-22 19:30:00.000000",
+          "home": "赫尔城",
+          "away": "曼联",
+          "actual": "2:0",
+          "euro": [
+            null,
+            null,
+            null
+          ],
+          "has_crs": false,
+          "crs_source": "empty",
+          "stored_wdl": null,
+          "confidence": null,
+          "model": null,
+          "published": null,
+          "replay": {
+            "primary": null,
+            "secondary": null,
+            "upset": null,
+            "hit_primary": null,
+            "hit_any3": null
+          },
+          "backtest_row": null
+        },
+        {
+          "match_id": 2112,
+          "matchday": 1,
+          "kickoff": "2026-08-22 22:00:00.000000",
+          "home": "伊普斯维奇",
+          "away": "桑德兰",
+          "actual": "2:1",
+          "euro": [
+            null,
+            null,
+            null
+          ],
+          "has_crs": false,
+          "crs_source": "empty",
+          "stored_wdl": null,
+          "confidence": null,
+          "model": null,
+          "published": null,
+          "replay": {
+            "primary": null,
+            "secondary": null,
+            "upset": null,
+            "hit_primary": null,
+            "hit_any3": null
+          },
+          "backtest_row": null
+        },
+        {
+          "match_id": 2113,
+          "matchday": 1,
+          "kickoff": "2026-08-22 22:00:00.000000",
+          "home": "诺丁汉森林",
+          "away": "利兹联",
+          "actual": "0:1",
+          "euro": [
+            null,
+            null,
+            null
+          ],
+          "has_crs": false,
+          "crs_source": "empty",
+          "stored_wdl": null,
+          "confidence": null,
+          "model": null,
+          "published": null,
+          "replay": {
+            "primary": null,
+            "secondary": null,
+            "upset": null,
+            "hit_primary": null,
+            "hit_any3": null
+          },
+          "backtest_row": null
+        },
+        {
+          "match_id": 2114,
+          "matchday": 1,
+          "kickoff": "2026-08-22 22:00:00.000000",
+          "home": "埃弗顿",
+          "away": "水晶宫",
+          "actual": "2:0",
+          "euro": [
+            null,
+            null,
+            null
+          ],
+          "has_crs": false,
+          "crs_source": "empty",
+          "stored_wdl": null,
+          "confidence": null,
+          "model": null,
+          "published": null,
+          "replay": {
+            "primary": null,
+            "secondary": null,
+            "upset": null,
+            "hit_primary": null,
+            "hit_any3": null
+          },
+          "backtest_row": null
+        },
+        {
+          "match_id": 2115,
+          "matchday": 1,
+          "kickoff": "2026-08-23 00:30:00.000000",
+          "home": "布伦特福德",
+          "away": "热刺",
+          "actual": "3:0",
+          "euro": [
+            null,
+            null,
+            null
+          ],
+          "has_crs": false,
+          "crs_source": "empty",
+          "stored_wdl": null,
+          "confidence": null,
+          "model": null,
+          "published": null,
+          "replay": {
+            "primary": null,
+            "secondary": null,
+            "upset": null,
+            "hit_primary": null,
+            "hit_any3": null
+          },
+          "backtest_row": null
+        },
+        {
+          "match_id": 2116,
+          "matchday": 1,
+          "kickoff": "2026-08-23 21:00:00.000000",
+          "home": "曼城",
+          "away": "伯恩茅斯",
+          "actual": "2:1",
+          "euro": [
+            null,
+            null,
+            null
+          ],
+          "has_crs": false,
+          "crs_source": "empty",
+          "stored_wdl": null,
+          "confidence": null,
+          "model": null,
+          "published": null,
+          "replay": {
+            "primary": null,
+            "secondary": null,
+            "upset": null,
+            "hit_primary": null,
+            "hit_any3": null
+          },
+          "backtest_row": null
+        },
+        {
+          "match_id": 2117,
+          "matchday": 1,
+          "kickoff": "2026-08-23 21:00:00.000000",
+          "home": "布莱顿",
+          "away": "阿斯顿维拉",
+          "actual": "4:0",
+          "euro": [
+            null,
+            null,
+            null
+          ],
+          "has_crs": false,
+          "crs_source": "empty",
+          "stored_wdl": null,
+          "confidence": null,
+          "model": null,
+          "published": null,
+          "replay": {
+            "primary": null,
+            "secondary": null,
+            "upset": null,
+            "hit_primary": null,
+            "hit_any3": null
+          },
+          "backtest_row": null
+        },
+        {
+          "match_id": 2118,
+          "matchday": 1,
+          "kickoff": "2026-08-23 23:30:00.000000",
+          "home": "纽卡斯尔联",
+          "away": "利物浦",
+          "actual": "2:2",
+          "euro": [
+            null,
+            null,
+            null
+          ],
+          "has_crs": false,
+          "crs_source": "empty",
+          "stored_wdl": null,
+          "confidence": null,
+          "model": null,
+          "published": null,
+          "replay": {
+            "primary": null,
+            "secondary": null,
+            "upset": null,
+            "hit_primary": null,
+            "hit_any3": null
+          },
+          "backtest_row": null
+        },
+        {
+          "match_id": 2119,
+          "matchday": 1,
+          "kickoff": "2026-08-25 03:00:00.000000",
+          "home": "富勒姆",
+          "away": "切尔西",
+          "actual": "2:3",
+          "euro": [
+            4.05,
+            3.75,
+            1.63
+          ],
+          "has_crs": true,
+          "crs_source": "book",
+          "stored_wdl": null,
+          "confidence": null,
+          "model": null,
+          "published": null,
+          "replay": {
+            "primary": "0:1",
+            "secondary": "1:2",
+            "upset": "0:0",
+            "hit_primary": false,
+            "hit_any3": false
+          },
+          "backtest_row": {
+            "match_id": 2119,
+            "team_a": "富勒姆",
+            "team_b": "切尔西",
+            "actual_score": "2:3",
+            "primary_pick": "0:1",
+            "secondary_pick": "1:2",
+            "upset_pick": "0:0",
+            "primary_hit": false,
+            "triple_hit": false,
+            "pick_source": "replay",
+            "match_time": "2026-08-25T03:00:00+08:00",
+            "stage": "第1轮",
+            "group_name": null,
+            "matchday": 1,
+            "location": "英超",
+            "has_crs": true,
+            "crs_source": "book"
+          }
+        }
+      ]
+    },
+    {
+      "slug": "la-liga",
+      "name": "西甲",
+      "season": "2026/27",
+      "opening_date": "2026-08-15T16:00:00Z",
+      "finished": 16,
+      "with_euro": 4,
+      "with_crs": 2,
+      "with_published": 4,
+      "outcomes": {
+        "home": 6,
+        "draw": 7,
+        "away": 3
+      },
+      "summary": {
+        "published": {
+          "n": 4,
+          "primary_hits": 1,
+          "primary_pct": 0.25,
+          "any3_hits": 4,
+          "any3_pct": 1.0
+        },
+        "replay_all": {
+          "n": 6,
+          "primary_hits": 2,
+          "primary_pct": 0.333,
+          "any3_hits": 4,
+          "any3_pct": 0.667
+        },
+        "replay_book_crs": {
+          "n": 2,
+          "primary_hits": 1,
+          "primary_pct": 0.5,
+          "any3_hits": 2,
+          "any3_pct": 1.0
+        },
+        "replay_synthetic": {
+          "n": 4,
+          "primary_hits": 1,
+          "primary_pct": 0.25,
+          "any3_hits": 2,
+          "any3_pct": 0.5
+        },
+        "replay_bias": {
+          "home": 4,
+          "draw": 2,
+          "away": 0,
+          "other": 0
+        }
+      },
+      "issues": [],
+      "matches": [
+        {
+          "match_id": 2490,
+          "matchday": 1,
+          "kickoff": "2026-08-16 01:30:00.000000",
+          "home": "阿拉维斯",
+          "away": "赫塔费",
+          "actual": "3:0",
+          "euro": [
+            null,
+            null,
+            null
+          ],
+          "has_crs": false,
+          "crs_source": "empty",
+          "stored_wdl": null,
+          "confidence": null,
+          "model": null,
+          "published": null,
+          "replay": {
+            "primary": null,
+            "secondary": null,
+            "upset": null,
+            "hit_primary": null,
+            "hit_any3": null
+          },
+          "backtest_row": null
+        },
+        {
+          "match_id": 2491,
+          "matchday": 1,
+          "kickoff": "2026-08-16 03:30:00.000000",
+          "home": "塞维利亚",
+          "away": "巴列卡诺",
+          "actual": "2:1",
+          "euro": [
+            null,
+            null,
+            null
+          ],
+          "has_crs": false,
+          "crs_source": "empty",
+          "stored_wdl": null,
+          "confidence": null,
+          "model": null,
+          "published": null,
+          "replay": {
+            "primary": null,
+            "secondary": null,
+            "upset": null,
+            "hit_primary": null,
+            "hit_any3": null
+          },
+          "backtest_row": null
+        },
+        {
+          "match_id": 2492,
+          "matchday": 1,
+          "kickoff": "2026-08-16 23:00:00.000000",
+          "home": "桑坦德竞技",
+          "away": "比利亚雷亚尔",
+          "actual": "2:2",
+          "euro": [
+            null,
+            null,
+            null
+          ],
+          "has_crs": false,
+          "crs_source": "empty",
+          "stored_wdl": null,
+          "confidence": null,
+          "model": null,
+          "published": null,
+          "replay": {
+            "primary": null,
+            "secondary": null,
+            "upset": null,
+            "hit_primary": null,
+            "hit_any3": null
+          },
+          "backtest_row": null
+        },
+        {
+          "match_id": 2493,
+          "matchday": 1,
+          "kickoff": "2026-08-17 01:00:00.000000",
+          "home": "西班牙人",
+          "away": "莱万特",
+          "actual": "3:0",
+          "euro": [
+            null,
+            null,
+            null
+          ],
+          "has_crs": false,
+          "crs_source": "empty",
+          "stored_wdl": null,
+          "confidence": null,
+          "model": null,
+          "published": null,
+          "replay": {
+            "primary": null,
+            "secondary": null,
+            "upset": null,
+            "hit_primary": null,
+            "hit_any3": null
+          },
+          "backtest_row": null
+        },
+        {
+          "match_id": 2494,
+          "matchday": 1,
+          "kickoff": "2026-08-18 03:00:00.000000",
+          "home": "拉科鲁尼亚",
+          "away": "埃尔切",
+          "actual": "1:1",
+          "euro": [
+            null,
+            null,
+            null
+          ],
+          "has_crs": false,
+          "crs_source": "synthetic",
+          "stored_wdl": [
+            48.1,
+            26.4,
+            25.3
+          ],
+          "confidence": 0.61,
+          "model": "DeepSeek+Qwen+GLM",
+          "published": {
+            "primary": "2:1",
+            "secondary": "1:0",
+            "upset": "1:1",
+            "hit_primary": false,
+            "hit_any3": true
+          },
+          "replay": {
+            "primary": "2:1",
+            "secondary": "-",
+            "upset": "1:1",
+            "hit_primary": false,
+            "hit_any3": true
+          },
+          "backtest_row": {
+            "match_id": 2494,
+            "team_a": "拉科鲁尼亚",
+            "team_b": "埃尔切",
+            "actual_score": "1:1",
+            "primary_pick": "2:1",
+            "secondary_pick": "1:0",
+            "upset_pick": "1:1",
+            "primary_hit": false,
+            "triple_hit": true,
+            "pick_source": "published_synthetic",
+            "match_time": "2026-08-18T03:00:00+08:00",
+            "stage": "第1轮",
+            "group_name": null,
+            "matchday": 1,
+            "location": "西甲",
+            "has_crs": false,
+            "crs_source": "synthetic"
+          }
+        },
+        {
+          "match_id": 2495,
+          "matchday": 1,
+          "kickoff": "2026-08-20 03:00:00.000000",
+          "home": "马竞",
+          "away": "马拉加",
+          "actual": "2:0",
+          "euro": [
+            null,
+            null,
+            null
+          ],
+          "has_crs": false,
+          "crs_source": "synthetic",
+          "stored_wdl": [
+            73.1,
+            13.0,
+            13.9
+          ],
+          "confidence": 0.63,
+          "model": "DeepSeek+Qwen+GLM",
+          "published": {
+            "primary": "2:0",
+            "secondary": "1:0",
+            "upset": "0:0",
+            "hit_primary": true,
+            "hit_any3": true
+          },
+          "replay": {
+            "primary": "2:1",
+            "secondary": "-",
+            "upset": "0:0",
+            "hit_primary": false,
+            "hit_any3": false
+          },
+          "backtest_row": {
+            "match_id": 2495,
+            "team_a": "马竞",
+            "team_b": "马拉加",
+            "actual_score": "2:0",
+            "primary_pick": "2:0",
+            "secondary_pick": "1:0",
+            "upset_pick": "0:0",
+            "primary_hit": true,
+            "triple_hit": true,
+            "pick_source": "published_synthetic",
+            "match_time": "2026-08-20T03:00:00+08:00",
+            "stage": "第1轮",
+            "group_name": null,
+            "matchday": 1,
+            "location": "西甲",
+            "has_crs": false,
+            "crs_source": "synthetic"
+          }
+        },
+        {
+          "match_id": 2496,
+          "matchday": 2,
+          "kickoff": "2026-08-21 03:00:00.000000",
+          "home": "巴列卡诺",
+          "away": "阿拉维斯",
+          "actual": "1:1",
+          "euro": [
+            2.07,
+            2.84,
+            3.4
+          ],
+          "has_crs": false,
+          "crs_source": "synthetic",
+          "stored_wdl": [
+            51.4,
+            29.7,
+            19.0
+          ],
+          "confidence": 0.58,
+          "model": "DeepSeek+Qwen+GLM",
+          "published": {
+            "primary": "1:0",
+            "secondary": "2:1",
+            "upset": "1:1",
+            "hit_primary": false,
+            "hit_any3": true
+          },
+          "replay": {
+            "primary": "1:1",
+            "secondary": "0:0",
+            "upset": "1:2",
+            "hit_primary": true,
+            "hit_any3": true
+          },
+          "backtest_row": {
+            "match_id": 2496,
+            "team_a": "巴列卡诺",
+            "team_b": "阿拉维斯",
+            "actual_score": "1:1",
+            "primary_pick": "1:0",
+            "secondary_pick": "2:1",
+            "upset_pick": "1:1",
+            "primary_hit": false,
+            "triple_hit": true,
+            "pick_source": "published_synthetic",
+            "match_time": "2026-08-21T03:00:00+08:00",
+            "stage": "第2轮",
+            "group_name": null,
+            "matchday": 2,
+            "location": "西甲",
+            "has_crs": false,
+            "crs_source": "synthetic"
+          }
+        },
+        {
+          "match_id": 2497,
+          "matchday": 2,
+          "kickoff": "2026-08-22 03:00:00.000000",
+          "home": "贝蒂斯",
+          "away": "皇家社会",
+          "actual": "1:0",
+          "euro": [
+            2.0,
+            3.26,
+            3.1
+          ],
+          "has_crs": false,
+          "crs_source": "synthetic",
+          "stored_wdl": [
+            49.3,
+            29.7,
+            20.9
+          ],
+          "confidence": 0.58,
+          "model": "DeepSeek+Qwen+GLM",
+          "published": {
+            "primary": "2:1",
+            "secondary": "1:0",
+            "upset": "1:1",
+            "hit_primary": false,
+            "hit_any3": true
+          },
+          "replay": {
+            "primary": "2:1",
+            "secondary": "-",
+            "upset": "1:1",
+            "hit_primary": false,
+            "hit_any3": false
+          },
+          "backtest_row": {
+            "match_id": 2497,
+            "team_a": "贝蒂斯",
+            "team_b": "皇家社会",
+            "actual_score": "1:0",
+            "primary_pick": "2:1",
+            "secondary_pick": "1:0",
+            "upset_pick": "1:1",
+            "primary_hit": false,
+            "triple_hit": true,
+            "pick_source": "published_synthetic",
+            "match_time": "2026-08-22T03:00:00+08:00",
+            "stage": "第2轮",
+            "group_name": null,
+            "matchday": 2,
+            "location": "西甲",
+            "has_crs": false,
+            "crs_source": "synthetic"
+          }
+        },
+        {
+          "match_id": 2498,
+          "matchday": 2,
+          "kickoff": "2026-08-22 23:00:00.000000",
+          "home": "毕尔巴鄂",
+          "away": "塞维利亚",
+          "actual": "1:3",
+          "euro": [
+            null,
+            null,
+            null
+          ],
+          "has_crs": false,
+          "crs_source": "empty",
+          "stored_wdl": null,
+          "confidence": null,
+          "model": null,
+          "published": null,
+          "replay": {
+            "primary": null,
+            "secondary": null,
+            "upset": null,
+            "hit_primary": null,
+            "hit_any3": null
+          },
+          "backtest_row": null
+        },
+        {
+          "match_id": 2499,
+          "matchday": 2,
+          "kickoff": "2026-08-23 01:30:00.000000",
+          "home": "瓦伦西亚",
+          "away": "塞尔塔",
+          "actual": "0:0",
+          "euro": [
+            null,
+            null,
+            null
+          ],
+          "has_crs": false,
+          "crs_source": "empty",
+          "stored_wdl": null,
+          "confidence": null,
+          "model": null,
+          "published": null,
+          "replay": {
+            "primary": null,
+            "secondary": null,
+            "upset": null,
+            "hit_primary": null,
+            "hit_any3": null
+          },
+          "backtest_row": null
+        },
+        {
+          "match_id": 2500,
+          "matchday": 2,
+          "kickoff": "2026-08-23 03:30:00.000000",
+          "home": "西班牙人",
+          "away": "皇马",
+          "actual": "1:2",
+          "euro": [
+            null,
+            null,
+            null
+          ],
+          "has_crs": false,
+          "crs_source": "empty",
+          "stored_wdl": null,
+          "confidence": null,
+          "model": null,
+          "published": null,
+          "replay": {
+            "primary": null,
+            "secondary": null,
+            "upset": null,
+            "hit_primary": null,
+            "hit_any3": null
+          },
+          "backtest_row": null
+        },
+        {
+          "match_id": 2501,
+          "matchday": 2,
+          "kickoff": "2026-08-23 23:00:00.000000",
+          "home": "马竞",
+          "away": "比利亚雷亚尔",
+          "actual": "2:2",
+          "euro": [
+            null,
+            null,
+            null
+          ],
+          "has_crs": false,
+          "crs_source": "empty",
+          "stored_wdl": null,
+          "confidence": null,
+          "model": null,
+          "published": null,
+          "replay": {
+            "primary": null,
+            "secondary": null,
+            "upset": null,
+            "hit_primary": null,
+            "hit_any3": null
+          },
+          "backtest_row": null
+        },
+        {
+          "match_id": 2502,
+          "matchday": 2,
+          "kickoff": "2026-08-24 01:30:00.000000",
+          "home": "赫塔费",
+          "away": "桑坦德竞技",
+          "actual": "1:0",
+          "euro": [
+            null,
+            null,
+            null
+          ],
+          "has_crs": false,
+          "crs_source": "empty",
+          "stored_wdl": null,
+          "confidence": null,
+          "model": null,
+          "published": null,
+          "replay": {
+            "primary": null,
+            "secondary": null,
+            "upset": null,
+            "hit_primary": null,
+            "hit_any3": null
+          },
+          "backtest_row": null
+        },
+        {
+          "match_id": 2503,
+          "matchday": 2,
+          "kickoff": "2026-08-24 03:30:00.000000",
+          "home": "埃尔切",
+          "away": "巴萨",
+          "actual": "0:5",
+          "euro": [
+            null,
+            null,
+            null
+          ],
+          "has_crs": false,
+          "crs_source": "empty",
+          "stored_wdl": null,
+          "confidence": null,
+          "model": null,
+          "published": null,
+          "replay": {
+            "primary": null,
+            "secondary": null,
+            "upset": null,
+            "hit_primary": null,
+            "hit_any3": null
+          },
+          "backtest_row": null
+        },
+        {
+          "match_id": 2504,
+          "matchday": 2,
+          "kickoff": "2026-08-25 01:30:00.000000",
+          "home": "奥萨苏纳",
+          "away": "莱万特",
+          "actual": "0:0",
+          "euro": [
+            1.62,
+            3.36,
+            4.66
+          ],
+          "has_crs": true,
+          "crs_source": "book",
+          "stored_wdl": null,
+          "confidence": null,
+          "model": null,
+          "published": null,
+          "replay": {
+            "primary": "2:0",
+            "secondary": "1:0",
+            "upset": "0:0",
+            "hit_primary": false,
+            "hit_any3": true
+          },
+          "backtest_row": {
+            "match_id": 2504,
+            "team_a": "奥萨苏纳",
+            "team_b": "莱万特",
+            "actual_score": "0:0",
+            "primary_pick": "2:0",
+            "secondary_pick": "1:0",
+            "upset_pick": "0:0",
+            "primary_hit": false,
+            "triple_hit": true,
+            "pick_source": "replay",
+            "match_time": "2026-08-25T01:30:00+08:00",
+            "stage": "第2轮",
+            "group_name": null,
+            "matchday": 2,
+            "location": "西甲",
+            "has_crs": true,
+            "crs_source": "book"
+          }
+        },
+        {
+          "match_id": 2505,
+          "matchday": 2,
+          "kickoff": "2026-08-25 03:30:00.000000",
+          "home": "马拉加",
+          "away": "拉科鲁尼亚",
+          "actual": "1:1",
+          "euro": [
+            2.28,
+            2.78,
+            3.02
+          ],
+          "has_crs": true,
+          "crs_source": "book",
+          "stored_wdl": null,
+          "confidence": null,
+          "model": null,
+          "published": null,
+          "replay": {
+            "primary": "1:1",
+            "secondary": "0:0",
+            "upset": "0:1",
+            "hit_primary": true,
+            "hit_any3": true
+          },
+          "backtest_row": {
+            "match_id": 2505,
+            "team_a": "马拉加",
+            "team_b": "拉科鲁尼亚",
+            "actual_score": "1:1",
+            "primary_pick": "1:1",
+            "secondary_pick": "0:0",
+            "upset_pick": "0:1",
+            "primary_hit": true,
+            "triple_hit": true,
+            "pick_source": "replay",
+            "match_time": "2026-08-25T03:30:00+08:00",
+            "stage": "第2轮",
+            "group_name": null,
+            "matchday": 2,
+            "location": "西甲",
+            "has_crs": true,
+            "crs_source": "book"
+          }
+        }
+      ]
+    },
+    {
+      "slug": "serie-a",
+      "name": "意甲",
+      "season": "2026/27",
+      "opening_date": "2026-08-23T16:00:00Z",
+      "finished": 10,
+      "with_euro": 2,
+      "with_crs": 2,
+      "with_published": 0,
+      "outcomes": {
+        "home": 3,
+        "draw": 1,
+        "away": 6
+      },
+      "summary": {
+        "published": {
+          "n": 0,
+          "primary_hits": 0,
+          "primary_pct": null,
+          "any3_hits": 0,
+          "any3_pct": null
+        },
+        "replay_all": {
+          "n": 2,
+          "primary_hits": 0,
+          "primary_pct": 0.0,
+          "any3_hits": 1,
+          "any3_pct": 0.5
+        },
+        "replay_book_crs": {
+          "n": 2,
+          "primary_hits": 0,
+          "primary_pct": 0.0,
+          "any3_hits": 1,
+          "any3_pct": 0.5
+        },
+        "replay_synthetic": {
+          "n": 0,
+          "primary_hits": 0,
+          "primary_pct": null,
+          "any3_hits": 0,
+          "any3_pct": null
+        },
+        "replay_bias": {
+          "home": 1,
+          "draw": 1,
+          "away": 0,
+          "other": 0
+        }
+      },
+      "issues": [],
+      "matches": [
+        {
+          "match_id": 2870,
+          "matchday": 1,
+          "kickoff": "2026-08-23 00:30:00.000000",
+          "home": "乌迪内斯",
+          "away": "科莫",
+          "actual": "1:1",
+          "euro": [
+            null,
+            null,
+            null
+          ],
+          "has_crs": false,
+          "crs_source": "empty",
+          "stored_wdl": null,
+          "confidence": null,
+          "model": null,
+          "published": null,
+          "replay": {
+            "primary": null,
+            "secondary": null,
+            "upset": null,
+            "hit_primary": null,
+            "hit_any3": null
+          },
+          "backtest_row": null
+        },
+        {
+          "match_id": 2871,
+          "matchday": 1,
+          "kickoff": "2026-08-23 00:30:00.000000",
+          "home": "国际米兰",
+          "away": "蒙扎",
+          "actual": "4:1",
+          "euro": [
+            null,
+            null,
+            null
+          ],
+          "has_crs": false,
+          "crs_source": "empty",
+          "stored_wdl": null,
+          "confidence": null,
+          "model": null,
+          "published": null,
+          "replay": {
+            "primary": null,
+            "secondary": null,
+            "upset": null,
+            "hit_primary": null,
+            "hit_any3": null
+          },
+          "backtest_row": null
+        },
+        {
+          "match_id": 2872,
+          "matchday": 1,
+          "kickoff": "2026-08-23 02:45:00.000000",
+          "home": "热那亚",
+          "away": "那不勒斯",
+          "actual": "0:2",
+          "euro": [
+            null,
+            null,
+            null
+          ],
+          "has_crs": false,
+          "crs_source": "empty",
+          "stored_wdl": null,
+          "confidence": null,
+          "model": null,
+          "published": null,
+          "replay": {
+            "primary": null,
+            "secondary": null,
+            "upset": null,
+            "hit_primary": null,
+            "hit_any3": null
+          },
+          "backtest_row": null
+        },
+        {
+          "match_id": 2873,
+          "matchday": 1,
+          "kickoff": "2026-08-23 02:45:00.000000",
+          "home": "帕尔马",
+          "away": "卡利亚里",
+          "actual": "0:1",
+          "euro": [
+            null,
+            null,
+            null
+          ],
+          "has_crs": false,
+          "crs_source": "empty",
+          "stored_wdl": null,
+          "confidence": null,
+          "model": null,
+          "published": null,
+          "replay": {
+            "primary": null,
+            "secondary": null,
+            "upset": null,
+            "hit_primary": null,
+            "hit_any3": null
+          },
+          "backtest_row": null
+        },
+        {
+          "match_id": 2874,
+          "matchday": 1,
+          "kickoff": "2026-08-24 00:30:00.000000",
+          "home": "弗罗西诺内",
+          "away": "尤文图斯",
+          "actual": "0:1",
+          "euro": [
+            null,
+            null,
+            null
+          ],
+          "has_crs": false,
+          "crs_source": "empty",
+          "stored_wdl": null,
+          "confidence": null,
+          "model": null,
+          "published": null,
+          "replay": {
+            "primary": null,
+            "secondary": null,
+            "upset": null,
+            "hit_primary": null,
+            "hit_any3": null
+          },
+          "backtest_row": null
+        },
+        {
+          "match_id": 2875,
+          "matchday": 1,
+          "kickoff": "2026-08-24 00:30:00.000000",
+          "home": "威尼斯",
+          "away": "莱切",
+          "actual": "0:2",
+          "euro": [
+            null,
+            null,
+            null
+          ],
+          "has_crs": false,
+          "crs_source": "empty",
+          "stored_wdl": null,
+          "confidence": null,
+          "model": null,
+          "published": null,
+          "replay": {
+            "primary": null,
+            "secondary": null,
+            "upset": null,
+            "hit_primary": null,
+            "hit_any3": null
+          },
+          "backtest_row": null
+        },
+        {
+          "match_id": 2876,
+          "matchday": 1,
+          "kickoff": "2026-08-24 02:45:00.000000",
+          "home": "亚特兰大",
+          "away": "萨索洛",
+          "actual": "2:1",
+          "euro": [
+            null,
+            null,
+            null
+          ],
+          "has_crs": false,
+          "crs_source": "empty",
+          "stored_wdl": null,
+          "confidence": null,
+          "model": null,
+          "published": null,
+          "replay": {
+            "primary": null,
+            "secondary": null,
+            "upset": null,
+            "hit_primary": null,
+            "hit_any3": null
+          },
+          "backtest_row": null
+        },
+        {
+          "match_id": 2877,
+          "matchday": 1,
+          "kickoff": "2026-08-24 02:45:00.000000",
+          "home": "都灵",
+          "away": "AC米兰",
+          "actual": "1:2",
+          "euro": [
+            null,
+            null,
+            null
+          ],
+          "has_crs": false,
+          "crs_source": "empty",
+          "stored_wdl": null,
+          "confidence": null,
+          "model": null,
+          "published": null,
+          "replay": {
+            "primary": null,
+            "secondary": null,
+            "upset": null,
+            "hit_primary": null,
+            "hit_any3": null
+          },
+          "backtest_row": null
+        },
+        {
+          "match_id": 2878,
+          "matchday": 1,
+          "kickoff": "2026-08-25 00:30:00.000000",
+          "home": "博洛尼亚",
+          "away": "拉齐奥",
+          "actual": "0:1",
+          "euro": [
+            2.08,
+            2.85,
+            3.36
+          ],
+          "has_crs": true,
+          "crs_source": "book",
+          "stored_wdl": null,
+          "confidence": null,
+          "model": null,
+          "published": null,
+          "replay": {
+            "primary": "1:1",
+            "secondary": "1:0",
+            "upset": "0:1",
+            "hit_primary": false,
+            "hit_any3": true
+          },
+          "backtest_row": {
+            "match_id": 2878,
+            "team_a": "博洛尼亚",
+            "team_b": "拉齐奥",
+            "actual_score": "0:1",
+            "primary_pick": "1:1",
+            "secondary_pick": "1:0",
+            "upset_pick": "0:1",
+            "primary_hit": false,
+            "triple_hit": true,
+            "pick_source": "replay",
+            "match_time": "2026-08-25T00:30:00+08:00",
+            "stage": "第1轮",
+            "group_name": null,
+            "matchday": 1,
+            "location": "意甲",
+            "has_crs": true,
+            "crs_source": "book"
+          }
+        },
+        {
+          "match_id": 2879,
+          "matchday": 1,
+          "kickoff": "2026-08-25 02:45:00.000000",
+          "home": "罗马",
+          "away": "佛罗伦萨",
+          "actual": "4:0",
+          "euro": [
+            1.54,
+            3.55,
+            5.05
+          ],
+          "has_crs": true,
+          "crs_source": "book",
+          "stored_wdl": null,
+          "confidence": null,
+          "model": null,
+          "published": null,
+          "replay": {
+            "primary": "2:0",
+            "secondary": "1:0",
+            "upset": "0:0",
+            "hit_primary": false,
+            "hit_any3": false
+          },
+          "backtest_row": {
+            "match_id": 2879,
+            "team_a": "罗马",
+            "team_b": "佛罗伦萨",
+            "actual_score": "4:0",
+            "primary_pick": "2:0",
+            "secondary_pick": "1:0",
+            "upset_pick": "0:0",
+            "primary_hit": false,
+            "triple_hit": false,
+            "pick_source": "replay",
+            "match_time": "2026-08-25T02:45:00+08:00",
+            "stage": "第1轮",
+            "group_name": null,
+            "matchday": 1,
+            "location": "意甲",
+            "has_crs": true,
+            "crs_source": "book"
+          }
+        }
+      ]
+    },
+    {
+      "slug": "bundesliga",
+      "name": "德甲",
+      "season": "2026/27",
+      "opening_date": "2026-08-28T18:30:00Z",
+      "finished": 0,
+      "with_euro": 0,
+      "with_crs": 0,
+      "with_published": 0,
+      "outcomes": {
+        "home": 0,
+        "draw": 0,
+        "away": 0
+      },
+      "summary": {
+        "published": {
+          "n": 0,
+          "primary_hits": 0,
+          "primary_pct": null,
+          "any3_hits": 0,
+          "any3_pct": null
+        },
+        "replay_all": {
+          "n": 0,
+          "primary_hits": 0,
+          "primary_pct": null,
+          "any3_hits": 0,
+          "any3_pct": null
+        },
+        "replay_book_crs": {
+          "n": 0,
+          "primary_hits": 0,
+          "primary_pct": null,
+          "any3_hits": 0,
+          "any3_pct": null
+        },
+        "replay_synthetic": {
+          "n": 0,
+          "primary_hits": 0,
+          "primary_pct": null,
+          "any3_hits": 0,
+          "any3_pct": null
+        },
+        "replay_bias": {
+          "home": 0,
+          "draw": 0,
+          "away": 0,
+          "other": 0
+        }
+      },
+      "issues": [],
+      "matches": []
+    },
+    {
+      "slug": "ligue-1",
+      "name": "法甲",
+      "season": "2026/27",
+      "opening_date": "2026-08-23T15:00:00Z",
+      "finished": 9,
+      "with_euro": 0,
+      "with_crs": 0,
+      "with_published": 0,
+      "outcomes": {
+        "home": 2,
+        "draw": 4,
+        "away": 3
+      },
+      "summary": {
+        "published": {
+          "n": 0,
+          "primary_hits": 0,
+          "primary_pct": null,
+          "any3_hits": 0,
+          "any3_pct": null
+        },
+        "replay_all": {
+          "n": 0,
+          "primary_hits": 0,
+          "primary_pct": null,
+          "any3_hits": 0,
+          "any3_pct": null
+        },
+        "replay_book_crs": {
+          "n": 0,
+          "primary_hits": 0,
+          "primary_pct": null,
+          "any3_hits": 0,
+          "any3_pct": null
+        },
+        "replay_synthetic": {
+          "n": 0,
+          "primary_hits": 0,
+          "primary_pct": null,
+          "any3_hits": 0,
+          "any3_pct": null
+        },
+        "replay_bias": {
+          "home": 0,
+          "draw": 0,
+          "away": 0,
+          "other": 0
+        }
+      },
+      "issues": [],
+      "matches": [
+        {
+          "match_id": 3556,
+          "matchday": 1,
+          "kickoff": "2026-08-22 02:45:00.000000",
+          "home": "马赛",
+          "away": "斯特拉斯堡",
+          "actual": "4:0",
+          "euro": [
+            null,
+            null,
+            null
+          ],
+          "has_crs": false,
+          "crs_source": "empty",
+          "stored_wdl": null,
+          "confidence": null,
+          "model": null,
+          "published": null,
+          "replay": {
+            "primary": null,
+            "secondary": null,
+            "upset": null,
+            "hit_primary": null,
+            "hit_any3": null
+          },
+          "backtest_row": null
+        },
+        {
+          "match_id": 3557,
+          "matchday": 1,
+          "kickoff": "2026-08-22 23:15:00.000000",
+          "home": "朗斯",
+          "away": "欧塞尔",
+          "actual": "5:2",
+          "euro": [
+            null,
+            null,
+            null
+          ],
+          "has_crs": false,
+          "crs_source": "empty",
+          "stored_wdl": null,
+          "confidence": null,
+          "model": null,
+          "published": null,
+          "replay": {
+            "primary": null,
+            "secondary": null,
+            "upset": null,
+            "hit_primary": null,
+            "hit_any3": null
+          },
+          "backtest_row": null
+        },
+        {
+          "match_id": 3558,
+          "matchday": 1,
+          "kickoff": "2026-08-23 02:45:00.000000",
+          "home": "勒芒",
+          "away": "布雷斯特",
+          "actual": "2:2",
+          "euro": [
+            null,
+            null,
+            null
+          ],
+          "has_crs": false,
+          "crs_source": "empty",
+          "stored_wdl": null,
+          "confidence": null,
+          "model": null,
+          "published": null,
+          "replay": {
+            "primary": null,
+            "secondary": null,
+            "upset": null,
+            "hit_primary": null,
+            "hit_any3": null
+          },
+          "backtest_row": null
+        },
+        {
+          "match_id": 3559,
+          "matchday": 1,
+          "kickoff": "2026-08-23 02:45:00.000000",
+          "home": "特鲁瓦",
+          "away": "巴黎FC",
+          "actual": "0:0",
+          "euro": [
+            null,
+            null,
+            null
+          ],
+          "has_crs": false,
+          "crs_source": "empty",
+          "stored_wdl": null,
+          "confidence": null,
+          "model": null,
+          "published": null,
+          "replay": {
+            "primary": null,
+            "secondary": null,
+            "upset": null,
+            "hit_primary": null,
+            "hit_any3": null
+          },
+          "backtest_row": null
+        },
+        {
+          "match_id": 3560,
+          "matchday": 1,
+          "kickoff": "2026-08-23 02:45:00.000000",
+          "home": "尼斯",
+          "away": "洛里昂",
+          "actual": "0:0",
+          "euro": [
+            null,
+            null,
+            null
+          ],
+          "has_crs": false,
+          "crs_source": "empty",
+          "stored_wdl": null,
+          "confidence": null,
+          "model": null,
+          "published": null,
+          "replay": {
+            "primary": null,
+            "secondary": null,
+            "upset": null,
+            "hit_primary": null,
+            "hit_any3": null
+          },
+          "backtest_row": null
+        },
+        {
+          "match_id": 3561,
+          "matchday": 1,
+          "kickoff": "2026-08-23 02:45:00.000000",
+          "home": "图卢兹",
+          "away": "里昂",
+          "actual": "0:2",
+          "euro": [
+            null,
+            null,
+            null
+          ],
+          "has_crs": false,
+          "crs_source": "empty",
+          "stored_wdl": null,
+          "confidence": null,
+          "model": null,
+          "published": null,
+          "replay": {
+            "primary": null,
+            "secondary": null,
+            "upset": null,
+            "hit_primary": null,
+            "hit_any3": null
+          },
+          "backtest_row": null
+        },
+        {
+          "match_id": 3562,
+          "matchday": 1,
+          "kickoff": "2026-08-23 21:00:00.000000",
+          "home": "昂热",
+          "away": "里尔",
+          "actual": "0:2",
+          "euro": [
+            null,
+            null,
+            null
+          ],
+          "has_crs": false,
+          "crs_source": "empty",
+          "stored_wdl": null,
+          "confidence": null,
+          "model": null,
+          "published": null,
+          "replay": {
+            "primary": null,
+            "secondary": null,
+            "upset": null,
+            "hit_primary": null,
+            "hit_any3": null
+          },
+          "backtest_row": null
+        },
+        {
+          "match_id": 3563,
+          "matchday": 1,
+          "kickoff": "2026-08-23 23:15:00.000000",
+          "home": "勒阿弗尔",
+          "away": "摩纳哥",
+          "actual": "0:1",
+          "euro": [
+            null,
+            null,
+            null
+          ],
+          "has_crs": false,
+          "crs_source": "empty",
+          "stored_wdl": null,
+          "confidence": null,
+          "model": null,
+          "published": null,
+          "replay": {
+            "primary": null,
+            "secondary": null,
+            "upset": null,
+            "hit_primary": null,
+            "hit_any3": null
+          },
+          "backtest_row": null
+        },
+        {
+          "match_id": 3564,
+          "matchday": 1,
+          "kickoff": "2026-08-24 02:45:00.000000",
+          "home": "巴黎圣日耳曼",
+          "away": "雷恩",
+          "actual": "2:2",
+          "euro": [
+            null,
+            null,
+            null
+          ],
+          "has_crs": false,
+          "crs_source": "empty",
+          "stored_wdl": null,
+          "confidence": null,
+          "model": null,
+          "published": null,
+          "replay": {
+            "primary": null,
+            "secondary": null,
+            "upset": null,
+            "hit_primary": null,
+            "hit_any3": null
+          },
+          "backtest_row": null
+        }
+      ]
+    }
+  ]
+}

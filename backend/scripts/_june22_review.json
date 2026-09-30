@@ -1,0 +1,438 @@
+[
+  {
+    "match": "西班牙 vs 沙特阿拉伯",
+    "actual": "4:0",
+    "stored": [
+      "4:0",
+      "5:0",
+      "1:1"
+    ],
+    "stored_hit": true,
+    "replay": [
+      "3:0",
+      "4:0",
+      "1:1"
+    ],
+    "replay_hit": true,
+    "wdl": [
+      72.7,
+      18.6,
+      8.7
+    ],
+    "spf": [
+      null,
+      null,
+      null
+    ],
+    "handicap": "-2",
+    "ou": "2.5",
+    "ctx_keys": {
+      "group_name": "H",
+      "must_win_a": true,
+      "must_win_b": true,
+      "both_need_draw": false,
+      "group_avg_gf": 0.5,
+      "standing_a": {
+        "team": "西班牙",
+        "played": 1,
+        "won": 0,
+        "draw": 1,
+        "lost": 0,
+        "goals_for": 0,
+        "goals_against": 0,
+        "points": 1,
+        "goal_diff": 0
+      },
+      "standing_b": {
+        "team": "沙特阿拉伯",
+        "played": 1,
+        "won": 0,
+        "draw": 1,
+        "lost": 0,
+        "goals_for": 1,
+        "goals_against": 1,
+        "points": 1,
+        "goal_diff": 0
+      },
+      "group_table": [
+        {
+          "team": "沙特阿拉伯",
+          "played": 1,
+          "won": 0,
+          "draw": 1,
+          "lost": 0,
+          "goals_for": 1,
+          "goals_against": 1,
+          "points": 1,
+          "goal_diff": 0
+        },
+        {
+          "team": "乌拉圭",
+          "played": 1,
+          "won": 0,
+          "draw": 1,
+          "lost": 0,
+          "goals_for": 1,
+          "goals_against": 1,
+          "points": 1,
+          "goal_diff": 0
+        },
+        {
+          "team": "西班牙",
+          "played": 1,
+          "won": 0,
+          "draw": 1,
+          "lost": 0,
+          "goals_for": 0,
+          "goals_against": 0,
+          "points": 1,
+          "goal_diff": 0
+        },
+        {
+          "team": "佛得角",
+          "played": 1,
+          "won": 0,
+          "draw": 1,
+          "lost": 0,
+          "goals_for": 0,
+          "goals_against": 0,
+          "points": 1,
+          "goal_diff": 0
+        }
+      ]
+    },
+    "crs_draw": {
+      "0:0": 34.0,
+      "1:1": 22.0,
+      "2:2": 45.0
+    },
+    "actual_odd": 7.0
+  },
+  {
+    "match": "比利时 vs 伊朗",
+    "actual": "0:0",
+    "stored": [
+      "2:0",
+      "5:0",
+      "1:1"
+    ],
+    "stored_hit": false,
+    "replay": [
+      "2:0",
+      "1:1",
+      "0:0"
+    ],
+    "replay_hit": true,
+    "wdl": [
+      69.4,
+      19.7,
+      10.9
+    ],
+    "spf": [
+      1.26,
+      4.76,
+      7.95
+    ],
+    "handicap": "-1",
+    "ou": "2.5",
+    "ctx_keys": {
+      "group_name": "G",
+      "must_win_a": true,
+      "must_win_b": true,
+      "both_need_draw": false,
+      "group_avg_gf": 1.5,
+      "standing_a": {
+        "team": "比利时",
+        "played": 1,
+        "won": 0,
+        "draw": 1,
+        "lost": 0,
+        "goals_for": 1,
+        "goals_against": 1,
+        "points": 1,
+        "goal_diff": 0
+      },
+      "standing_b": {
+        "team": "伊朗",
+        "played": 1,
+        "won": 0,
+        "draw": 1,
+        "lost": 0,
+        "goals_for": 2,
+        "goals_against": 2,
+        "points": 1,
+        "goal_diff": 0
+      },
+      "group_table": [
+        {
+          "team": "新西兰",
+          "played": 1,
+          "won": 0,
+          "draw": 1,
+          "lost": 0,
+          "goals_for": 2,
+          "goals_against": 2,
+          "points": 1,
+          "goal_diff": 0
+        },
+        {
+          "team": "伊朗",
+          "played": 1,
+          "won": 0,
+          "draw": 1,
+          "lost": 0,
+          "goals_for": 2,
+          "goals_against": 2,
+          "points": 1,
+          "goal_diff": 0
+        },
+        {
+          "team": "比利时",
+          "played": 1,
+          "won": 0,
+          "draw": 1,
+          "lost": 0,
+          "goals_for": 1,
+          "goals_against": 1,
+          "points": 1,
+          "goal_diff": 0
+        },
+        {
+          "team": "埃及",
+          "played": 1,
+          "won": 0,
+          "draw": 1,
+          "lost": 0,
+          "goals_for": 1,
+          "goals_against": 1,
+          "points": 1,
+          "goal_diff": 0
+        }
+      ]
+    },
+    "crs_draw": {
+      "0:0": 14.0,
+      "1:1": 8.25,
+      "2:2": 19.0
+    },
+    "actual_odd": 14.0
+  },
+  {
+    "match": "乌拉圭 vs 佛得角",
+    "actual": "2:2",
+    "stored": [
+      "2:0",
+      "4:0",
+      "1:1"
+    ],
+    "stored_hit": false,
+    "replay": [
+      "3:0",
+      "1:1",
+      "2:2"
+    ],
+    "replay_hit": true,
+    "wdl": [
+      70.8,
+      19.7,
+      9.5
+    ],
+    "spf": [
+      1.28,
+      4.2,
+      9.05
+    ],
+    "handicap": "-1",
+    "ou": "2.5",
+    "ctx_keys": {
+      "group_name": "H",
+      "must_win_a": true,
+      "must_win_b": true,
+      "both_need_draw": false,
+      "group_avg_gf": 0.5,
+      "standing_a": {
+        "team": "乌拉圭",
+        "played": 1,
+        "won": 0,
+        "draw": 1,
+        "lost": 0,
+        "goals_for": 1,
+        "goals_against": 1,
+        "points": 1,
+        "goal_diff": 0
+      },
+      "standing_b": {
+        "team": "佛得角",
+        "played": 1,
+        "won": 0,
+        "draw": 1,
+        "lost": 0,
+        "goals_for": 0,
+        "goals_against": 0,
+        "points": 1,
+        "goal_diff": 0
+      },
+      "group_table": [
+        {
+          "team": "沙特阿拉伯",
+          "played": 1,
+          "won": 0,
+          "draw": 1,
+          "lost": 0,
+          "goals_for": 1,
+          "goals_against": 1,
+          "points": 1,
+          "goal_diff": 0
+        },
+        {
+          "team": "乌拉圭",
+          "played": 1,
+          "won": 0,
+          "draw": 1,
+          "lost": 0,
+          "goals_for": 1,
+          "goals_against": 1,
+          "points": 1,
+          "goal_diff": 0
+        },
+        {
+          "team": "西班牙",
+          "played": 1,
+          "won": 0,
+          "draw": 1,
+          "lost": 0,
+          "goals_for": 0,
+          "goals_against": 0,
+          "points": 1,
+          "goal_diff": 0
+        },
+        {
+          "team": "佛得角",
+          "played": 1,
+          "won": 0,
+          "draw": 1,
+          "lost": 0,
+          "goals_for": 0,
+          "goals_against": 0,
+          "points": 1,
+          "goal_diff": 0
+        }
+      ]
+    },
+    "crs_draw": {
+      "0:0": 9.0,
+      "1:1": 7.3,
+      "2:2": 28.0
+    },
+    "actual_odd": 28.0
+  },
+  {
+    "match": "新西兰 vs 埃及",
+    "actual": "1:3",
+    "stored": [
+      "0:1",
+      "1:2",
+      "1:1"
+    ],
+    "stored_hit": false,
+    "replay": [
+      "0:1",
+      "1:3",
+      "1:1"
+    ],
+    "replay_hit": true,
+    "wdl": [
+      15.9,
+      24.4,
+      59.7
+    ],
+    "spf": [
+      6.0,
+      3.87,
+      1.42
+    ],
+    "handicap": "+1",
+    "ou": "2.5",
+    "ctx_keys": {
+      "group_name": "G",
+      "must_win_a": true,
+      "must_win_b": true,
+      "both_need_draw": false,
+      "group_avg_gf": 1.5,
+      "standing_a": {
+        "team": "新西兰",
+        "played": 1,
+        "won": 0,
+        "draw": 1,
+        "lost": 0,
+        "goals_for": 2,
+        "goals_against": 2,
+        "points": 1,
+        "goal_diff": 0
+      },
+      "standing_b": {
+        "team": "埃及",
+        "played": 1,
+        "won": 0,
+        "draw": 1,
+        "lost": 0,
+        "goals_for": 1,
+        "goals_against": 1,
+        "points": 1,
+        "goal_diff": 0
+      },
+      "group_table": [
+        {
+          "team": "新西兰",
+          "played": 1,
+          "won": 0,
+          "draw": 1,
+          "lost": 0,
+          "goals_for": 2,
+          "goals_against": 2,
+          "points": 1,
+          "goal_diff": 0
+        },
+        {
+          "team": "伊朗",
+          "played": 1,
+          "won": 0,
+          "draw": 1,
+          "lost": 0,
+          "goals_for": 2,
+          "goals_against": 2,
+          "points": 1,
+          "goal_diff": 0
+        },
+        {
+          "team": "比利时",
+          "played": 1,
+          "won": 0,
+          "draw": 1,
+          "lost": 0,
+          "goals_for": 1,
+          "goals_against": 1,
+          "points": 1,
+          "goal_diff": 0
+        },
+        {
+          "team": "埃及",
+          "played": 1,
+          "won": 0,
+          "draw": 1,
+          "lost": 0,
+          "goals_for": 1,
+          "goals_against": 1,
+          "points": 1,
+          "goal_diff": 0
+        }
+      ]
+    },
+    "crs_draw": {
+      "0:0": 11.0,
+      "1:1": 6.8,
+      "2:2": 17.5
+    },
+    "actual_odd": 11.0
+  }
+]

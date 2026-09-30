@@ -1,0 +1,934 @@
+[
+  {
+    "match": "巴西 vs 摩洛哥",
+    "time": "2026-06-14T06:00:00",
+    "matchday": 1,
+    "ranks": [
+      6,
+      8
+    ],
+    "handicap": "-1",
+    "has_1x2": true,
+    "stored": [
+      "1:1",
+      "2:1",
+      "0:1"
+    ],
+    "replay": [
+      "2:0",
+      "1:0",
+      "1:1"
+    ],
+    "wdl": [
+      30.8,
+      62.1,
+      7.1
+    ],
+    "rule_wdl": [
+      52.5,
+      20.4,
+      27.1
+    ],
+    "crs_top": [
+      [
+        "2:1",
+        4.4
+      ],
+      [
+        "1:0",
+        6.0
+      ],
+      [
+        "1:1",
+        6.0
+      ]
+    ],
+    "ctx": {
+      "must_win_a": false,
+      "must_win_b": false,
+      "qualified_a": false,
+      "qualified_b": false,
+      "both_need_draw": false,
+      "both_must_win": false,
+      "draw_suits_a": false,
+      "draw_suits_b": false
+    },
+    "issues": [
+      "存盘平→回放主胜(贴近CRS)"
+    ]
+  },
+  {
+    "match": "海地 vs 苏格兰",
+    "time": "2026-06-14T09:00:00",
+    "matchday": 1,
+    "ranks": [
+      72,
+      43
+    ],
+    "handicap": null,
+    "has_1x2": true,
+    "stored": [
+      "0:1",
+      "1:1",
+      "1:0"
+    ],
+    "replay": [
+      "0:1",
+      "0:1",
+      "1:1"
+    ],
+    "wdl": [
+      18.6,
+      25.4,
+      56.0
+    ],
+    "rule_wdl": [
+      22.9,
+      18.1,
+      59.0
+    ],
+    "crs_top": [
+      [
+        "1:1",
+        6.0
+      ],
+      [
+        "0:1",
+        6.5
+      ],
+      [
+        "0:2",
+        9.0
+      ]
+    ],
+    "ctx": {
+      "must_win_a": false,
+      "must_win_b": false,
+      "qualified_a": false,
+      "qualified_b": false,
+      "both_need_draw": false,
+      "both_must_win": false,
+      "draw_suits_a": false,
+      "draw_suits_b": false
+    },
+    "issues": [
+      "CRS首推平 vs WDL倾向客胜"
+    ]
+  },
+  {
+    "match": "澳大利亚 vs 土耳其",
+    "time": "2026-06-14T12:00:00",
+    "matchday": 1,
+    "ranks": [
+      27,
+      22
+    ],
+    "handicap": null,
+    "has_1x2": true,
+    "stored": [
+      "2:0",
+      "1:1",
+      "0:1"
+    ],
+    "replay": [
+      "1:1",
+      "2:0",
+      "0:1"
+    ],
+    "wdl": [
+      38.0,
+      31.0,
+      31.0
+    ],
+    "rule_wdl": [
+      38.2,
+      23.2,
+      38.6
+    ],
+    "crs_top": [
+      [
+        "1:1",
+        6.0
+      ],
+      [
+        "0:1",
+        7.5
+      ],
+      [
+        "1:0",
+        8.5
+      ]
+    ],
+    "ctx": {
+      "must_win_a": false,
+      "must_win_b": false,
+      "qualified_a": false,
+      "qualified_b": false,
+      "both_need_draw": false,
+      "both_must_win": false,
+      "draw_suits_a": false,
+      "draw_suits_b": false
+    },
+    "issues": [
+      "存盘主胜→回放平(贴近CRS)"
+    ]
+  },
+  {
+    "match": "瑞士 vs 波黑",
+    "time": "2026-06-19T06:00:00",
+    "matchday": 2,
+    "ranks": [
+      19,
+      54
+    ],
+    "handicap": "+1",
+    "has_1x2": true,
+    "stored": [
+      "2:0",
+      "1:1",
+      "0:0"
+    ],
+    "replay": [
+      "1:0",
+      "2:1",
+      "0:0"
+    ],
+    "wdl": [
+      54.1,
+      20.2,
+      25.7
+    ],
+    "rule_wdl": [
+      36.3,
+      18.3,
+      45.4
+    ],
+    "crs_top": [
+      [
+        "0:2",
+        5.55
+      ],
+      [
+        "0:1",
+        5.75
+      ],
+      [
+        "1:2",
+        6.5
+      ]
+    ],
+    "ctx": {
+      "must_win_a": true,
+      "must_win_b": true,
+      "qualified_a": false,
+      "qualified_b": false,
+      "both_need_draw": false,
+      "both_must_win": false,
+      "draw_suits_a": false,
+      "draw_suits_b": false
+    },
+    "issues": [
+      "CRS首推客胜 vs WDL倾向主胜"
+    ]
+  },
+  {
+    "match": "苏格兰 vs 摩洛哥",
+    "time": "2026-06-20T09:00:00",
+    "matchday": 2,
+    "ranks": [
+      43,
+      8
+    ],
+    "handicap": "-1",
+    "has_1x2": true,
+    "stored": [
+      "0:1",
+      "0:2",
+      "1:1"
+    ],
+    "replay": [
+      "0:1",
+      "1:2",
+      "0:0"
+    ],
+    "wdl": [
+      26.5,
+      17.7,
+      55.8
+    ],
+    "rule_wdl": [
+      35.0,
+      17.7,
+      47.3
+    ],
+    "crs_top": [
+      [
+        "1:0",
+        5.5
+      ],
+      [
+        "1:1",
+        5.75
+      ],
+      [
+        "2:0",
+        6.7
+      ]
+    ],
+    "ctx": {
+      "must_win_a": false,
+      "must_win_b": true,
+      "qualified_a": true,
+      "qualified_b": false,
+      "both_need_draw": false,
+      "both_must_win": false,
+      "draw_suits_a": false,
+      "draw_suits_b": false
+    },
+    "issues": [
+      "CRS首推主胜 vs WDL倾向客胜"
+    ]
+  },
+  {
+    "match": "厄瓜多尔 vs 库拉索",
+    "time": "2026-06-21T08:00:00",
+    "matchday": 2,
+    "ranks": [
+      23,
+      82
+    ],
+    "handicap": "+1",
+    "has_1x2": true,
+    "stored": [
+      "1:0",
+      "2:0",
+      "0:0"
+    ],
+    "replay": [
+      "1:0",
+      "0:0",
+      "0:0"
+    ],
+    "wdl": [
+      57.3,
+      17.1,
+      25.6
+    ],
+    "rule_wdl": [
+      41.2,
+      18.3,
+      40.5
+    ],
+    "crs_top": [
+      [
+        "0:1",
+        5.5
+      ],
+      [
+        "0:0",
+        6.0
+      ],
+      [
+        "1:1",
+        6.2
+      ]
+    ],
+    "ctx": {
+      "must_win_a": true,
+      "must_win_b": true,
+      "qualified_a": false,
+      "qualified_b": false,
+      "both_need_draw": false,
+      "both_must_win": false,
+      "draw_suits_a": false,
+      "draw_suits_b": false
+    },
+    "issues": [
+      "CRS首推客胜 vs WDL倾向主胜"
+    ]
+  },
+  {
+    "match": "突尼斯 vs 日本",
+    "time": "2026-06-21T12:00:00",
+    "matchday": 2,
+    "ranks": [
+      44,
+      18
+    ],
+    "handicap": "-1",
+    "has_1x2": true,
+    "stored": [
+      "0:3",
+      "0:4",
+      "1:1"
+    ],
+    "replay": [
+      "2:0",
+      "2:1",
+      "1:1"
+    ],
+    "wdl": [
+      21.0,
+      14.0,
+      65.0
+    ],
+    "rule_wdl": [
+      47.4,
+      18.4,
+      34.2
+    ],
+    "crs_top": [
+      [
+        "2:0",
+        4.95
+      ],
+      [
+        "2:1",
+        5.5
+      ],
+      [
+        "1:0",
+        6.4
+      ]
+    ],
+    "ctx": {
+      "must_win_a": true,
+      "must_win_b": true,
+      "qualified_a": false,
+      "qualified_b": false,
+      "both_need_draw": false,
+      "both_must_win": false,
+      "draw_suits_a": false,
+      "draw_suits_b": false
+    },
+    "issues": [
+      "CRS首推主胜 vs WDL倾向客胜",
+      "存盘客胜→回放主胜(贴近CRS)"
+    ]
+  },
+  {
+    "match": "瑞士 vs 加拿大",
+    "time": "2026-06-25T03:00:00",
+    "matchday": 3,
+    "ranks": [
+      19,
+      30
+    ],
+    "handicap": "-1",
+    "has_1x2": true,
+    "stored": [
+      "2:1",
+      "1:1",
+      "2:2"
+    ],
+    "replay": [
+      "2:1",
+      "1:1",
+      "2:2"
+    ],
+    "wdl": [
+      39.5,
+      33.2,
+      27.3
+    ],
+    "rule_wdl": [
+      47.2,
+      22.2,
+      30.6
+    ],
+    "crs_top": [
+      [
+        "1:1",
+        4.5
+      ],
+      [
+        "2:1",
+        7.0
+      ],
+      [
+        "0:0",
+        8.0
+      ]
+    ],
+    "ctx": {
+      "must_win_a": true,
+      "must_win_b": false,
+      "qualified_a": true,
+      "qualified_b": true,
+      "both_need_draw": false,
+      "both_must_win": false,
+      "draw_suits_a": false,
+      "draw_suits_b": true
+    },
+    "issues": [
+      "MD3已出线客队vs必赢主队却存盘主胜"
+    ]
+  },
+  {
+    "match": "捷克 vs 墨西哥",
+    "time": "2026-06-25T09:00:00",
+    "matchday": 3,
+    "ranks": [
+      41,
+      15
+    ],
+    "handicap": "+1",
+    "has_1x2": true,
+    "stored": [
+      "0:3",
+      "0:2",
+      "1:0"
+    ],
+    "replay": [
+      "0:3",
+      "0:2",
+      "1:0"
+    ],
+    "wdl": [
+      32.6,
+      23.4,
+      44.0
+    ],
+    "rule_wdl": [
+      29.7,
+      18.0,
+      52.3
+    ],
+    "crs_top": [
+      [
+        "1:1",
+        6.0
+      ],
+      [
+        "0:1",
+        6.5
+      ],
+      [
+        "1:2",
+        6.75
+      ]
+    ],
+    "ctx": {
+      "must_win_a": true,
+      "must_win_b": false,
+      "qualified_a": false,
+      "qualified_b": true,
+      "both_need_draw": false,
+      "both_must_win": false,
+      "draw_suits_a": false,
+      "draw_suits_b": false
+    },
+    "issues": [
+      "CRS首推平 vs WDL倾向客胜"
+    ]
+  },
+  {
+    "match": "南非 vs 韩国",
+    "time": "2026-06-25T09:00:00",
+    "matchday": 3,
+    "ranks": [
+      58,
+      25
+    ],
+    "handicap": "+1",
+    "has_1x2": true,
+    "stored": [
+      "0:1",
+      "0:0",
+      "1:0"
+    ],
+    "replay": [
+      "0:1",
+      "0:0",
+      "1:0"
+    ],
+    "wdl": [
+      27.2,
+      29.5,
+      43.3
+    ],
+    "rule_wdl": [
+      24.1,
+      16.1,
+      59.8
+    ],
+    "crs_top": [
+      [
+        "0:1",
+        6.0
+      ],
+      [
+        "1:2",
+        6.25
+      ],
+      [
+        "1:1",
+        6.5
+      ]
+    ],
+    "ctx": {
+      "must_win_a": true,
+      "must_win_b": false,
+      "qualified_a": false,
+      "qualified_b": false,
+      "both_need_draw": false,
+      "both_must_win": false,
+      "draw_suits_a": false,
+      "draw_suits_b": false
+    },
+    "issues": [
+      "align误改: contextual 主胜→客胜"
+    ]
+  },
+  {
+    "match": "库拉索 vs 科特迪瓦",
+    "time": "2026-06-26T04:00:00",
+    "matchday": 3,
+    "ranks": [
+      82,
+      34
+    ],
+    "handicap": "+2",
+    "has_1x2": false,
+    "stored": [
+      "0:2",
+      "1:3",
+      "2:2"
+    ],
+    "replay": [
+      "0:2",
+      "1:3",
+      "2:2"
+    ],
+    "wdl": [
+      39.3,
+      38.0,
+      22.7
+    ],
+    "rule_wdl": [
+      29.5,
+      10.0,
+      60.5
+    ],
+    "crs_top": [
+      [
+        "0:2",
+        6.0
+      ],
+      [
+        "0:3",
+        6.5
+      ],
+      [
+        "0:1",
+        7.0
+      ]
+    ],
+    "ctx": {
+      "must_win_a": true,
+      "must_win_b": false,
+      "qualified_a": false,
+      "qualified_b": false,
+      "both_need_draw": false,
+      "both_must_win": false,
+      "draw_suits_a": false,
+      "draw_suits_b": false
+    },
+    "issues": [
+      "无1X2但WDL主胜偏高(客队强很多)",
+      "CRS首推客胜 vs WDL倾向主胜",
+      "align误改: contextual 客胜→主胜"
+    ]
+  },
+  {
+    "match": "巴拉圭 vs 澳大利亚",
+    "time": "2026-06-26T10:00:00",
+    "matchday": 3,
+    "ranks": [
+      40,
+      27
+    ],
+    "handicap": "-1",
+    "has_1x2": true,
+    "stored": [
+      "0:0",
+      "1:1",
+      "0:1"
+    ],
+    "replay": [
+      "2:1",
+      "1:1",
+      "2:2"
+    ],
+    "wdl": [
+      34.6,
+      38.0,
+      27.4
+    ],
+    "rule_wdl": [
+      38.5,
+      28.5,
+      33.0
+    ],
+    "crs_top": [
+      [
+        "1:1",
+        3.6
+      ],
+      [
+        "0:0",
+        4.5
+      ],
+      [
+        "1:0",
+        6.7
+      ]
+    ],
+    "ctx": {
+      "must_win_a": true,
+      "must_win_b": false,
+      "qualified_a": false,
+      "qualified_b": false,
+      "both_need_draw": false,
+      "both_must_win": false,
+      "draw_suits_a": false,
+      "draw_suits_b": true
+    },
+    "issues": [
+      "存盘平→回放主胜(贴近CRS)"
+    ]
+  },
+  {
+    "match": "法国 vs 挪威",
+    "time": "2026-06-27T03:00:00",
+    "matchday": 3,
+    "ranks": [
+      1,
+      31
+    ],
+    "handicap": "-1",
+    "has_1x2": true,
+    "stored": [
+      "1:2",
+      "1:1",
+      "2:2"
+    ],
+    "replay": [
+      "1:2",
+      "1:1",
+      "2:1"
+    ],
+    "wdl": [
+      27.0,
+      18.0,
+      55.0
+    ],
+    "rule_wdl": [
+      60.8,
+      15.6,
+      23.6
+    ],
+    "crs_top": [
+      [
+        "2:1",
+        6.5
+      ],
+      [
+        "1:1",
+        6.9
+      ],
+      [
+        "2:0",
+        8.25
+      ]
+    ],
+    "ctx": {
+      "must_win_a": false,
+      "must_win_b": true,
+      "qualified_a": true,
+      "qualified_b": true,
+      "both_need_draw": false,
+      "both_must_win": false,
+      "draw_suits_a": true,
+      "draw_suits_b": false
+    },
+    "issues": [
+      "CRS首推主胜 vs WDL倾向客胜",
+      "MD3已出线主队vs必赢客队却存盘客胜"
+    ]
+  },
+  {
+    "match": "西班牙 vs 乌拉圭",
+    "time": "2026-06-27T08:00:00",
+    "matchday": 3,
+    "ranks": [
+      2,
+      17
+    ],
+    "handicap": "-1",
+    "has_1x2": true,
+    "stored": [
+      "3:0",
+      "1:0",
+      "1:1"
+    ],
+    "replay": [
+      "2:0",
+      "1:0",
+      "1:1"
+    ],
+    "wdl": [
+      47.6,
+      34.7,
+      17.6
+    ],
+    "rule_wdl": [
+      62.4,
+      16.4,
+      21.2
+    ],
+    "crs_top": [
+      [
+        "2:0",
+        6.2
+      ],
+      [
+        "1:0",
+        6.25
+      ],
+      [
+        "1:1",
+        7.0
+      ]
+    ],
+    "ctx": {
+      "must_win_a": false,
+      "must_win_b": false,
+      "qualified_a": true,
+      "qualified_b": false,
+      "both_need_draw": false,
+      "both_must_win": false,
+      "draw_suits_a": false,
+      "draw_suits_b": false
+    },
+    "issues": [
+      "align误改: contextual 平→主胜"
+    ]
+  },
+  {
+    "match": "巴拿马 vs 英格兰",
+    "time": "2026-06-28T05:00:00",
+    "matchday": 3,
+    "ranks": [
+      33,
+      4
+    ],
+    "handicap": "+2",
+    "has_1x2": false,
+    "stored": [
+      "0:3",
+      "0:2",
+      "1:1"
+    ],
+    "replay": [
+      "0:3",
+      "0:2",
+      "1:1"
+    ],
+    "wdl": [
+      40.8,
+      20.6,
+      38.6
+    ],
+    "rule_wdl": [
+      34.4,
+      12.6,
+      53.0
+    ],
+    "crs_top": [
+      [
+        "0:2",
+        5.25
+      ],
+      [
+        "0:3",
+        5.6
+      ],
+      [
+        "0:1",
+        7.5
+      ]
+    ],
+    "ctx": {
+      "must_win_a": true,
+      "must_win_b": false,
+      "qualified_a": false,
+      "qualified_b": true,
+      "both_need_draw": false,
+      "both_must_win": false,
+      "draw_suits_a": false,
+      "draw_suits_b": false
+    },
+    "issues": [
+      "CRS首推客胜 vs WDL倾向主胜"
+    ]
+  },
+  {
+    "match": "克罗地亚 vs 加纳",
+    "time": "2026-06-28T05:00:00",
+    "matchday": 3,
+    "ranks": [
+      11,
+      59
+    ],
+    "handicap": "-1",
+    "has_1x2": true,
+    "stored": [
+      "2:1",
+      "1:1",
+      "2:2"
+    ],
+    "replay": [
+      "2:1",
+      "1:1",
+      "2:2"
+    ],
+    "wdl": [
+      49.2,
+      33.4,
+      17.4
+    ],
+    "rule_wdl": [
+      74.0,
+      16.3,
+      9.7
+    ],
+    "crs_top": [
+      [
+        "1:0",
+        5.5
+      ],
+      [
+        "1:1",
+        5.5
+      ],
+      [
+        "2:0",
+        6.1
+      ]
+    ],
+    "ctx": {
+      "must_win_a": true,
+      "must_win_b": false,
+      "qualified_a": false,
+      "qualified_b": true,
+      "both_need_draw": false,
+      "both_must_win": false,
+      "draw_suits_a": false,
+      "draw_suits_b": false
+    },
+    "issues": [
+      "MD3已出线客队vs必赢主队却存盘主胜"
+    ]
+  }
+]

@@ -1,0 +1,211 @@
+{
+  "finished_by_league": [
+    {
+      "competition_slug": "bundesliga",
+      "season": "2025/26",
+      "n": 306,
+      "mn": "2025-08-22 18:30:00.000000",
+      "mx": "2026-05-16 13:30:00.000000"
+    },
+    {
+      "competition_slug": "la-liga",
+      "season": "2025/26",
+      "n": 380,
+      "mn": "2025-08-15 17:00:00.000000",
+      "mx": "2026-05-24 19:00:00.000000"
+    },
+    {
+      "competition_slug": "la-liga",
+      "season": "2026/27",
+      "n": 17,
+      "mn": "2026-08-16 01:30:00.000000",
+      "mx": "2026-08-26 03:00:00.000000"
+    },
+    {
+      "competition_slug": "ligue-1",
+      "season": "2025/26",
+      "n": 306,
+      "mn": "2025-08-15 18:45:00.000000",
+      "mx": "2026-05-17 19:00:00.000000"
+    },
+    {
+      "competition_slug": "ligue-1",
+      "season": "2026/27",
+      "n": 9,
+      "mn": "2026-08-22 02:45:00.000000",
+      "mx": "2026-08-24 02:45:00.000000"
+    },
+    {
+      "competition_slug": "premier-league",
+      "season": "2025/26",
+      "n": 380,
+      "mn": "2025-08-15 19:00:00.000000",
+      "mx": "2026-05-24 15:00:00.000000"
+    },
+    {
+      "competition_slug": "premier-league",
+      "season": "2026/27",
+      "n": 10,
+      "mn": "2026-08-22 03:00:00.000000",
+      "mx": "2026-08-25 03:00:00.000000"
+    },
+    {
+      "competition_slug": "serie-a",
+      "season": "2025/26",
+      "n": 380,
+      "mn": "2025-08-23 16:30:00.000000",
+      "mx": "2026-05-24 19:45:00.000000"
+    },
+    {
+      "competition_slug": "serie-a",
+      "season": "2026/27",
+      "n": 10,
+      "mn": "2026-08-23 00:30:00.000000",
+      "mx": "2026-08-25 02:45:00.000000"
+    }
+  ],
+  "last_night_window_aug25_12_to_aug26_12": [
+    {
+      "id": 2506,
+      "competition_slug": "la-liga",
+      "season": "2026/27",
+      "matchday": 1,
+      "stage": "第1轮",
+      "match_time": "2026-08-26 03:00:00.000000",
+      "team_a": "瓦伦西亚",
+      "team_b": "贝蒂斯",
+      "result_a": 0,
+      "result_b": 1,
+      "status": "finished",
+      "location": "西甲",
+      "best_score": null,
+      "win_rate": null,
+      "draw_rate": null,
+      "lose_rate": null,
+      "confidence": null,
+      "model_used": null,
+      "win_win": null,
+      "euro_draw": null,
+      "win_lose": null,
+      "handicap": null,
+      "score_odds": null,
+      "odds_source": null
+    }
+  ],
+  "mon_night_aug25_am": [
+    {
+      "id": 2878,
+      "competition_slug": "serie-a",
+      "matchday": 1,
+      "match_time": "2026-08-25 00:30:00.000000",
+      "team_a": "博洛尼亚",
+      "team_b": "拉齐奥",
+      "result_a": 0,
+      "result_b": 1,
+      "status": "finished",
+      "best_score": null,
+      "win_rate": null,
+      "draw_rate": null,
+      "lose_rate": null,
+      "win_win": 2.08,
+      "euro_draw": 2.85,
+      "win_lose": 3.36,
+      "handicap": "-1",
+      "has_crs": 1
+    },
+    {
+      "id": 2504,
+      "competition_slug": "la-liga",
+      "matchday": 2,
+      "match_time": "2026-08-25 01:30:00.000000",
+      "team_a": "奥萨苏纳",
+      "team_b": "莱万特",
+      "result_a": 0,
+      "result_b": 0,
+      "status": "finished",
+      "best_score": null,
+      "win_rate": null,
+      "draw_rate": null,
+      "lose_rate": null,
+      "win_win": 1.62,
+      "euro_draw": 3.36,
+      "win_lose": 4.66,
+      "handicap": "-1",
+      "has_crs": 1
+    },
+    {
+      "id": 2879,
+      "competition_slug": "serie-a",
+      "matchday": 1,
+      "match_time": "2026-08-25 02:45:00.000000",
+      "team_a": "罗马",
+      "team_b": "佛罗伦萨",
+      "result_a": 4,
+      "result_b": 0,
+      "status": "finished",
+      "best_score": null,
+      "win_rate": null,
+      "draw_rate": null,
+      "lose_rate": null,
+      "win_win": 1.54,
+      "euro_draw": 3.55,
+      "win_lose": 5.05,
+      "handicap": "-1",
+      "has_crs": 1
+    },
+    {
+      "id": 2119,
+      "competition_slug": "premier-league",
+      "matchday": 1,
+      "match_time": "2026-08-25 03:00:00.000000",
+      "team_a": "富勒姆",
+      "team_b": "切尔西",
+      "result_a": 2,
+      "result_b": 3,
+      "status": "finished",
+      "best_score": null,
+      "win_rate": null,
+      "draw_rate": null,
+      "lose_rate": null,
+      "win_win": 4.05,
+      "euro_draw": 3.75,
+      "win_lose": 1.63,
+      "handicap": "+1",
+      "has_crs": 1
+    },
+    {
+      "id": 2505,
+      "competition_slug": "la-liga",
+      "matchday": 2,
+      "match_time": "2026-08-25 03:30:00.000000",
+      "team_a": "马拉加",
+      "team_b": "拉科鲁尼亚",
+      "result_a": 1,
+      "result_b": 1,
+      "status": "finished",
+      "best_score": null,
+      "win_rate": null,
+      "draw_rate": null,
+      "lose_rate": null,
+      "win_win": 2.28,
+      "euro_draw": 2.78,
+      "win_lose": 3.02,
+      "handicap": "-1",
+      "has_crs": 1
+    }
+  ],
+  "upcoming_to_aug28": [
+    {
+      "id": 2507,
+      "competition_slug": "la-liga",
+      "matchday": 1,
+      "match_time": "2026-08-27 03:00:00.000000",
+      "team_a": "皇马",
+      "team_b": "皇家社会",
+      "result_a": null,
+      "result_b": null,
+      "status": "upcoming"
+    }
+  ],
+  "recent_no_result": []
+}
